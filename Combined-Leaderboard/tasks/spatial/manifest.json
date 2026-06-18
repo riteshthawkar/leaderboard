@@ -1,0 +1,195 @@
+{
+  "task_id": "spatial",
+  "version": "1.0",
+  "note": "We do not redistribute these datasets. The harness downloads each from its official source on your machine. Verify every hf_id/config (entries with verify=true) against VLMEvalKit.",
+  "conditions": [
+    "standard",
+    "cot",
+    "no_image",
+    "no_image_plus"
+  ],
+  "no_image_plus_option": "Cannot determine from the image",
+  "dataset_count": 13,
+  "approx_total_samples": 16830,
+  "datasets": [
+    {
+      "id": "blink",
+      "name": "BLINK",
+      "type": "2D",
+      "approx_n": 1900,
+      "tags": [
+        "depth",
+        "relation",
+        "count",
+        "localization"
+      ],
+      "hf_id": "BLINK-Benchmark/BLINK",
+      "license": "Apache-2.0",
+      "verify": false
+    },
+    {
+      "id": "cvbench2d",
+      "name": "CV-Bench (2D)",
+      "type": "2D",
+      "approx_n": 1400,
+      "tags": [
+        "relation",
+        "count",
+        "localization",
+        "size"
+      ],
+      "hf_id": "nyu-visionx/CV-Bench",
+      "license": "Apache-2.0",
+      "verify": false
+    },
+    {
+      "id": "mmvp",
+      "name": "MMVP",
+      "type": "2D",
+      "approx_n": 300,
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "hf_id": "MMVP/MMVP",
+      "license": "MIT",
+      "verify": true
+    },
+    {
+      "id": "realworldqa",
+      "name": "RealWorldQA",
+      "type": "2D",
+      "approx_n": 765,
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "hf_id": "xai-org/RealworldQA",
+      "license": "CC BY-ND 4.0",
+      "verify": false
+    },
+    {
+      "id": "spatialbench",
+      "name": "SpatialBench",
+      "type": "2D",
+      "approx_n": 174,
+      "tags": [
+        "relation",
+        "localization",
+        "size"
+      ],
+      "hf_id": "RussRobin/SpatialBench",
+      "license": "see source",
+      "verify": true
+    },
+    {
+      "id": "vsr",
+      "name": "VSR",
+      "type": "2D",
+      "approx_n": 1200,
+      "tags": [
+        "relation",
+        "orientation",
+        "egocentric"
+      ],
+      "hf_id": "cambridgeltl/vsr_zeroshot",
+      "license": "Apache-2.0",
+      "verify": true
+    },
+    {
+      "id": "vstar",
+      "name": "V*Bench",
+      "type": "2D",
+      "approx_n": 191,
+      "tags": [
+        "attribute",
+        "relation"
+      ],
+      "hf_id": "craigwu/vstar_bench",
+      "license": "MIT",
+      "verify": false
+    },
+    {
+      "id": "3dsrbench",
+      "name": "3DSRBench",
+      "type": "3D",
+      "approx_n": 5200,
+      "tags": [
+        "3d",
+        "localization",
+        "orientation"
+      ],
+      "hf_id": "ccvl/3DSRBench",
+      "license": "see source",
+      "verify": false
+    },
+    {
+      "id": "cvbench3d",
+      "name": "CV-Bench (3D)",
+      "type": "3D",
+      "approx_n": 1200,
+      "tags": [
+        "depth",
+        "3d",
+        "relation"
+      ],
+      "hf_id": "nyu-visionx/CV-Bench",
+      "license": "Apache-2.0",
+      "verify": false
+    },
+    {
+      "id": "mindcube",
+      "name": "MindCube",
+      "type": "3D",
+      "approx_n": 1000,
+      "tags": [
+        "multiview",
+        "relation",
+        "egocentric"
+      ],
+      "hf_id": "MLL-Lab/MindCube",
+      "license": "see source",
+      "verify": true
+    },
+    {
+      "id": "mmsibench",
+      "name": "MMSI-Bench",
+      "type": "3D",
+      "approx_n": 1000,
+      "tags": [
+        "multiimage",
+        "spatial"
+      ],
+      "hf_id": "RunsenXu/MMSI-Bench",
+      "license": "see source",
+      "verify": false
+    },
+    {
+      "id": "omnispatial",
+      "name": "OmniSpatial",
+      "type": "3D",
+      "approx_n": 1500,
+      "tags": [
+        "spatial",
+        "reasoning"
+      ],
+      "hf_id": "qizekun/OmniSpatial",
+      "license": "see source",
+      "verify": true
+    },
+    {
+      "id": "satreal",
+      "name": "SAT (Real)",
+      "type": "dynamic",
+      "approx_n": 1000,
+      "tags": [
+        "dynamic",
+        "egocentric",
+        "action"
+      ],
+      "hf_id": "array/SAT",
+      "license": "see source",
+      "verify": true
+    }
+  ]
+}

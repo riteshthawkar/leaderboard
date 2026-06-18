@@ -1,0 +1,383 @@
+{
+  "blink:000": {
+    "answer": "A",
+    "group": "blink",
+    "dataset": "BLINK",
+    "tags": [
+      "depth",
+      "relation",
+      "count",
+      "localization"
+    ]
+  },
+  "blink:001": {
+    "answer": "A",
+    "group": "blink",
+    "dataset": "BLINK",
+    "tags": [
+      "depth",
+      "relation",
+      "count",
+      "localization"
+    ]
+  },
+  "blink:002": {
+    "answer": "C",
+    "group": "blink",
+    "dataset": "BLINK",
+    "tags": [
+      "depth",
+      "relation",
+      "count",
+      "localization"
+    ]
+  },
+  "cvbench2d:000": {
+    "answer": "B",
+    "group": "cvbench2d",
+    "dataset": "CV-Bench (2D)",
+    "tags": [
+      "relation",
+      "count",
+      "localization",
+      "size"
+    ]
+  },
+  "cvbench2d:001": {
+    "answer": "B",
+    "group": "cvbench2d",
+    "dataset": "CV-Bench (2D)",
+    "tags": [
+      "relation",
+      "count",
+      "localization",
+      "size"
+    ]
+  },
+  "cvbench2d:002": {
+    "answer": "B",
+    "group": "cvbench2d",
+    "dataset": "CV-Bench (2D)",
+    "tags": [
+      "relation",
+      "count",
+      "localization",
+      "size"
+    ]
+  },
+  "mmvp:000": {
+    "answer": "A",
+    "group": "mmvp",
+    "dataset": "MMVP",
+    "tags": [
+      "relation",
+      "localization"
+    ]
+  },
+  "mmvp:001": {
+    "answer": "A",
+    "group": "mmvp",
+    "dataset": "MMVP",
+    "tags": [
+      "relation",
+      "localization"
+    ]
+  },
+  "mmvp:002": {
+    "answer": "D",
+    "group": "mmvp",
+    "dataset": "MMVP",
+    "tags": [
+      "relation",
+      "localization"
+    ]
+  },
+  "realworldqa:000": {
+    "answer": "A",
+    "group": "realworldqa",
+    "dataset": "RealWorldQA",
+    "tags": [
+      "relation",
+      "localization"
+    ]
+  },
+  "realworldqa:001": {
+    "answer": "A",
+    "group": "realworldqa",
+    "dataset": "RealWorldQA",
+    "tags": [
+      "relation",
+      "localization"
+    ]
+  },
+  "realworldqa:002": {
+    "answer": "A",
+    "group": "realworldqa",
+    "dataset": "RealWorldQA",
+    "tags": [
+      "relation",
+      "localization"
+    ]
+  },
+  "spatialbench:000": {
+    "answer": "B",
+    "group": "spatialbench",
+    "dataset": "SpatialBench",
+    "tags": [
+      "relation",
+      "localization",
+      "size"
+    ]
+  },
+  "spatialbench:001": {
+    "answer": "B",
+    "group": "spatialbench",
+    "dataset": "SpatialBench",
+    "tags": [
+      "relation",
+      "localization",
+      "size"
+    ]
+  },
+  "spatialbench:002": {
+    "answer": "A",
+    "group": "spatialbench",
+    "dataset": "SpatialBench",
+    "tags": [
+      "relation",
+      "localization",
+      "size"
+    ]
+  },
+  "vsr:000": {
+    "answer": "B",
+    "group": "vsr",
+    "dataset": "VSR",
+    "tags": [
+      "relation",
+      "orientation",
+      "egocentric"
+    ]
+  },
+  "vsr:001": {
+    "answer": "D",
+    "group": "vsr",
+    "dataset": "VSR",
+    "tags": [
+      "relation",
+      "orientation",
+      "egocentric"
+    ]
+  },
+  "vsr:002": {
+    "answer": "B",
+    "group": "vsr",
+    "dataset": "VSR",
+    "tags": [
+      "relation",
+      "orientation",
+      "egocentric"
+    ]
+  },
+  "vstar:000": {
+    "answer": "D",
+    "group": "vstar",
+    "dataset": "V*Bench",
+    "tags": [
+      "attribute",
+      "relation"
+    ]
+  },
+  "vstar:001": {
+    "answer": "C",
+    "group": "vstar",
+    "dataset": "V*Bench",
+    "tags": [
+      "attribute",
+      "relation"
+    ]
+  },
+  "vstar:002": {
+    "answer": "A",
+    "group": "vstar",
+    "dataset": "V*Bench",
+    "tags": [
+      "attribute",
+      "relation"
+    ]
+  },
+  "3dsrbench:000": {
+    "answer": "B",
+    "group": "3dsrbench",
+    "dataset": "3DSRBench",
+    "tags": [
+      "3d",
+      "localization",
+      "orientation"
+    ]
+  },
+  "3dsrbench:001": {
+    "answer": "D",
+    "group": "3dsrbench",
+    "dataset": "3DSRBench",
+    "tags": [
+      "3d",
+      "localization",
+      "orientation"
+    ]
+  },
+  "3dsrbench:002": {
+    "answer": "C",
+    "group": "3dsrbench",
+    "dataset": "3DSRBench",
+    "tags": [
+      "3d",
+      "localization",
+      "orientation"
+    ]
+  },
+  "cvbench3d:000": {
+    "answer": "C",
+    "group": "cvbench3d",
+    "dataset": "CV-Bench (3D)",
+    "tags": [
+      "depth",
+      "3d",
+      "relation"
+    ]
+  },
+  "cvbench3d:001": {
+    "answer": "B",
+    "group": "cvbench3d",
+    "dataset": "CV-Bench (3D)",
+    "tags": [
+      "depth",
+      "3d",
+      "relation"
+    ]
+  },
+  "cvbench3d:002": {
+    "answer": "B",
+    "group": "cvbench3d",
+    "dataset": "CV-Bench (3D)",
+    "tags": [
+      "depth",
+      "3d",
+      "relation"
+    ]
+  },
+  "mindcube:000": {
+    "answer": "C",
+    "group": "mindcube",
+    "dataset": "MindCube",
+    "tags": [
+      "multiview",
+      "relation",
+      "egocentric"
+    ]
+  },
+  "mindcube:001": {
+    "answer": "A",
+    "group": "mindcube",
+    "dataset": "MindCube",
+    "tags": [
+      "multiview",
+      "relation",
+      "egocentric"
+    ]
+  },
+  "mindcube:002": {
+    "answer": "A",
+    "group": "mindcube",
+    "dataset": "MindCube",
+    "tags": [
+      "multiview",
+      "relation",
+      "egocentric"
+    ]
+  },
+  "mmsibench:000": {
+    "answer": "D",
+    "group": "mmsibench",
+    "dataset": "MMSI-Bench",
+    "tags": [
+      "multiimage",
+      "spatial"
+    ]
+  },
+  "mmsibench:001": {
+    "answer": "A",
+    "group": "mmsibench",
+    "dataset": "MMSI-Bench",
+    "tags": [
+      "multiimage",
+      "spatial"
+    ]
+  },
+  "mmsibench:002": {
+    "answer": "C",
+    "group": "mmsibench",
+    "dataset": "MMSI-Bench",
+    "tags": [
+      "multiimage",
+      "spatial"
+    ]
+  },
+  "omnispatial:000": {
+    "answer": "C",
+    "group": "omnispatial",
+    "dataset": "OmniSpatial",
+    "tags": [
+      "spatial",
+      "reasoning"
+    ]
+  },
+  "omnispatial:001": {
+    "answer": "C",
+    "group": "omnispatial",
+    "dataset": "OmniSpatial",
+    "tags": [
+      "spatial",
+      "reasoning"
+    ]
+  },
+  "omnispatial:002": {
+    "answer": "A",
+    "group": "omnispatial",
+    "dataset": "OmniSpatial",
+    "tags": [
+      "spatial",
+      "reasoning"
+    ]
+  },
+  "satreal:000": {
+    "answer": "D",
+    "group": "satreal",
+    "dataset": "SAT (Real)",
+    "tags": [
+      "dynamic",
+      "egocentric",
+      "action"
+    ]
+  },
+  "satreal:001": {
+    "answer": "A",
+    "group": "satreal",
+    "dataset": "SAT (Real)",
+    "tags": [
+      "dynamic",
+      "egocentric",
+      "action"
+    ]
+  },
+  "satreal:002": {
+    "answer": "D",
+    "group": "satreal",
+    "dataset": "SAT (Real)",
+    "tags": [
+      "dynamic",
+      "egocentric",
+      "action"
+    ]
+  }
+}

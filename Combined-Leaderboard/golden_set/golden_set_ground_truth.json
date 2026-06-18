@@ -1,0 +1,3152 @@
+{
+  "do_you_see_me:visual_spatial:0000": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0001": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0002": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0003": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0004": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0005": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0006": {
+    "answer": "5",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0007": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0008": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0009": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0010": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0011": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0012": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0013": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0014": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0015": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0016": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0017": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0018": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0019": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0020": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0021": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0022": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0023": {
+    "answer": "0",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_spatial:0024": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_spatial",
+    "capability": "spatial_relation",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0000": {
+    "answer": "UNFME",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0001": {
+    "answer": "JUHHLDOZJ",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0002": {
+    "answer": "BOUNG",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0003": {
+    "answer": "DUUURLYHR",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0004": {
+    "answer": "IHTEL",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0005": {
+    "answer": "D",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0006": {
+    "answer": "D",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0007": {
+    "answer": "YEORSZHFM",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0008": {
+    "answer": "E",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0009": {
+    "answer": "H",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0010": {
+    "answer": "G",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0011": {
+    "answer": "L",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0012": {
+    "answer": "GFRIRBOTT",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0013": {
+    "answer": "UGEZWQPZI",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0014": {
+    "answer": "FSPIVBFDA",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0015": {
+    "answer": "D",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0016": {
+    "answer": "F",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0017": {
+    "answer": "CYWDV",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0018": {
+    "answer": "A",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0019": {
+    "answer": "XBBOT",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0020": {
+    "answer": "GMVBQNKSR",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0021": {
+    "answer": "T",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0022": {
+    "answer": "IWHHF",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0023": {
+    "answer": "Q",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:letter_disambiguation:0024": {
+    "answer": "SGMIGPWLR",
+    "benchmark": "do_you_see_me",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0000": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0001": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0002": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0003": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0004": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0005": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0006": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0007": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0008": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0009": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0010": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0011": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0012": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0013": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0014": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0015": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0016": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0017": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0018": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0019": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0020": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0021": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0022": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0023": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_form_constancy:0024": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0000": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0001": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0002": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0003": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0004": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0005": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0006": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0007": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0008": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0009": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0010": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0011": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0012": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0013": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0014": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0015": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0016": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0017": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0018": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0019": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0020": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0021": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0022": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0023": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_figure_ground:0024": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0000": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0001": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0002": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0003": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0004": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0005": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0006": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0007": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0008": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0009": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0010": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0011": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0012": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0013": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0014": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0015": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0016": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0017": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0018": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0019": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0020": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0021": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0022": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0023": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:visual_closure:0024": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "visual_closure",
+    "capability": "visual_closure",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0000": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0001": {
+    "answer": "11",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0002": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0003": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0004": {
+    "answer": "7",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0005": {
+    "answer": "7",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0006": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0007": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0008": {
+    "answer": "8",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0009": {
+    "answer": "5",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0010": {
+    "answer": "5",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0011": {
+    "answer": "9",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0012": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0013": {
+    "answer": "7",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0014": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0015": {
+    "answer": "3",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0016": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0017": {
+    "answer": "8",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0018": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0019": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0020": {
+    "answer": "8",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0021": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0022": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0023": {
+    "answer": "5",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:geometric_dataset:0024": {
+    "answer": "7",
+    "benchmark": "do_you_see_me",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0000": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0001": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0002": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0003": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0004": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0005": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0006": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0007": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0008": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0009": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0010": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0011": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0012": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0013": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0014": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0015": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0016": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0017": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0018": {
+    "answer": "4",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0019": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0020": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0021": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0022": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0023": {
+    "answer": "1",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0024": {
+    "answer": "2",
+    "benchmark": "do_you_see_me",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding",
+    "layer": "perception",
+    "dimension": "2D",
+    "format": "vqa"
+  },
+  "minds_eye:mental_rotation:0000": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0001": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0002": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0003": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0004": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0005": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0006": {
+    "answer": "B",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0007": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0008": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0009": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0010": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0011": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0012": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0013": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0014": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0015": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0016": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0017": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0018": {
+    "answer": "B",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0019": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0020": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0021": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0022": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0023": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_rotation:0024": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "mental_rotation",
+    "capability": "mental_rotation",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0000": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0001": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0002": {
+    "answer": "B",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0003": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0004": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0005": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0006": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0007": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0008": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0009": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0010": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0011": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0012": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0013": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0014": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0015": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0016": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0017": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0018": {
+    "answer": "A",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0019": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0020": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0021": {
+    "answer": "D",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0022": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0023": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:paper_folding:0024": {
+    "answer": "C",
+    "benchmark": "minds_eye",
+    "task": "paper_folding",
+    "capability": "spatial_visualization",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0000": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0001": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0002": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0003": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0004": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0005": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0006": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0007": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0008": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0009": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0010": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0011": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0012": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0013": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0014": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0015": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0016": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0017": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0018": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0019": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0020": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0021": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0022": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0023": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:mental_composition:0024": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "mental_composition",
+    "capability": "mental_composition",
+    "layer": "imagery",
+    "dimension": "3D",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0000": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0001": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0002": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0003": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0004": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0005": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0006": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0007": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0008": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0009": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0010": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0011": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0012": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0013": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0014": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0015": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0016": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0017": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0018": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0019": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0020": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0021": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0022": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0023": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:dynamic_isomorph:0024": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "dynamic_isomorph",
+    "capability": "dynamic_reasoning",
+    "layer": "imagery",
+    "dimension": "dynamic",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0000": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0001": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0002": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0003": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0004": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0005": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0006": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0007": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0008": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0009": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0010": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0011": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0012": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0013": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0014": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0015": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0016": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0017": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0018": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0019": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0020": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0021": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0022": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0023": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:symmetric_isomorph:0024": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "symmetric_isomorph",
+    "capability": "symmetry_analysis",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0000": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0001": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0002": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0003": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0004": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0005": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0006": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0007": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0008": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0009": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0010": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0011": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0012": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0013": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0014": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0015": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0016": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0017": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0018": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0019": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0020": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0021": {
+    "answer": "a",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0022": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0023": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:hierarchial_isomorph:0024": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "hierarchial_isomorph",
+    "capability": "hierarchical_reasoning",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0000": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0001": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0002": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0003": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0004": {
+    "answer": "e",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0005": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0006": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0007": {
+    "answer": "e",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0008": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0009": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0010": {
+    "answer": "e",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0011": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0012": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0013": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0014": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0015": {
+    "answer": "e",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0016": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0017": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0018": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0019": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0020": {
+    "answer": "b",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0021": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0022": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0023": {
+    "answer": "d",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  },
+  "minds_eye:slippage:0024": {
+    "answer": "c",
+    "benchmark": "minds_eye",
+    "task": "slippage",
+    "capability": "conceptual_slippage",
+    "layer": "imagery",
+    "dimension": "2D",
+    "format": "mcq"
+  }
+}

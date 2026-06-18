@@ -1,0 +1,49 @@
+# --- Third-party benchmark repos (separate git repos, large, license-restricted) ---
+/Do-You-See-Me/
+/Mind-s-Eye/
+
+# --- Local virtual environments ---
+/env/
+.venv/
+venv/
+ENV/
+
+# --- Runtime data & uploads (not source) ---
+/results/
+/uploads/
+Combined-Leaderboard/results/
+Combined-Leaderboard/uploads/
+
+# --- Secrets ---
+.env
+*.env
+!.env.example
+
+# --- Logs ---
+logs/
+*.log
+
+# --- Python caches & build artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Harness scratch / generated test artifacts ---
+**/_gray_cache/
+**/_dryrun_*.json
+spatial_responses.json
+dysm_responses.json
+minds_eye_responses.json
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+*.swp

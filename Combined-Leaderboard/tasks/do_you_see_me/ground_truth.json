@@ -1,0 +1,1052 @@
+{
+  "do_you_see_me:visual_spatial:0000": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0001": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0002": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0003": {
+    "answer": "4",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0004": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0005": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0006": {
+    "answer": "5",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0007": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0008": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0009": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0010": {
+    "answer": "4",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0011": {
+    "answer": "2",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0012": {
+    "answer": "2",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0013": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0014": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0015": {
+    "answer": "2",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0016": {
+    "answer": "1",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0017": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0018": {
+    "answer": "1",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0019": {
+    "answer": "1",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0020": {
+    "answer": "1",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0021": {
+    "answer": "1",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0022": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0023": {
+    "answer": "0",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:visual_spatial:0024": {
+    "answer": "1",
+    "group": "spatial_relation",
+    "task": "visual_spatial",
+    "capability": "spatial_relation"
+  },
+  "do_you_see_me:letter_disambiguation:0000": {
+    "answer": "UNFME",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0001": {
+    "answer": "JUHHLDOZJ",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0002": {
+    "answer": "BOUNG",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0003": {
+    "answer": "DUUURLYHR",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0004": {
+    "answer": "IHTEL",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0005": {
+    "answer": "D",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0006": {
+    "answer": "D",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0007": {
+    "answer": "YEORSZHFM",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0008": {
+    "answer": "E",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0009": {
+    "answer": "H",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0010": {
+    "answer": "G",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0011": {
+    "answer": "L",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0012": {
+    "answer": "GFRIRBOTT",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0013": {
+    "answer": "UGEZWQPZI",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0014": {
+    "answer": "FSPIVBFDA",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0015": {
+    "answer": "D",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0016": {
+    "answer": "F",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0017": {
+    "answer": "CYWDV",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0018": {
+    "answer": "A",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0019": {
+    "answer": "XBBOT",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0020": {
+    "answer": "GMVBQNKSR",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0021": {
+    "answer": "T",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0022": {
+    "answer": "IWHHF",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0023": {
+    "answer": "Q",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:letter_disambiguation:0024": {
+    "answer": "SGMIGPWLR",
+    "group": "form_discrimination",
+    "task": "letter_disambiguation",
+    "capability": "form_discrimination"
+  },
+  "do_you_see_me:visual_form_constancy:0000": {
+    "answer": "4",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0001": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0002": {
+    "answer": "1",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0003": {
+    "answer": "3",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0004": {
+    "answer": "1",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0005": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0006": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0007": {
+    "answer": "4",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0008": {
+    "answer": "4",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0009": {
+    "answer": "3",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0010": {
+    "answer": "3",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0011": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0012": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0013": {
+    "answer": "3",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0014": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0015": {
+    "answer": "3",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0016": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0017": {
+    "answer": "3",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0018": {
+    "answer": "1",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0019": {
+    "answer": "1",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0020": {
+    "answer": "4",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0021": {
+    "answer": "1",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0022": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0023": {
+    "answer": "2",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_form_constancy:0024": {
+    "answer": "4",
+    "group": "form_constancy",
+    "task": "visual_form_constancy",
+    "capability": "form_constancy"
+  },
+  "do_you_see_me:visual_figure_ground:0000": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0001": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0002": {
+    "answer": "4",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0003": {
+    "answer": "4",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0004": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0005": {
+    "answer": "1",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0006": {
+    "answer": "4",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0007": {
+    "answer": "2",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0008": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0009": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0010": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0011": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0012": {
+    "answer": "4",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0013": {
+    "answer": "1",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0014": {
+    "answer": "4",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0015": {
+    "answer": "1",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0016": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0017": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0018": {
+    "answer": "2",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0019": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0020": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0021": {
+    "answer": "4",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0022": {
+    "answer": "2",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0023": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_figure_ground:0024": {
+    "answer": "3",
+    "group": "figure_ground",
+    "task": "visual_figure_ground",
+    "capability": "figure_ground"
+  },
+  "do_you_see_me:visual_closure:0000": {
+    "answer": "3",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0001": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0002": {
+    "answer": "3",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0003": {
+    "answer": "3",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0004": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0005": {
+    "answer": "3",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0006": {
+    "answer": "1",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0007": {
+    "answer": "3",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0008": {
+    "answer": "1",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0009": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0010": {
+    "answer": "2",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0011": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0012": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0013": {
+    "answer": "2",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0014": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0015": {
+    "answer": "1",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0016": {
+    "answer": "3",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0017": {
+    "answer": "1",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0018": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0019": {
+    "answer": "4",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0020": {
+    "answer": "2",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0021": {
+    "answer": "1",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0022": {
+    "answer": "1",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0023": {
+    "answer": "1",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:visual_closure:0024": {
+    "answer": "2",
+    "group": "visual_closure",
+    "task": "visual_closure",
+    "capability": "visual_closure"
+  },
+  "do_you_see_me:geometric_dataset:0000": {
+    "answer": "4",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0001": {
+    "answer": "11",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0002": {
+    "answer": "4",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0003": {
+    "answer": "3",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0004": {
+    "answer": "7",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0005": {
+    "answer": "7",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0006": {
+    "answer": "1",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0007": {
+    "answer": "4",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0008": {
+    "answer": "8",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0009": {
+    "answer": "5",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0010": {
+    "answer": "5",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0011": {
+    "answer": "9",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0012": {
+    "answer": "1",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0013": {
+    "answer": "7",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0014": {
+    "answer": "1",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0015": {
+    "answer": "3",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0016": {
+    "answer": "1",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0017": {
+    "answer": "8",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0018": {
+    "answer": "4",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0019": {
+    "answer": "1",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0020": {
+    "answer": "8",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0021": {
+    "answer": "2",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0022": {
+    "answer": "1",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0023": {
+    "answer": "5",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:geometric_dataset:0024": {
+    "answer": "7",
+    "group": "shape_discrimination",
+    "task": "geometric_dataset",
+    "capability": "shape_discrimination"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0000": {
+    "answer": "2",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0001": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0002": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0003": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0004": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0005": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0006": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0007": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0008": {
+    "answer": "2",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0009": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0010": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0011": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0012": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0013": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0014": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0015": {
+    "answer": "2",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0016": {
+    "answer": "2",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0017": {
+    "answer": "2",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0018": {
+    "answer": "4",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0019": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0020": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0021": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0022": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0023": {
+    "answer": "1",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  },
+  "do_you_see_me:color_and_shape_disambiguation:0024": {
+    "answer": "2",
+    "group": "feature_binding",
+    "task": "color_and_shape_disambiguation",
+    "capability": "feature_binding"
+  }
+}

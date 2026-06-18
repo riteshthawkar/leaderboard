@@ -1,0 +1,748 @@
+{
+  "task_id": "spatial",
+  "label": "Spatial Reasoning Analysis",
+  "section": "spatial",
+  "layer": "reasoning",
+  "version": "1.0",
+  "total_samples": 39,
+  "conditions": [
+    "standard",
+    "cot",
+    "no_image",
+    "no_image_plus"
+  ],
+  "samples": [
+    {
+      "sample_id": "blink:000",
+      "group": "blink",
+      "dataset": "BLINK",
+      "type": "2D",
+      "tags": [
+        "depth",
+        "relation",
+        "count",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "blink:001",
+      "group": "blink",
+      "dataset": "BLINK",
+      "type": "2D",
+      "tags": [
+        "depth",
+        "relation",
+        "count",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "blink:002",
+      "group": "blink",
+      "dataset": "BLINK",
+      "type": "2D",
+      "tags": [
+        "depth",
+        "relation",
+        "count",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "cvbench2d:000",
+      "group": "cvbench2d",
+      "dataset": "CV-Bench (2D)",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "count",
+        "localization",
+        "size"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "cvbench2d:001",
+      "group": "cvbench2d",
+      "dataset": "CV-Bench (2D)",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "count",
+        "localization",
+        "size"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "cvbench2d:002",
+      "group": "cvbench2d",
+      "dataset": "CV-Bench (2D)",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "count",
+        "localization",
+        "size"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mmvp:000",
+      "group": "mmvp",
+      "dataset": "MMVP",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mmvp:001",
+      "group": "mmvp",
+      "dataset": "MMVP",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mmvp:002",
+      "group": "mmvp",
+      "dataset": "MMVP",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "realworldqa:000",
+      "group": "realworldqa",
+      "dataset": "RealWorldQA",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "realworldqa:001",
+      "group": "realworldqa",
+      "dataset": "RealWorldQA",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "realworldqa:002",
+      "group": "realworldqa",
+      "dataset": "RealWorldQA",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "spatialbench:000",
+      "group": "spatialbench",
+      "dataset": "SpatialBench",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization",
+        "size"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "spatialbench:001",
+      "group": "spatialbench",
+      "dataset": "SpatialBench",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization",
+        "size"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "spatialbench:002",
+      "group": "spatialbench",
+      "dataset": "SpatialBench",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "localization",
+        "size"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "vsr:000",
+      "group": "vsr",
+      "dataset": "VSR",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "orientation",
+        "egocentric"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "vsr:001",
+      "group": "vsr",
+      "dataset": "VSR",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "orientation",
+        "egocentric"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "vsr:002",
+      "group": "vsr",
+      "dataset": "VSR",
+      "type": "2D",
+      "tags": [
+        "relation",
+        "orientation",
+        "egocentric"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "vstar:000",
+      "group": "vstar",
+      "dataset": "V*Bench",
+      "type": "2D",
+      "tags": [
+        "attribute",
+        "relation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "vstar:001",
+      "group": "vstar",
+      "dataset": "V*Bench",
+      "type": "2D",
+      "tags": [
+        "attribute",
+        "relation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "vstar:002",
+      "group": "vstar",
+      "dataset": "V*Bench",
+      "type": "2D",
+      "tags": [
+        "attribute",
+        "relation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "3dsrbench:000",
+      "group": "3dsrbench",
+      "dataset": "3DSRBench",
+      "type": "3D",
+      "tags": [
+        "3d",
+        "localization",
+        "orientation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "3dsrbench:001",
+      "group": "3dsrbench",
+      "dataset": "3DSRBench",
+      "type": "3D",
+      "tags": [
+        "3d",
+        "localization",
+        "orientation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "3dsrbench:002",
+      "group": "3dsrbench",
+      "dataset": "3DSRBench",
+      "type": "3D",
+      "tags": [
+        "3d",
+        "localization",
+        "orientation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "cvbench3d:000",
+      "group": "cvbench3d",
+      "dataset": "CV-Bench (3D)",
+      "type": "3D",
+      "tags": [
+        "depth",
+        "3d",
+        "relation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "cvbench3d:001",
+      "group": "cvbench3d",
+      "dataset": "CV-Bench (3D)",
+      "type": "3D",
+      "tags": [
+        "depth",
+        "3d",
+        "relation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "cvbench3d:002",
+      "group": "cvbench3d",
+      "dataset": "CV-Bench (3D)",
+      "type": "3D",
+      "tags": [
+        "depth",
+        "3d",
+        "relation"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mindcube:000",
+      "group": "mindcube",
+      "dataset": "MindCube",
+      "type": "3D",
+      "tags": [
+        "multiview",
+        "relation",
+        "egocentric"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mindcube:001",
+      "group": "mindcube",
+      "dataset": "MindCube",
+      "type": "3D",
+      "tags": [
+        "multiview",
+        "relation",
+        "egocentric"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mindcube:002",
+      "group": "mindcube",
+      "dataset": "MindCube",
+      "type": "3D",
+      "tags": [
+        "multiview",
+        "relation",
+        "egocentric"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mmsibench:000",
+      "group": "mmsibench",
+      "dataset": "MMSI-Bench",
+      "type": "3D",
+      "tags": [
+        "multiimage",
+        "spatial"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mmsibench:001",
+      "group": "mmsibench",
+      "dataset": "MMSI-Bench",
+      "type": "3D",
+      "tags": [
+        "multiimage",
+        "spatial"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "mmsibench:002",
+      "group": "mmsibench",
+      "dataset": "MMSI-Bench",
+      "type": "3D",
+      "tags": [
+        "multiimage",
+        "spatial"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "omnispatial:000",
+      "group": "omnispatial",
+      "dataset": "OmniSpatial",
+      "type": "3D",
+      "tags": [
+        "spatial",
+        "reasoning"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "omnispatial:001",
+      "group": "omnispatial",
+      "dataset": "OmniSpatial",
+      "type": "3D",
+      "tags": [
+        "spatial",
+        "reasoning"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "omnispatial:002",
+      "group": "omnispatial",
+      "dataset": "OmniSpatial",
+      "type": "3D",
+      "tags": [
+        "spatial",
+        "reasoning"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "satreal:000",
+      "group": "satreal",
+      "dataset": "SAT (Real)",
+      "type": "dynamic",
+      "tags": [
+        "dynamic",
+        "egocentric",
+        "action"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "satreal:001",
+      "group": "satreal",
+      "dataset": "SAT (Real)",
+      "type": "dynamic",
+      "tags": [
+        "dynamic",
+        "egocentric",
+        "action"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    },
+    {
+      "sample_id": "satreal:002",
+      "group": "satreal",
+      "dataset": "SAT (Real)",
+      "type": "dynamic",
+      "tags": [
+        "dynamic",
+        "egocentric",
+        "action"
+      ],
+      "question": "[SAMPLE] Multiple-choice spatial question; see harness output for real items.",
+      "options": {
+        "A": "option A",
+        "B": "option B",
+        "C": "option C",
+        "D": "option D"
+      },
+      "sample": true
+    }
+  ]
+}
