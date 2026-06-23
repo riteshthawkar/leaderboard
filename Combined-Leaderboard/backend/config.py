@@ -5,8 +5,14 @@ Configuration and paths for the leaderboard system.
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Base directories
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+# Load environment variables from the Combined-Leaderboard/.env file (if present)
+# before any os.getenv() lookups below. This is where the judge API key lives.
+load_dotenv(PROJECT_ROOT / ".env")
 BACKEND_DIR = PROJECT_ROOT / "backend"
 UPLOADS_DIR = PROJECT_ROOT / "uploads"
 RESULTS_DIR = PROJECT_ROOT / "results"
@@ -80,7 +86,6 @@ GOLDEN_SET_QUESTIONS_FILE = GOLDEN_SET_DIR / "golden_set_questions.json"
 GOLDEN_SET_GROUND_TRUTH_FILE = GOLDEN_SET_DIR / "golden_set_ground_truth.json"
 GOLDEN_SET_TEMPLATE_CSV = GOLDEN_SET_DIR / "submission_template.csv"
 GOLDEN_SET_TEMPLATE_JSON = GOLDEN_SET_DIR / "submission_template.json"
-GOLDEN_LEADERBOARD_FILE = RESULTS_DIR / "golden_leaderboard.json"
 
 # How many samples to draw per task when building the golden set.
 GOLDEN_SET_SIZE_PER_TASK = int(os.getenv("GOLDEN_SET_SIZE_PER_TASK", "25"))
@@ -216,6 +221,56 @@ SECTIONS = {
         "label": "Spatial Reasoning Analysis",
         "tasks": ["spatial"],
         "primary_metric": "accuracy",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Grading configuration (single shared LLM judge: GPT-4o)
+# ---------------------------------------------------------------------------
+# All three tasks are graded by the SAME judge model - GPT-4o - served through
+# the OpenAI chat-completions API, so scores are uniform and directly
+# comparable across tasks. Only the grading *method* differs by task, because
+# the task formats differ:
+#   * do_you_see_me - GPT-4o answer *extractor*, then exact match (MCQ label or
+#     numeric value).                       (Do You See Me, arXiv:2506.02022)
+#   * minds_eye     - GPT-4o answer *extractor*, then exact MCQ-label match.
+#                                            (Mind's Eye, arXiv:2604.16054)
+#   * spatial       - GPT-4o LLM-*as-judge* decides correct/incorrect.
+#                                            (CoT Degrades..., arXiv:2604.16060)
+#
+# The only setting read from the environment (.env) is the API key:
+#   OPENAI_API_KEY  = <your OpenAI key>
+#   GRADING_TIMEOUT = per-call timeout in seconds (default: 60)
+# When no key is configured (or a call fails) the grader falls back to
+# deterministic normalised string / single-letter / numeric matching, so the
+# leaderboard still works fully offline. The method actually used is recorded
+# per task.
+JUDGE_MODEL = os.getenv("JUDGE_MODEL", "gpt-4o")
+
+GRADING = {
+    "do_you_see_me": {
+        "method": "extract",
+        "paper": "Do You See Me (arXiv:2506.02022)",
+        "judge_model": JUDGE_MODEL,
+        "answer_types": ["mcq", "numeric"],
+        "random_baseline": None,  # free-response perception tasks
+    },
+    "minds_eye": {
+        "method": "extract",
+        "paper": "Mind's Eye (arXiv:2604.16054)",
+        "judge_model": JUDGE_MODEL,
+        "answer_types": ["mcq"],
+        # Paper reports a Random-Choice baseline (4- or 6-option MCQ). Computed
+        # per submission from the option counts; this is the default fallback.
+        "random_baseline": 0.25,
+    },
+    "spatial": {
+        "method": "judge",
+        "paper": "CoT Degrades Visual Spatial Reasoning (arXiv:2604.16060)",
+        "judge_model": JUDGE_MODEL,
+        "answer_types": ["mcq"],
+        "decoding": {"strategy": "greedy", "temperature": 0.0, "metric": "pass@1"},
+        "random_baseline": None,
     },
 }
 

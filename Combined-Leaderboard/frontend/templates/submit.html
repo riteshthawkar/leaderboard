@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block page_id %}submit{% endblock %}
+{% block title %}Submit · MSR Vision Leaderboard{% endblock %}
+{% block description %}Submit your multimodal LLM's predictions to the Do-You-See-Me, Mind's-Eye, and Spatial Reasoning benchmarks for paper-faithful scoring.{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div class="container">
+        <span class="eyebrow">Submit</span>
+        <h1>Evaluate your model</h1>
+        <p class="hero-sub">Submit predictions per benchmark for offline, paper-faithful scoring. Download a task's questions, run your model, then upload a JSON or CSV response file. Results post to the leaderboard immediately.</p>
+    </div>
+</section>
+
+<!-- STEPS -->
+<section class="section tight">
+    <div class="container">
+        <div class="grid cols-3 ruled">
+            <div class="card">
+                <span class="card-n">[01]</span>
+                <h3>Download questions</h3>
+                <p class="muted small">Grab each benchmark's question set and submission template (JSON or CSV) from its card below.</p>
+            </div>
+            <div class="card">
+                <span class="card-n">[02]</span>
+                <h3>Run your model</h3>
+                <p class="muted small">Produce one answer per question id. For Spatial, use the harness to generate standard / cot / no-image / no-image++ conditions.</p>
+            </div>
+            <div class="card">
+                <span class="card-n">[03]</span>
+                <h3>Upload &amp; rank</h3>
+                <p class="muted small">Submit per task. GPT-4o grades exactly as in the source paper; a deterministic fallback is used if no judge key is configured.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="grid cols-3" id="submit_cards">
+            <div class="card"><p class="muted">Loading submission forms…</p></div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+(function () {
+    var stored = JSON.parse(localStorage.getItem('lb_user') || 'null');
+    if (!stored || !stored.api_token) {
+        window.location.replace('/login?next=/submit');
+    }
+    // Notify main.js of the stored token so forms are pre-filled
+    if (stored && stored.api_token) {
+        window.dispatchEvent(new CustomEvent('lb_auth', {detail: stored}));
+    }
+})();
+</script>
+{% endblock %}

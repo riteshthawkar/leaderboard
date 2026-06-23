@@ -49,6 +49,18 @@ class TaskScore:
     diagnostics: Optional[Diagnostics] = None
     model_meta: Dict[str, Any] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Paper-faithful reporting:
+    #   macro_accuracy - mean of per-group accuracies (matches the papers' "Avg"
+    #                    column, which averages across sub-tasks / datasets).
+    #   accuracy_std   - std. dev. of per-group accuracies (papers report
+    #                    "mean accuracy +/- std. dev.").
+    #   random_baseline- chance-level accuracy (Mind's-Eye reports this).
+    #   grading        - which grading pipeline was used (LLM judge/extractor or
+    #                    deterministic fallback) and the judge model.
+    macro_accuracy: Optional[float] = None
+    accuracy_std: Optional[float] = None
+    random_baseline: Optional[float] = None
+    grading: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self):
         return {
@@ -58,10 +70,17 @@ class TaskScore:
             "submitted_at": self.submitted_at.isoformat()
             if isinstance(self.submitted_at, datetime) else self.submitted_at,
             "accuracy": round(self.accuracy, 4),
+            "macro_accuracy": round(self.macro_accuracy, 4)
+            if self.macro_accuracy is not None else None,
+            "accuracy_std": round(self.accuracy_std, 4)
+            if self.accuracy_std is not None else None,
+            "random_baseline": round(self.random_baseline, 4)
+            if self.random_baseline is not None else None,
             "total_samples": self.total_samples,
             "correct_samples": self.correct_samples,
             "groups": {k: asdict(v) for k, v in self.groups.items()},
             "diagnostics": self.diagnostics.to_dict() if self.diagnostics else None,
+            "grading": self.grading,
             "model_meta": self.model_meta,
             "metadata": self.metadata,
         }

@@ -38,6 +38,21 @@ dist/
 # --- Harness scratch / generated test artifacts ---
 **/_gray_cache/
 **/_dryrun_*.json
+
+# --- Database (contains user credentials — never commit) ---
+*.db
+*.db-shm
+*.db-wal
+
+# --- Atomic write temp files ---
+*.tmp
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
 spatial_responses.json
 dysm_responses.json
 minds_eye_responses.json

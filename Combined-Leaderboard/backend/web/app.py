@@ -3,6 +3,8 @@ Production-ready Flask web application for the leaderboard system.
 """
 
 import os
+import re
+import secrets
 import sys
 import json
 import logging
@@ -29,10 +31,11 @@ import requests
 from config import (
     UPLOADS_DIR, RESULTS_DIR,
     TASKS, SECTIONS, SPATIAL_DATASETS, SPATIAL_MANIFEST_FILE, NO_IMAGE_PLUS_OPTION,
-    LAYER_LABELS, VCI_LAYER_WEIGHTS, EVAL_CONDITIONS,
+    LAYER_LABELS, VCI_LAYER_WEIGHTS, EVAL_CONDITIONS, GRADING,
 )
 from models.submission import BenchmarkType
 from scoring.engine import ScoringEngine
+from auth_db import init_db as init_auth_db, register_user, login_user, get_username_by_token
 from scoring.task_scorer import TaskScorer
 from leaderboard_manager import LeaderboardManager
 from leaderboard_store import LeaderboardStore
@@ -42,6 +45,7 @@ from file_security import FileSecurityValidator
 from constants import (
     ERROR_INVALID_BENCHMARK,
     SUBMISSIONS_PER_HOUR,
+    SUBMISSIONS_PER_DAY,
     DEFAULT_LEADERBOARD_LIMIT,
 )
 from logging_config import logger
@@ -55,6 +59,19 @@ app = Flask(
     template_folder=str(PROJECT_ROOT / "frontend" / "templates"),
     static_folder=str(PROJECT_ROOT / "frontend" / "static")
 )
+
+# Secret key – required for Flask internals (CSRF helpers, signed cookies, etc.)
+# Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+_secret = os.getenv("SECRET_KEY", "")
+if not _secret:
+    import warnings
+    warnings.warn(
+        "SECRET_KEY not set in environment. Using a random key — sessions will "
+        "not survive server restarts. Set SECRET_KEY in your .env for production.",
+        stacklevel=1,
+    )
+    _secret = secrets.token_hex(32)
+app.secret_key = _secret
 
 # CORS configuration
 CORS(app, resources={
@@ -80,6 +97,17 @@ limiter = Limiter(
 # Authentication
 auth = HTTPTokenAuth('Bearer')
 
+def get_token_identity():
+    """Rate-limit key: resolve token to username if possible, else fall back to IP."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        username = get_username_by_token(token)
+        if username:
+            return "user:" + username
+        return "token:" + token
+    return "ip:" + get_remote_address()
+
 # Initialize managers
 scoring_engine = ScoringEngine(use_ollama=False)
 leaderboard_manager = LeaderboardManager()
@@ -88,6 +116,9 @@ gt_manager = GroundTruthManager()
 # Three-task Visual Cognition / Spatial managers
 task_scorers = {tid: TaskScorer(tid) for tid in TASKS}
 leaderboard_store = LeaderboardStore()
+
+# Initialise user auth DB
+init_auth_db()
 
 # Generate request ID for tracking
 @app.before_request
@@ -131,13 +162,27 @@ def after_request(response):
 
 @auth.verify_token
 def verify_token(token):
-    """Verify API token from environment."""
-    valid_tokens = os.getenv("API_TOKENS", "").split(",")
+    """Verify API token: check user DB first, fall back to env API_TOKENS for admin."""
+    # Check registered users
+    username = get_username_by_token(token)
+    if username:
+        g.user_id = username
+        return True
+    # Fallback: static admin tokens from environment
+    valid_tokens = [t for t in os.getenv("API_TOKENS", "").split(",") if t]
     if token in valid_tokens:
         g.user_id = token
         return True
     logger.warning(f"Invalid token attempted from {request.remote_addr}")
     return False
+
+@auth.error_handler
+def auth_error(status=401):
+    """Return a JSON 401 so API clients (and the web UI) get a parseable error."""
+    return jsonify({
+        "error": "Authentication required",
+        "request_id": getattr(g, 'request_id', None)
+    }), status
 
 # Error handlers
 @app.errorhandler(400)
@@ -187,16 +232,87 @@ def server_error(error):
     }), 500
 
 # Routes
+# ------------------------------------------------------------------ auth
+@app.route("/api/auth/register", methods=["POST"])
+@limiter.limit("5 per hour")
+def auth_register():
+    """Register a new user. Returns an API token on success."""
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip().lower()
+    password = str(data.get("password") or "")
+    if not username or not password:
+        return jsonify({"error": "username and password are required"}), 400
+    if len(username) < 3 or len(username) > 40:
+        return jsonify({"error": "username must be 3–40 characters"}), 400
+    if not re.fullmatch(r'[a-z0-9_-]+', username):
+        return jsonify({"error": "username may only contain letters, numbers, hyphens and underscores"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "password must be at least 6 characters"}), 400
+    token = register_user(username, password)
+    if token is None:
+        return jsonify({"error": "Username already taken"}), 409
+    return jsonify({"username": username, "api_token": token}), 201
+
+
+@app.route("/api/auth/login", methods=["POST"])
+@limiter.limit("10 per hour")
+def auth_login():
+    """Log in an existing user. Returns their API token."""
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip().lower()
+    password = str(data.get("password") or "")
+    if not username or not password:
+        return jsonify({"error": "username and password are required"}), 400
+    token = login_user(username, password)
+    if token is None:
+        return jsonify({"error": "Invalid username or password"}), 401
+    return jsonify({"username": username, "api_token": token}), 200
+
+
 @app.route("/", methods=["GET"])
 def index():
-    """Home page."""
+    """Combined home / landing page."""
     try:
-        stats = leaderboard_manager.get_statistics()
-        logger.info("Index page loaded")
-        return render_template("index.html", stats=stats)
+        return render_template("home.html")
     except Exception as e:
         logger.error(f"Error loading index: {e}", exc_info=True)
         return jsonify({"error": "Failed to load page"}), 500
+
+
+@app.route("/benchmarks/do-you-see-me", methods=["GET"])
+def page_dysm():
+    """Do-You-See-Me benchmark page."""
+    return render_template("benchmark_dysm.html")
+
+
+@app.route("/benchmarks/minds-eye", methods=["GET"])
+def page_minds_eye():
+    """Mind's-Eye benchmark page."""
+    return render_template("benchmark_minds_eye.html")
+
+
+@app.route("/benchmarks/spatial", methods=["GET"])
+def page_spatial():
+    """Spatial reasoning benchmark page."""
+    return render_template("benchmark_spatial.html")
+
+
+@app.route("/leaderboard", methods=["GET"])
+def page_leaderboard():
+    """Model rankings page (Visual Cognition + Spatial tracks)."""
+    return render_template("leaderboard.html")
+
+
+@app.route("/login", methods=["GET"])
+def page_login():
+    """Login / register page."""
+    return render_template("login.html")
+
+
+@app.route("/submit", methods=["GET"])
+def page_submit():
+    """Submission page."""
+    return render_template("submit.html")
 
 @app.route("/api/health", methods=["GET"])
 @limiter.limit("60 per minute")
@@ -242,7 +358,8 @@ def health_check():
         }), 500
 
 @app.route("/api/submit", methods=["POST"])
-@limiter.limit(f"{SUBMISSIONS_PER_HOUR} per hour")
+@limiter.limit(f"{SUBMISSIONS_PER_HOUR} per hour", key_func=get_token_identity)
+@limiter.limit(f"{SUBMISSIONS_PER_DAY} per day", key_func=get_token_identity)
 @auth.login_required
 def submit_prediction():
     """Submit predictions for evaluation (requires authentication)."""
@@ -571,6 +688,16 @@ def task_info(task_id):
             "description": task["description"],
             "total_samples": total,
         }
+        # Advertise how this task is graded (which paper pipeline + judge model)
+        # so the UI can show it even before any submission. Never expose keys.
+        gcfg = GRADING.get(task_id, {})
+        if gcfg:
+            info["grading"] = {
+                "method": gcfg.get("method"),
+                "judge_model": gcfg.get("judge_model"),
+                "paper": gcfg.get("paper"),
+                "random_baseline": gcfg.get("random_baseline"),
+            }
         if task_id == "spatial":
             info["datasets"] = SPATIAL_DATASETS
             info["conditions"] = EVAL_CONDITIONS
@@ -622,7 +749,8 @@ def spatial_manifest():
 
 
 @app.route("/api/tasks/<task_id>/submit", methods=["POST"])
-@limiter.limit(f"{SUBMISSIONS_PER_HOUR} per hour")
+@limiter.limit(f"{SUBMISSIONS_PER_HOUR} per hour", key_func=get_token_identity)
+@limiter.limit(f"{SUBMISSIONS_PER_DAY} per day", key_func=get_token_identity)
 @auth.login_required
 def submit_task(task_id):
     """Submit one task's predictions, score them, and update the model entry."""
@@ -660,12 +788,14 @@ def submit_task(task_id):
                 pass
             return jsonify({"error": f"Scoring failed: {str(e)}"}), 400
 
-        record = leaderboard_store.add_result(score)
+        record = leaderboard_store.add_result(score, submitted_by=getattr(g, 'user_id', None))
         logger.info(
             f"Task '{task_id}' scored for {model_name}: acc={score.accuracy:.4f}",
             extra={"request_id": request_id},
         )
         return jsonify({**record, "success": True, "request_id": request_id}), 200
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
     except Exception as e:
         logger.error(f"Task submission error: {e}", extra={"request_id": request_id}, exc_info=True)
         return jsonify({"error": "Server error processing submission", "request_id": request_id}), 500

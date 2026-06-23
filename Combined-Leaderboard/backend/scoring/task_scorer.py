@@ -12,13 +12,15 @@ LLM-as-judge can be layered in later by overriding :meth:`match`.
 import csv
 import json
 import re
+import statistics
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from config import TASKS
+from config import TASKS, GRADING
 from models.tasks import GroupResult, Diagnostics, TaskScore
+from scoring.llm_grader import LLMGrader
 
 _OPTIONAL_CONDITIONS = {"cot", "no_image", "no_image_plus"}
 _ALL_CONDITIONS = {"standard"} | _OPTIONAL_CONDITIONS
@@ -68,9 +70,16 @@ class TaskScorer:
         self.task_id = task_id
         self.task = TASKS[task_id]
         self.ground_truth_file = Path(self.task["paths"]["ground_truth"])
+        self.questions_file = Path(self.task["paths"]["questions"])
         self.group_by = self.task.get("group_by", "group")
         self.supports_diagnostics = bool(self.task.get("supports_diagnostics"))
         self._gt: Optional[Dict[str, dict]] = None
+        self._questions: Optional[Dict[str, dict]] = None
+        # Per-paper grading pipeline (LLM extractor / judge with deterministic
+        # fallback). See config.GRADING and scoring/llm_grader.py.
+        self.grading_cfg = GRADING.get(task_id, {"method": "extract", "answer_types": ["mcq"]})
+        self.grader = LLMGrader(self.grading_cfg)
+        self._method_counts: Dict[str, int] = {}
 
     @property
     def ground_truth(self) -> Dict[str, dict]:
@@ -83,6 +92,71 @@ class TaskScorer:
             with open(self.ground_truth_file, "r", encoding="utf-8") as f:
                 self._gt = json.load(f)
         return self._gt
+
+    @property
+    def questions(self) -> Dict[str, dict]:
+        """sample_id -> {question, options, format}; empty if no questions file.
+
+        The question text and options are passed to the LLM extractor / judge so
+        grading matches the source papers (which grade the raw response against
+        the question + options).
+        """
+        if self._questions is None:
+            self._questions = {}
+            if self.questions_file.exists():
+                try:
+                    with open(self.questions_file, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    samples = data.get("samples", []) if isinstance(data, dict) else data
+                    for s in samples or []:
+                        if not isinstance(s, dict):
+                            continue
+                        sid = str(s.get("sample_id") or "")
+                        if sid:
+                            self._questions[sid] = {
+                                "question": s.get("question", ""),
+                                "options": s.get("options"),
+                                "format": s.get("format", "mcq"),
+                            }
+                except Exception:
+                    self._questions = {}
+        return self._questions
+
+    # ------------------------------------------------------------- grading
+    def _answer_type(self, gold) -> str:
+        """Pick the extractor target for a sample based on the configured types
+        and the shape of the gold answer (numeric / single-letter MCQ / free)."""
+        types = self.grading_cfg.get("answer_types", ["mcq"]) or ["mcq"]
+        g = str(gold).strip()
+        if "numeric" in types and re.fullmatch(r"-?\d+(?:\.\d+)?", g):
+            return "numeric"
+        if re.fullmatch(r"[A-Fa-f]", g):
+            return "mcq"
+        # Do-You-See-Me has free-response (non-letter / non-numeric) answers.
+        return "free" if "numeric" in types else "mcq"
+
+    def _grade(self, pred, gold, sid) -> bool:
+        """Grade one prediction with the task's paper-faithful pipeline."""
+        q = self.questions.get(str(sid), {})
+        correct, method = self.grader.grade(
+            pred, gold,
+            question=q.get("question", ""),
+            options=q.get("options"),
+            answer_type=self._answer_type(gold),
+        )
+        self._method_counts[method] = self._method_counts.get(method, 0) + 1
+        return correct
+
+    def _random_baseline(self) -> Optional[float]:
+        cfg = self.grading_cfg.get("random_baseline")
+        if cfg is None:
+            return None
+        vals = []
+        for q in self.questions.values():
+            opts = q.get("options")
+            if isinstance(opts, (list, tuple, dict)) and opts:
+                vals.append(1.0 / len(opts))
+        return sum(vals) / len(vals) if vals else float(cfg)
 
     # ------------------------------------------------------------------ parse
     def parse_submission(self, file_path: Path) -> Tuple[Dict[str, Dict[str, str]], Dict]:
@@ -169,7 +243,7 @@ class TaskScorer:
             if sid not in preds:
                 continue
             total += 1
-            if _match(preds[sid], meta["answer"]):
+            if self._grade(preds[sid], meta["answer"], sid):
                 correct += 1
         return correct, total
 
@@ -179,6 +253,7 @@ class TaskScorer:
         meta = {**(parsed_meta or {}), **(model_meta or {})}
         gt = self.ground_truth
         standard = predictions["standard"]
+        self._method_counts = {}
 
         group_acc: Dict[str, List[int]] = {}    # group -> [correct, total]
         overall_correct = overall_total = 0
@@ -186,7 +261,7 @@ class TaskScorer:
         for sid, info in gt.items():
             if sid not in standard:
                 continue
-            is_correct = 1 if _match(standard[sid], info["answer"]) else 0
+            is_correct = 1 if self._grade(standard[sid], info["answer"], sid) else 0
             overall_total += 1
             overall_correct += is_correct
             group = str(info.get(self.group_by) or info.get("group") or "all")
@@ -200,18 +275,41 @@ class TaskScorer:
             for g, (c, t) in group_acc.items()
         }
 
+        # Micro accuracy (overall correct / overall samples) is kept as the
+        # headline `accuracy` used for ranking and the VCI. The papers report a
+        # macro mean +/- std. dev. across sub-tasks / datasets, plus (Mind's-Eye)
+        # a random-choice baseline; we surface those alongside.
+        micro = overall_correct / overall_total if overall_total else 0.0
+        group_accs = [gr.accuracy for gr in groups.values()]
+        macro = sum(group_accs) / len(group_accs) if group_accs else 0.0
+        std = statistics.stdev(group_accs) if len(group_accs) > 1 else 0.0
+
         diagnostics = self._compute_diagnostics(predictions) if self.supports_diagnostics else None
+
+        llm_used = any(m in ("llm_judge", "llm_extract") for m in self._method_counts)
+        grading = {
+            "method": self.grading_cfg.get("method"),
+            "judge_model": self.grading_cfg.get("judge_model"),
+            "paper": self.grading_cfg.get("paper"),
+            "backend": self.grader._backend or "deterministic",
+            "llm_graded": llm_used,
+            "method_counts": dict(self._method_counts),
+        }
 
         return TaskScore(
             task_id=self.task_id,
             submission_id=str(uuid.uuid4()),
             model_name=model_name,
             submitted_at=datetime.now(),
-            accuracy=(overall_correct / overall_total if overall_total else 0.0),
+            accuracy=micro,
+            macro_accuracy=macro,
+            accuracy_std=std,
+            random_baseline=self._random_baseline(),
             total_samples=overall_total,
             correct_samples=overall_correct,
             groups=groups,
             diagnostics=diagnostics,
+            grading=grading,
             model_meta=meta,
             metadata={"submission_file": Path(file_path).name},
         )

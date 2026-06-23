@@ -49,20 +49,40 @@ class LeaderboardStore:
         return {"models": {}}
 
     def _write(self, data: dict):
-        with open(self.store_file, "w", encoding="utf-8") as f:
+        # Write to a temp file then atomically replace to prevent corruption
+        # on crash mid-write (os.replace / Path.replace is atomic on POSIX).
+        tmp = self.store_file.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+            f.flush()
+            import os
+            os.fsync(f.fileno())
+        tmp.replace(self.store_file)
 
     # ------------------------------------------------------------- mutate
-    def add_result(self, score: TaskScore) -> dict:
-        """Upsert a task result under its model name (latest submission wins)."""
+    def add_result(self, score: TaskScore, submitted_by: str = None) -> dict:
+        """Upsert a task result under its model name.
+
+        Only the original submitter can update an existing model entry.
+        Raises PermissionError if a different user tries to overwrite.
+        """
         record = score.to_dict()
         key = _norm_name(score.model_name)
         with self._lock:
             data = self._read()
+            existing = data["models"].get(key)
+            if existing:
+                owner = existing.get("submitted_by")
+                if owner and submitted_by and owner != submitted_by:
+                    raise PermissionError(
+                        f"Model '{score.model_name}' was registered by a different account."
+                    )
             entry = data["models"].setdefault(
                 key, {"model_name": score.model_name, "model_meta": {}, "tasks": {}}
             )
             entry["model_name"] = score.model_name
+            if submitted_by and not entry.get("submitted_by"):
+                entry["submitted_by"] = submitted_by
             if score.model_meta:
                 entry["model_meta"] = {**entry.get("model_meta", {}), **score.model_meta}
             entry["tasks"][score.task_id] = record
@@ -109,6 +129,8 @@ class LeaderboardStore:
             "imagery_submission": me["submission_id"] if me else None,
             "perception_groups": dysm.get("groups", {}) if dysm else {},
             "imagery_groups": me.get("groups", {}) if me else {},
+            "perception_grading": dysm.get("grading") if dysm else None,
+            "imagery_grading": me.get("grading") if me else None,
         }
 
     def visual_cognition_leaderboard(self, limit: int = 100) -> List[dict]:
@@ -135,12 +157,15 @@ class LeaderboardStore:
                 "model_name": entry.get("model_name", key),
                 "model_meta": entry.get("model_meta", {}),
                 "accuracy": sp.get("accuracy", 0.0),
+                "macro_accuracy": sp.get("macro_accuracy"),
+                "accuracy_std": sp.get("accuracy_std"),
                 "total_samples": sp.get("total_samples", 0),
                 "correct_samples": sp.get("correct_samples", 0),
                 "submission_id": sp.get("submission_id"),
                 "submitted_at": sp.get("submitted_at"),
                 "groups": sp.get("groups", {}),
                 "diagnostics": sp.get("diagnostics"),
+                "grading": sp.get("grading"),
             })
         rows.sort(key=lambda r: r.get("accuracy", 0.0), reverse=True)
         for i, r in enumerate(rows[:limit], start=1):

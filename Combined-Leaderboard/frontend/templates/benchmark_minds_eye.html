@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block page_id %}minds_eye{% endblock %}
+{% block title %}Mind's-Eye · MSR Vision Leaderboard{% endblock %}
+{% block description %}Mind's Eye — a benchmark of visual abstraction, transformation and composition probing visuo-cognitive reasoning in multimodal LLMs under an A–R–T taxonomy.{% endblock %}
+{% block head_extra %}<style>.page-hero{--accent-soft:var(--me-soft)}.page-hero h1 .grad{color:var(--me)}.bench-accent{--accent:var(--me);--accent-soft:var(--me-soft)}</style>{% endblock %}
+
+{% block content %}
+<section class="page-hero bench-accent">
+    <div class="container">
+        <span class="eyebrow" style="color:var(--me);background:var(--me-soft)">Mental imagery · arXiv:2604.16054</span>
+        <h1>Mind's Eye</h1>
+        <p class="hero-sub">8 visuo-cognitive tasks &mdash; mental rotation, paper folding, shape composition &mdash; organized under an Abstraction&ndash;Relation&ndash;Transformation taxonomy.</p>
+        <div class="hero-cta">
+            <a href="{{ url_for('page_leaderboard') }}" class="btn brand">Imagery rankings</a>
+            <a href="{{ url_for('page_submit') }}" class="btn">Submit a model</a>
+            <a href="https://arxiv.org/abs/2604.16054" target="_blank" rel="noopener" class="btn ghost">Read paper ↗</a>
+        </div>
+    </div>
+</section>
+
+<section class="section prose">
+    <div class="container">
+        <div class="grid cols-2" style="align-items:start">
+            <div>
+                <div class="section-tag" style="color:var(--me)">The premise</div>
+                <h2>Can models build and manipulate mental images?</h2>
+                <p class="lede">Can a model generate visual states not in the input &mdash; rotating a 3D object, predicting a fold, composing shapes? This is fluid spatial intelligence, and it remains an open question for MLLMs.</p>
+            </div>
+            <div class="card callout bench-accent standalone">
+                <h4>The headline gap</h4>
+                <div class="kpi-row">
+                    <div class="kpi"><div class="kpi-label">Human accuracy</div><div class="kpi-val pos">80%</div></div>
+                    <div class="kpi"><div class="kpi-label">Best MLLM</div><div class="kpi-val neg">&lt;50%</div></div>
+                </div>
+                <p class="muted small">Deepest deficits on Transformation and Abstraction &mdash; tasks demanding mental simulation.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section alt">
+    <div class="container">
+        <div class="section-head">
+            <div class="section-tag" style="color:var(--me)">The taxonomy</div>
+            <h2>Abstraction · Relation · Transformation</h2>
+            <p>Eight tasks span three complementary facets of visuo-cognitive reasoning.</p>
+        </div>
+        <div class="grid cols-3 ruled">
+            <div class="card finding">
+                <span class="card-n">[A]</span>
+                <div class="stat-line">Abstract</div>
+                <h3>Inferring latent structure</h3>
+                <p>Pattern induction across configurations &mdash; in the spirit of Raven's Progressive Matrices. Covers abstract pattern completion and hierarchical isomorphs.</p>
+            </div>
+            <div class="card finding">
+                <span class="card-n">[R]</span>
+                <div class="stat-line">Relate</div>
+                <h3>Mapping correspondences</h3>
+                <p>Analogical mapping across configurations &mdash; dynamic and symmetric isomorphs, plus slippage (violation detection).</p>
+            </div>
+            <div class="card finding">
+                <span class="card-n">[T]</span>
+                <div class="stat-line">Transform</div>
+                <h3>Manipulating structure</h3>
+                <p>Mental rotation, paper folding, and shape composition &mdash; the generative operations central to spatial intelligence.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="section-head">
+            <div class="section-tag" style="color:var(--me)">Findings</div>
+            <h2>Where visuo-cognition breaks down</h2>
+        </div>
+        <div class="grid cols-3 ruled">
+            <div class="card finding">
+                <div class="stat-line">Transform ↓</div>
+                <h3>Simulation is missing</h3>
+                <p>Failures cluster on Transformation and Abstraction &mdash; consistent with absent mental simulation, not just difficulty.</p>
+            </div>
+            <div class="card finding">
+                <div class="stat-line">Prompt ±</div>
+                <h3>Scaffolding cuts both ways</h3>
+                <p>Structured prompting helps Abstraction but consistently hurts Transformation &mdash; rule derivation vs. mental simulation.</p>
+            </div>
+            <div class="card finding">
+                <div class="stat-line">Look ≠ reason</div>
+                <h3>They look but can't reason</h3>
+                <p>Models localize the right image regions but fail to reason over them &mdash; they find <em>where</em> to look, not <em>how</em> to reason.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section alt">
+    <div class="container">
+        <div class="grid cols-2" style="align-items:start">
+            <div>
+                <div class="section-tag" style="color:var(--me)">Scoring on this leaderboard</div>
+                <h2>How submissions are graded</h2>
+                <p>GPT-4o <strong>extracts</strong> the MCQ label from each response and exact-matches it against ground truth.</p>
+                <ul class="spec-list" style="margin-top:16px">
+                    <li><span class="k">Judge</span><span class="v">GPT-4o (answer extractor)</span></li>
+                    <li><span class="k">Format</span><span class="v">Multiple choice (4–6 options)</span></li>
+                    <li><span class="k">Baseline</span><span class="v">Random-choice (~25%)</span></li>
+                    <li><span class="k">Ranks into</span><span class="v">Visual-Cognition Index (with Do-You-See-Me)</span></li>
+                </ul>
+            </div>
+            <div class="card callout bench-accent standalone">
+                <h4>Get started</h4>
+                <p class="muted">Download the question set, run your model, upload the response file.</p>
+                <div class="dl-row">
+                    <a class="btn sm" href="/api/tasks/minds_eye/questions">Questions (JSON)</a>
+                    <a class="btn sm ghost" href="/api/tasks/minds_eye/template.json">Template (JSON)</a>
+                    <a class="btn sm ghost" href="/api/tasks/minds_eye/template.csv">Template (CSV)</a>
+                </div>
+                <a href="{{ url_for('page_submit') }}" class="btn brand" style="margin-top:8px">Go to submission →</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CITATION -->
+<section class="section" id="cite">
+    <div class="container">
+        <div class="section-head">
+            <div class="section-tag">Citation</div>
+            <h2>Cite this benchmark</h2>
+        </div>
+        <div class="cite-block">
+            <div class="cite-head"><span class="ttl">Mind's Eye</span><button class="copy-btn" data-copy="cite-me">Copy</button></div>
+            <pre id="cite-me">@article{mindseye2026,
+  title   = {Mind's Eye: A Benchmark of Visual
+             Abstraction, Transformation and
+             Composition for Multimodal LLMs},
+  author  = {Sinha, Rohit and Kancheti, Sai Srinivas
+             and Balasubramanian, Vineeth N and Ganu, Tanuja},
+  journal = {arXiv:2604.16054},
+  year    = {2026}
+}</pre>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -30,6 +30,24 @@
     if (v == null) return "—";
     return (v >= 0 ? "+" : "") + (v * 100).toFixed(1);
   }
+  /* macro accuracy +/- std, the "Avg" reported in the papers */
+  function fmtMeanStd(mean, std) {
+    if (mean == null) return "—";
+    var s = (mean * 100).toFixed(1);
+    if (std != null) s += " ± " + (std * 100).toFixed(1);
+    return s + "%";
+  }
+  /* small badge showing how a submission was graded vs the source paper */
+  function gradingBadge(g) {
+    if (!g) return "";
+    if (g.llm_graded) {
+      return '<span class="chip layer-perception" title="Graded by ' +
+        esc(g.judge_model || "LLM") + ' (' + esc(g.paper || "") +
+        ')">LLM-graded · ' + esc(g.judge_model || "") + "</span>";
+    }
+    return '<span class="chip" title="LLM judge not configured — deterministic ' +
+      'string/numeric matching used as fallback">deterministic</span>';
+  }
   function prettyLabel(s) {
     return String(s || "").replace(/_/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); });
   }
@@ -52,20 +70,6 @@
     return r.json();
   }
 
-  /* ------------------------------------------------------------------ theme */
-  function initTheme() {
-    var saved = localStorage.getItem("vci-theme");
-    if (saved) document.documentElement.setAttribute("data-theme", saved);
-    var btn = $("theme_toggle");
-    if (btn) btn.addEventListener("click", function () {
-      var cur = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", cur);
-      localStorage.setItem("vci-theme", cur);
-      renderRadar();
-      renderCotChart();
-    });
-  }
-
   /* ------------------------------------------------------------------- tabs */
   function initTabs() {
     function show(tab) {
@@ -81,20 +85,6 @@
         e.preventDefault();
         show(b.getAttribute("data-tab"));
       });
-    });
-  }
-
-  /* ------------------------------------------------------------------ health */
-  function checkHealth() {
-    fetch("/api/health").then(function (r) {
-      var ok = r.ok;
-      var dot = $("status_dot"), txt = $("status_text");
-      if (dot) dot.classList.toggle("ok", ok);
-      if (txt) txt.textContent = ok ? "Online" : "Offline";
-    }).catch(function () {
-      var dot = $("status_dot"), txt = $("status_text");
-      if (dot) dot.classList.remove("ok");
-      if (txt) txt.textContent = "Offline";
     });
   }
 
@@ -114,6 +104,7 @@
     renderVcStats();
     renderSpatialStats();
     renderManifest();
+    renderSubmitCards();
   }
 
   async function loadVisualCognition() {
@@ -271,7 +262,7 @@
     });
     return Object.keys(set).sort();
   }
-  var PALETTE = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed"];
+  var PALETTE = ["#fafafa", "#a1a1aa", "#71717a", "#52525b", "#d4d4d8"];
 
   function renderCapPicker() {
     var box = $("cap_model_picker");
@@ -304,7 +295,7 @@
     if (legend) legend.innerHTML = "";
     if (axes.length < 3) {
       ctx.fillStyle = getCss("--text-muted");
-      ctx.font = "14px Inter, sans-serif";
+      ctx.font = "14px 'JetBrains Mono', monospace";
       ctx.textAlign = "center";
       ctx.fillText("Submit Visual Cognition tasks to see capability profiles.", cv.width / 2, cv.height / 2);
       return;
@@ -325,7 +316,7 @@
       ctx.stroke();
     }
     ctx.fillStyle = muted;
-    ctx.font = "11px Inter, sans-serif";
+    ctx.font = "11px 'JetBrains Mono', monospace";
     axes.forEach(function (name, i) {
       var ang = (Math.PI * 2 * i) / axes.length - Math.PI / 2;
       var x = cx + R * Math.cos(ang), y = cy + R * Math.sin(ang);
@@ -369,7 +360,7 @@
     var rows = state.spatial.filter(function (r) { return r.diagnostics && r.diagnostics.cot_delta != null; });
     var muted = getCss("--text-muted");
     if (!rows.length) {
-      ctx.fillStyle = muted; ctx.font = "14px Inter, sans-serif"; ctx.textAlign = "center";
+      ctx.fillStyle = muted; ctx.font = "14px 'JetBrains Mono', monospace"; ctx.textAlign = "center";
       ctx.fillText("Submit Task-3 with CoT predictions to populate.", cv.width / 2, cv.height / 2);
       return;
     }
@@ -382,12 +373,12 @@
     var bh = Math.max(8, slot - 8);
     var border = getCss("--border");
     ctx.strokeStyle = border; ctx.beginPath(); ctx.moveTo(midX, top); ctx.lineTo(midX, bottom); ctx.stroke();
-    ctx.font = "12px Inter, sans-serif";
+    ctx.font = "12px 'JetBrains Mono', monospace";
     rows.forEach(function (r, i) {
       var v = r.diagnostics.cot_delta;
       var y = top + i * slot + 4;
       var w = (Math.abs(v) / maxAbs) * half;
-      var color = v < 0 ? (getCss("--danger") || "#dc2626") : (getCss("--success") || "#16a34a");
+      var color = v < 0 ? (getCss("--neg") || "#71717a") : (getCss("--pos") || "#fafafa");
       ctx.fillStyle = color;
       if (v < 0) ctx.fillRect(midX - w, y, w, bh);
       else ctx.fillRect(midX, y, w, bh);
@@ -415,9 +406,16 @@
         ? '<div class="dl-row"><a class="btn ghost" href="/api/spatial/manifest">Manifest (JSON)</a></div>' +
           '<p class="muted small">Run the harness in <code>spatial_harness/</code> to produce the response file (standard + cot + no_image + no_image_plus).</p>'
         : "";
+      var g = (state.taskInfo[t.id] || {}).grading;
+      var gradeNote = g
+        ? '<p class="muted small grading-note">Graded as in the paper via ' +
+          (g.method === "judge" ? "LLM-as-judge" : "LLM answer-extractor") +
+          " <code>" + esc(g.judge_model || "") + "</code></p>"
+        : "";
       card.innerHTML =
         "<h2>" + esc(t.label) + "</h2>" +
         '<p class="muted small">' + esc(t.section) + "</p>" +
+        gradeNote +
         '<div class="dl-row">' +
           '<a class="btn" href="/api/tasks/' + t.id + '/questions">Questions (JSON)</a>' +
           '<a class="btn ghost" href="/api/tasks/' + t.id + '/template.json">Template (JSON)</a>' +
@@ -429,8 +427,6 @@
             '<input type="text" name="model_name" maxlength="255" placeholder="e.g. GPT-4o" required></label>' +
           '<label class="field"><span>Response file (JSON/CSV) <em>*</em></span>' +
             '<input type="file" name="file" accept=".json,.csv" required></label>' +
-          '<label class="field"><span>API token <small>(optional)</small></span>' +
-            '<input type="text" name="api_token" placeholder="Bearer token if required"></label>' +
           '<button type="submit" class="btn primary">Submit ' + esc(t.label) + "</button>" +
           '<div class="form-msg" role="status"></div>' +
         "</form>";
@@ -450,17 +446,32 @@
     var fd = new FormData();
     fd.append("model_name", form.model_name.value.trim());
     fd.append("file", form.file.files[0]);
-    var token = (form.api_token.value || "").trim();
+    var user = JSON.parse(localStorage.getItem('lb_user') || 'null');
+    if (!user || !user.api_token) {
+      msg.className = "form-msg err";
+      msg.textContent = "You must be signed in to submit. Redirecting to login…";
+      setTimeout(function () { window.location.replace('/login?next=/submit'); }, 1500);
+      return;
+    }
     msg.textContent = "Scoring…"; msg.className = "form-msg"; btn.disabled = true;
     try {
-      var headers = {};
-      if (token) headers["Authorization"] = "Bearer " + token;
+      var headers = { "Authorization": "Bearer " + user.api_token };
       var r = await fetch("/api/tasks/" + taskId + "/submit", { method: "POST", body: fd, headers: headers });
-      var data = await r.json();
-      if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+      var data = await r.json().catch(function () { return {}; });
+      if (!r.ok) {
+        if (r.status === 401) {
+          localStorage.removeItem('lb_user');
+          throw new Error("Session expired. Please sign in again.");
+        }
+        throw new Error(data.error || ("HTTP " + r.status));
+      }
       msg.className = "form-msg ok";
+      var g = data.grading || {};
+      var avg = (data.macro_accuracy != null)
+        ? " · avg " + fmtMeanStd(data.macro_accuracy, data.accuracy_std)
+        : "";
       msg.innerHTML = "Scored: <strong>" + fmtPct(data.accuracy) + "</strong> over " +
-        (data.total_samples || 0) + " samples.";
+        (data.total_samples || 0) + " samples" + avg + ". " + gradingBadge(g);
       await refreshLeaderboards();
     } catch (err) {
       msg.className = "form-msg err";
@@ -513,13 +524,15 @@
     html += "</div>";
 
     if (tasks.do_you_see_me) {
-      html += "<h3>Do-You-See-Me — capabilities</h3>" + groupsTable(tasks.do_you_see_me.groups);
+      html += "<h3>Do-You-See-Me — capabilities</h3>" + gradingLine(tasks.do_you_see_me) +
+        groupsTable(tasks.do_you_see_me.groups);
     }
     if (tasks.minds_eye) {
-      html += "<h3>Mind's-Eye — capabilities</h3>" + groupsTable(tasks.minds_eye.groups);
+      html += "<h3>Mind's-Eye — capabilities</h3>" + gradingLine(tasks.minds_eye) +
+        groupsTable(tasks.minds_eye.groups);
     }
     if (sp) {
-      html += "<h3>Spatial — per benchmark</h3>" + groupsTable(sp.groups);
+      html += "<h3>Spatial — per benchmark</h3>" + gradingLine(sp) + groupsTable(sp.groups);
       var d = sp.diagnostics;
       if (d) {
         html += "<h3>Diagnostics</h3><div class='kpi-row'>";
@@ -533,6 +546,20 @@
     return html;
   }
 
+  /* per-task grading provenance + paper-style avg ± std and random baseline */
+  function gradingLine(t) {
+    if (!t) return "";
+    var parts = [gradingBadge(t.grading)];
+    if (t.macro_accuracy != null) {
+      parts.push("<span class='muted small'>avg " +
+        fmtMeanStd(t.macro_accuracy, t.accuracy_std) + "</span>");
+    }
+    if (t.random_baseline != null) {
+      parts.push("<span class='muted small'>random " + fmtPct(t.random_baseline) + "</span>");
+    }
+    return '<p class="grading-line">' + parts.join(" ") + "</p>";
+  }
+
   function initModal() {
     document.querySelectorAll("[data-close]").forEach(function (b) {
       b.addEventListener("click", closeReport);
@@ -542,11 +569,14 @@
 
   /* ------------------------------------------------------------------- boot */
   function boot() {
-    initTheme();
+    // Theme + health pill are owned by site.js (present on every page).
+    // Re-render canvas charts when site.js toggles the theme.
+    window.addEventListener("themechange", function () {
+      renderRadar();
+      renderCotChart();
+    });
     initTabs();
     initModal();
-    checkHealth();
-    setInterval(checkHealth, 30000);
     loadSections();
     loadTaskInfo();
     refreshLeaderboards();

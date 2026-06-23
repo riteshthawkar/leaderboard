@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{% block description %}A unified leaderboard for three Microsoft Research benchmarks probing visual perception, mental imagery, and spatial reasoning in multimodal LLMs.{% endblock %}">
+    <title>{% block title %}MSR Visual Cognition & Spatial Reasoning Leaderboard{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/site.css') }}">
+    {% block head_extra %}{% endblock %}
+</head>
+<body data-page="{% block page_id %}{% endblock %}">
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="{{ url_for('index') }}" class="brand" aria-label="Home">
+                <span class="brand-text">
+                    <strong>MSR Vision Leaderboard</strong>
+                    <small>Perception · Imagery · Spatial</small>
+                </span>
+            </a>
+
+            <nav class="header-nav" id="nav_menu" aria-label="Primary">
+                <a href="{{ url_for('index') }}" class="nav-link" data-nav="home">Home</a>
+                <a href="{{ url_for('page_dysm') }}" class="nav-link" data-nav="dysm">Do-You-See-Me</a>
+                <a href="{{ url_for('page_minds_eye') }}" class="nav-link" data-nav="minds_eye">Mind's-Eye</a>
+                <a href="{{ url_for('page_spatial') }}" class="nav-link" data-nav="spatial">Spatial</a>
+                <a href="{{ url_for('page_leaderboard') }}" class="nav-link" data-nav="leaderboard">Leaderboard</a>
+            </nav>
+
+            <div class="header-actions">
+                <a href="{{ url_for('page_submit') }}" class="btn sm brand">Submit a model</a>
+                <button class="icon-btn nav-toggle" id="nav_toggle" type="button" aria-label="Menu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-col" style="max-width:320px">
+                    <a href="{{ url_for('index') }}" class="brand" style="margin-bottom:12px">
+                        <span class="brand-mark" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </span>
+                        <span class="brand-text"><strong>MSR Vision Leaderboard</strong></span>
+                    </a>
+                    <p class="muted small">A unified, paper-faithful evaluation of multimodal LLM visual perception, mental imagery, and spatial reasoning across three Microsoft Research benchmarks.</p>
+                </div>
+                <div class="footer-col">
+                    <h5>Benchmarks</h5>
+                    <a href="{{ url_for('page_dysm') }}">Do-You-See-Me</a>
+                    <a href="{{ url_for('page_minds_eye') }}">Mind's-Eye</a>
+                    <a href="{{ url_for('page_spatial') }}">Spatial Reasoning</a>
+                </div>
+                <div class="footer-col">
+                    <h5>Explore</h5>
+                    <a href="{{ url_for('page_leaderboard') }}">Leaderboard</a>
+                    <a href="{{ url_for('page_submit') }}">Submit a model</a>
+                    <a href="{{ url_for('index') }}#findings">Key findings</a>
+                </div>
+                <div class="footer-col">
+                    <h5>Papers</h5>
+                    <a href="https://arxiv.org/abs/2506.02022" target="_blank" rel="noopener">Do You See Me ↗</a>
+                    <a href="https://arxiv.org/abs/2604.16054" target="_blank" rel="noopener">Mind's Eye ↗</a>
+                    <a href="https://arxiv.org/abs/2604.16060" target="_blank" rel="noopener">CoT Degrades Spatial ↗</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>Benchmarks &copy; Microsoft Research. Leaderboard for non-commercial research use. Scores graded by a single GPT-4o judge.</span>
+                <div class="footer-meta">
+                    <span class="status-pill" title="Backend status">
+                        <span class="status-dot" id="status_dot"></span>
+                        <span id="status_text">&hellip;</span>
+                    </span>
+                    <button class="icon-btn" id="theme_toggle" type="button" aria-label="Toggle dark mode" title="Toggle theme">
+                        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/site.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
