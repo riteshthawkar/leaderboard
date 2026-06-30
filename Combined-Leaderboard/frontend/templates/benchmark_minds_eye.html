@@ -7,13 +7,24 @@
 {% block content %}
 <section class="page-hero bench-accent">
     <div class="container">
-        <span class="eyebrow" style="color:var(--me);background:var(--me-soft)">Mental imagery · arXiv:2604.16054</span>
+        <span class="eyebrow" style="color:var(--me)">Visual Cognition</span>
         <h1>Mind's Eye</h1>
         <p class="hero-sub">8 visuo-cognitive tasks &mdash; mental rotation, paper folding, shape composition &mdash; organized under an Abstraction&ndash;Relation&ndash;Transformation taxonomy.</p>
         <div class="hero-cta">
             <a href="{{ url_for('page_leaderboard') }}" class="btn brand">Imagery rankings</a>
             <a href="{{ url_for('page_submit') }}" class="btn">Submit a model</a>
             <a href="https://arxiv.org/abs/2604.16054" target="_blank" rel="noopener" class="btn ghost">Read paper ↗</a>
+        </div>
+    </div>
+</section>
+
+<section class="stats-section">
+    <div class="container">
+        <div class="stat-band cols-4 bench-accent">
+            <div class="stat-cell"><span class="n">[01]</span><span class="v">8</span><span class="l">Visuo-cognitive tasks across abstraction, relation, and transformation</span></div>
+            <div class="stat-cell"><span class="n">[02]</span><span class="v">3</span><span class="l">Taxonomy axes for probing mental image manipulation</span></div>
+            <div class="stat-cell"><span class="n">[03]</span><span class="v">80%</span><span class="l">Human accuracy across the benchmark</span></div>
+            <div class="stat-cell"><span class="n">[04]</span><span class="v">&lt;50%</span><span class="l">Top MLLM performance, with largest gaps on transformation</span></div>
         </div>
     </div>
 </section>
@@ -25,6 +36,11 @@
                 <div class="section-tag" style="color:var(--me)">The premise</div>
                 <h2>Can models build and manipulate mental images?</h2>
                 <p class="lede">Can a model generate visual states not in the input &mdash; rotating a 3D object, predicting a fold, composing shapes? This is fluid spatial intelligence, and it remains an open question for MLLMs.</p>
+                <ul class="spec-list" style="margin-top:20px">
+                    <li><span class="k">Task family</span><span class="v">Visual abstraction, transformation, and composition</span></li>
+                    <li><span class="k">Question style</span><span class="v">Multiple choice with 4-6 candidate answers</span></li>
+                    <li><span class="k">Core diagnosis</span><span class="v">Models localize image evidence but fail to mentally simulate it</span></li>
+                </ul>
             </div>
             <div class="card callout bench-accent standalone">
                 <h4>The headline gap</h4>
@@ -90,6 +106,23 @@
                 <h3>They look but can't reason</h3>
                 <p>Models localize the right image regions but fail to reason over them &mdash; they find <em>where</em> to look, not <em>how</em> to reason.</p>
             </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="section-head">
+            <div class="section-tag" style="color:var(--me)">How it's built</div>
+            <h2>From classic cognition tasks to model diagnostics</h2>
+            <p>The benchmark adapts psychology-style spatial intelligence probes into image-question tasks that require latent structure, correspondence, and transformation.</p>
+        </div>
+        <div class="pipeline">
+            <div class="pipe-step"><span class="n">[01]</span><h4>Select a faculty</h4><p>Choose abstraction, relation, or transformation as the target cognitive operation.</p></div>
+            <div class="pipe-step"><span class="n">[02]</span><h4>Instantiate tasks</h4><p>Build items such as mental rotation, paper folding, shape composition, and isomorph mapping.</p></div>
+            <div class="pipe-step"><span class="n">[03]</span><h4>Render options</h4><p>Present candidate outcomes so models must compare imagined states against choices.</p></div>
+            <div class="pipe-step"><span class="n">[04]</span><h4>Probe prompts</h4><p>Evaluate how structured reasoning helps rule extraction but hurts mental simulation.</p></div>
+            <div class="pipe-step"><span class="n">[05]</span><h4>Score gaps</h4><p>Compare model accuracy against human and random baselines by task family.</p></div>
         </div>
     </div>
 </section>

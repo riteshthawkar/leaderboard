@@ -9,6 +9,11 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}Combined Vision Leaderboard${NC}"
 echo "================================"
 
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+fi
+
 # Check if .env exists
 if [ ! -f .env ]; then
     echo -e "${BLUE}Creating .env from .env.example...${NC}"
@@ -19,7 +24,7 @@ fi
 # Check if venv exists
 if [ ! -d venv ]; then
     echo -e "${BLUE}Creating virtual environment...${NC}"
-    python -m venv venv
+    "$PYTHON_BIN" -m venv venv
     echo -e "${GREEN}✓ Virtual environment created${NC}"
 fi
 
@@ -33,7 +38,7 @@ echo -e "${GREEN}✓ Dependencies installed${NC}"
 
 # Run the Flask app
 echo -e "${BLUE}Starting Combined Leaderboard Server...${NC}"
-echo -e "${GREEN}Server running at http://localhost:5000${NC}"
+export FLASK_PORT="${FLASK_PORT:-5050}"
+echo -e "${GREEN}Server running at http://localhost:${FLASK_PORT}${NC}"
 echo ""
-cd backend/web || exit 1
-python -m flask run --host=0.0.0.0 --port=5000
+python backend/web/app.py

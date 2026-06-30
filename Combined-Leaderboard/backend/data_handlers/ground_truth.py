@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import logging
 
 from config import (
+    DO_YOU_SEE_ME_ROOT,
     DO_YOU_SEE_ME_2D_ROOT,
     DO_YOU_SEE_ME_3D_ROOT,
     MINDS_EYE_DATA_ROOT,
@@ -52,16 +53,21 @@ class DoYouSeeMeHandler:
         """
         try:
             if is_3d:
-                root = DO_YOU_SEE_ME_3D_ROOT
                 variant = "3D"
+                # The downloaded 3D dataset may use either a shared
+                # 3D_DoYouSeeMe/<task>/ folder or a per-task 3D_<task>/ folder;
+                # accept whichever layout is present.
+                candidates = [
+                    DO_YOU_SEE_ME_3D_ROOT / task_name / "dataset_info.csv",
+                    DO_YOU_SEE_ME_ROOT / f"3D_{task_name}" / "dataset_info.csv",
+                ]
+                csv_path = next((p for p in candidates if p.exists()), candidates[0])
             else:
-                root = DO_YOU_SEE_ME_2D_ROOT
                 variant = "2D"
-
-            csv_path = root / task_name / "dataset_info.csv"
+                csv_path = DO_YOU_SEE_ME_2D_ROOT / task_name / "dataset_info.csv"
 
             if not csv_path.exists():
-                logger.error(f"Ground truth file not found: {csv_path} ({variant})")
+                logger.debug(f"Ground truth file not present: {csv_path} ({variant})")
                 raise FileNotFoundError(f"Ground truth file not found: {csv_path}")
 
             logger.info(f"Loading {variant} ground truth for task '{task_name}' from {csv_path}")
@@ -126,34 +132,13 @@ class DoYouSeeMeHandler:
             logger.info(f"Loaded {len(ground_truth)} ground truth items from {csv_path} ({skipped_rows} rows skipped)")
             return ground_truth
 
-        except Exception as e:
+        except FileNotFoundError:
+            # Expected when an optional dataset (e.g. 3D variant) is not
+            # installed; the caller decides whether to skip it.
+            raise
+        except Exception:
             logger.error(f"Failed to load ground truth for {task_name} ({variant})", exc_info=True)
             raise
-
-        if not csv_path.exists():
-            raise FileNotFoundError(f"Ground truth file not found: {csv_path}")
-
-        df = pd.read_csv(csv_path)
-        ground_truth = {}
-
-        for _, row in df.iterrows():
-            image_name = str(row["filename"])
-            question = str(row["question"])
-            answer = str(row["answer"]).strip()
-
-            difficulty = None
-            if "sweep" in row:
-                difficulty = str(row["sweep"])
-
-            ground_truth[image_name] = GroundTruthItem(
-                image_name=image_name,
-                question=question,
-                answer=answer,
-                task_name=task_name,
-                difficulty=difficulty,
-            )
-
-        return ground_truth
 
     @staticmethod
     def load_all_ground_truth() -> Dict[str, Dict[str, GroundTruthItem]]:

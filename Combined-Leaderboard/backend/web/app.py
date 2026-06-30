@@ -11,7 +11,9 @@ import logging
 import uuid
 from pathlib import Path
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
+from typing import Dict, Optional
 
 # Ensure the backend package directory is importable when running this file
 # directly (e.g. `python backend/web/app.py`) so that `from config import ...`
@@ -20,7 +22,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from flask import Flask, request, jsonify, render_template, g, send_file
+from flask import Flask, request, jsonify, render_template, g, send_file, send_from_directory, redirect, url_for
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -35,7 +37,7 @@ from config import (
 )
 from models.submission import BenchmarkType
 from scoring.engine import ScoringEngine
-from auth_db import init_db as init_auth_db, register_user, login_user, get_username_by_token
+from auth_db import init_db as init_auth_db, register_user, login_user, oauth_login_user, get_username_by_token
 from scoring.task_scorer import TaskScorer
 from leaderboard_manager import LeaderboardManager
 from leaderboard_store import LeaderboardStore
@@ -59,6 +61,15 @@ app = Flask(
     template_folder=str(PROJECT_ROOT / "frontend" / "templates"),
     static_folder=str(PROJECT_ROOT / "frontend" / "static")
 )
+REACT_BUILD_DIR = PROJECT_ROOT / "frontend" / "static" / "react-app"
+
+
+def react_or_template(template_name):
+    """Serve the built React app when present; fall back to legacy Jinja during development."""
+    index_file = REACT_BUILD_DIR / "index.html"
+    if index_file.exists():
+        return send_from_directory(REACT_BUILD_DIR, "index.html")
+    return render_template(template_name)
 
 # Secret key – required for Flask internals (CSRF helpers, signed cookies, etc.)
 # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
@@ -96,6 +107,144 @@ limiter = Limiter(
 
 # Authentication
 auth = HTTPTokenAuth('Bearer')
+SUBMISSION_AUTH_DISABLED = os.getenv("DISABLE_SUBMISSION_AUTH", "false").lower() in {"1", "true", "yes", "on"}
+TEST_SUBMISSION_USER = os.getenv("TEST_SUBMISSION_USER", "local-test")
+
+OAUTH_STATE_COOKIE = "vista_oauth_state"
+OAUTH_STATE_MAX_AGE = 600
+OAUTH_PROVIDERS = {
+    "google": {
+        "label": "Google",
+        "client_id_env": "GOOGLE_CLIENT_ID",
+        "client_secret_env": "GOOGLE_CLIENT_SECRET",
+        "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "userinfo_url": "https://openidconnect.googleapis.com/v1/userinfo",
+        "scope": "openid email profile",
+    },
+    "microsoft": {
+        "label": "Microsoft",
+        "client_id_env": "MICROSOFT_CLIENT_ID",
+        "client_secret_env": "MICROSOFT_CLIENT_SECRET",
+        "authorize_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize",
+        "token_url": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token",
+        "userinfo_url": "https://graph.microsoft.com/oidc/userinfo",
+        "scope": "openid email profile",
+    },
+}
+
+
+def _safe_next_path(value: Optional[str]) -> str:
+    return value if re.match(r"^/[^/]", value or "") else "/submit"
+
+
+def _oauth_serializer():
+    from itsdangerous import URLSafeTimedSerializer
+    return URLSafeTimedSerializer(app.secret_key, salt="vista-oauth-state")
+
+
+def _oauth_config(provider: str):
+    config = OAUTH_PROVIDERS.get(provider)
+    if not config:
+        return None
+    tenant = os.getenv("MICROSOFT_TENANT_ID", "common")
+    return {
+        **config,
+        "authorize_url": config["authorize_url"].format(tenant=tenant),
+        "token_url": config["token_url"].format(tenant=tenant),
+    }
+
+
+def _oauth_redirect_uri(provider: str) -> str:
+    base_url = os.getenv("OAUTH_REDIRECT_BASE_URL", request.host_url.rstrip("/"))
+    return f"{base_url}{url_for('auth_oauth_callback', provider=provider)}"
+
+
+def _login_redirect(next_path: str, fragment: Optional[Dict[str, str]] = None):
+    target = f"/login?{urlencode({'next': _safe_next_path(next_path)})}"
+    if fragment:
+        target = f"{target}#{urlencode(fragment)}"
+    response = redirect(target)
+    response.delete_cookie(OAUTH_STATE_COOKIE)
+    return response
+
+
+def submission_auth_required(func):
+    """Require bearer auth unless explicitly disabled for local UI testing."""
+    if not SUBMISSION_AUTH_DISABLED:
+        return auth.login_required(func)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not getattr(g, "user_id", None):
+            g.user_id = TEST_SUBMISSION_USER
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def _form_value(name: str) -> str:
+    return str(request.form.get(name) or "").strip()
+
+
+def _word_count(value: str) -> int:
+    return len(re.findall(r"\b\S+\b", value or ""))
+
+
+def _submission_model_meta(task_id: str):
+    meta = {}
+    raw_meta = request.form.get("model_meta")
+    if raw_meta:
+        try:
+            parsed = json.loads(raw_meta)
+            if isinstance(parsed, dict):
+                meta.update({k: v for k, v in parsed.items() if isinstance(k, str)})
+        except json.JSONDecodeError:
+            return None, "model_meta must be valid JSON"
+
+    field_map = {
+        "organization": "organization",
+        "model_access": "access",
+        "parameter_count": "parameter_count",
+        "base_model": "base_model",
+        "training_data": "training_data",
+        "method_description": "method_description",
+        "cot_used": "cot_used",
+        "prompt_template": "prompt_template",
+        "changes_from_previous": "changes_from_previous",
+        "paper_url": "paper_url",
+    }
+    for form_name, meta_name in field_map.items():
+        value = _form_value(form_name)
+        if value:
+            meta[meta_name] = value
+
+    required = {
+        "organization": "organisation",
+        "access": "open/closed source status",
+        "parameter_count": "parameter count",
+        "base_model": "base model",
+        "training_data": "training data and fine-tuning information",
+        "method_description": "method description",
+        "cot_used": "CoT usage",
+        "prompt_template": "prompt template",
+        "changes_from_previous": "changes from previous submission",
+    }
+    missing = [label for key, label in required.items() if not str(meta.get(key) or "").strip()]
+    if missing:
+        return None, "Missing required metadata: " + ", ".join(missing)
+    if _word_count(str(meta.get("method_description") or "")) < 100:
+        return None, "Method description must be at least 100 words"
+    if _word_count(str(meta.get("changes_from_previous") or "")) < 50:
+        return None, "Changes from previous submission must be at least 50 words"
+    paper_url = str(meta.get("paper_url") or "").strip()
+    if paper_url and not re.match(r"^https?://", paper_url):
+        return None, "Paper / arXiv link must start with http:// or https://"
+
+    meta["org"] = str(meta.get("organization") or "").strip()
+    meta["type"] = str(meta.get("access") or "").strip()
+    meta["submission_track"] = task_id
+    return meta, None
 
 def get_token_identity():
     """Rate-limit key: resolve token to username if possible, else fall back to IP."""
@@ -125,7 +274,7 @@ init_auth_db()
 def before_request():
     """Generate request ID and log incoming request."""
     g.request_id = str(uuid.uuid4())
-    g.start_time = datetime.utcnow()
+    g.start_time = datetime.now(timezone.utc)
     
     # Log incoming request
     logger.debug(
@@ -141,7 +290,7 @@ def before_request():
 def after_request(response):
     """Log response and add headers."""
     if hasattr(g, 'start_time'):
-        duration = (datetime.utcnow() - g.start_time).total_seconds()
+        duration = (datetime.now(timezone.utc) - g.start_time).total_seconds()
         logger.debug(
             f"Response {response.status_code} ({duration:.3f}s)",
             extra={
@@ -269,11 +418,108 @@ def auth_login():
     return jsonify({"username": username, "api_token": token}), 200
 
 
+@app.route("/api/auth/providers", methods=["GET"])
+def auth_providers():
+    """List OAuth providers that are fully configured (client id + secret set).
+
+    The web UI uses this to only show sign-in buttons for providers that will
+    actually work, instead of rendering buttons that redirect back with a
+    "not configured" error.
+    """
+    available = [
+        {"id": pid, "label": cfg["label"]}
+        for pid, cfg in OAUTH_PROVIDERS.items()
+        if os.getenv(cfg["client_id_env"], "") and os.getenv(cfg["client_secret_env"], "")
+    ]
+    return jsonify({"providers": available}), 200
+
+
+@app.route("/api/auth/oauth/<provider>", methods=["GET"])
+@limiter.limit("20 per hour")
+def auth_oauth_start(provider):
+    """Start an OAuth login/register flow for a configured identity provider."""
+    provider = provider.strip().lower()
+    config = _oauth_config(provider)
+    next_path = _safe_next_path(request.args.get("next"))
+    if not config:
+        return _login_redirect(next_path, {"oauth_error": "Unsupported sign-in provider."})
+    client_id = os.getenv(config["client_id_env"], "")
+    if not client_id or not os.getenv(config["client_secret_env"], ""):
+        return _login_redirect(next_path, {"oauth_error": f"{config['label']} sign-in is not configured."})
+    nonce = secrets.token_urlsafe(24)
+    state = _oauth_serializer().dumps({"provider": provider, "next": next_path, "nonce": nonce})
+    params = {
+        "client_id": client_id,
+        "redirect_uri": _oauth_redirect_uri(provider),
+        "response_type": "code",
+        "scope": config["scope"],
+        "state": state,
+        "prompt": "select_account",
+    }
+    response = redirect(f"{config['authorize_url']}?{urlencode(params)}")
+    response.set_cookie(OAUTH_STATE_COOKIE, nonce, max_age=OAUTH_STATE_MAX_AGE, httponly=True, samesite="Lax", secure=request.is_secure)
+    return response
+
+
+@app.route("/api/auth/oauth/<provider>/callback", methods=["GET"])
+@limiter.limit("20 per hour")
+def auth_oauth_callback(provider):
+    """Complete OAuth login/register and hand the API token back to the React app."""
+    provider = provider.strip().lower()
+    config = _oauth_config(provider)
+    fallback_next = _safe_next_path(request.args.get("next"))
+    if not config:
+        return _login_redirect(fallback_next, {"oauth_error": "Unsupported sign-in provider."})
+    if request.args.get("error"):
+        return _login_redirect(fallback_next, {"oauth_error": request.args.get("error_description") or request.args.get("error") or "Sign-in was cancelled."})
+    try:
+        state = _oauth_serializer().loads(request.args.get("state") or "", max_age=OAUTH_STATE_MAX_AGE)
+    except Exception:
+        return _login_redirect(fallback_next, {"oauth_error": "Sign-in session expired. Please try again."})
+    next_path = _safe_next_path(state.get("next"))
+    if state.get("provider") != provider or state.get("nonce") != request.cookies.get(OAUTH_STATE_COOKIE):
+        return _login_redirect(next_path, {"oauth_error": "Sign-in session could not be verified."})
+    code = request.args.get("code")
+    if not code:
+        return _login_redirect(next_path, {"oauth_error": "Sign-in did not return an authorization code."})
+    client_id = os.getenv(config["client_id_env"], "")
+    client_secret = os.getenv(config["client_secret_env"], "")
+    try:
+        token_response = requests.post(
+            config["token_url"],
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "code": code,
+                "grant_type": "authorization_code",
+                "redirect_uri": _oauth_redirect_uri(provider),
+            },
+            timeout=10,
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json().get("access_token")
+        if not access_token:
+            raise ValueError("missing access token")
+        userinfo_response = requests.get(config["userinfo_url"], headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+        userinfo_response.raise_for_status()
+        userinfo = userinfo_response.json()
+    except Exception as exc:
+        logger.warning(f"OAuth {provider} exchange failed: {exc}")
+        return _login_redirect(next_path, {"oauth_error": f"{config['label']} sign-in failed. Please try again."})
+    subject = str(userinfo.get("sub") or userinfo.get("id") or "")
+    email = userinfo.get("email") or userinfo.get("preferred_username") or userinfo.get("userPrincipalName")
+    account = oauth_login_user(provider, subject, email)
+    if not account:
+        return _login_redirect(next_path, {"oauth_error": f"{config['label']} account could not be created."})
+    username, token = account
+    return _login_redirect(next_path, {"oauth_token": token, "username": username})
+
+
 @app.route("/", methods=["GET"])
 def index():
     """Combined home / landing page."""
     try:
-        return render_template("home.html")
+        return react_or_template("home.html")
     except Exception as e:
         logger.error(f"Error loading index: {e}", exc_info=True)
         return jsonify({"error": "Failed to load page"}), 500
@@ -282,42 +528,48 @@ def index():
 @app.route("/benchmarks/do-you-see-me", methods=["GET"])
 def page_dysm():
     """Do-You-See-Me benchmark page."""
-    return render_template("benchmark_dysm.html")
+    return react_or_template("benchmark_dysm.html")
 
 
 @app.route("/benchmarks/minds-eye", methods=["GET"])
 def page_minds_eye():
     """Mind's-Eye benchmark page."""
-    return render_template("benchmark_minds_eye.html")
+    return react_or_template("benchmark_minds_eye.html")
 
 
 @app.route("/benchmarks/spatial", methods=["GET"])
 def page_spatial():
     """Spatial reasoning benchmark page."""
-    return render_template("benchmark_spatial.html")
+    return react_or_template("benchmark_spatial.html")
 
 
 @app.route("/leaderboard", methods=["GET"])
 def page_leaderboard():
     """Model rankings page (Visual Cognition + Spatial tracks)."""
-    return render_template("leaderboard.html")
+    return react_or_template("leaderboard.html")
 
 
 @app.route("/login", methods=["GET"])
 def page_login():
     """Login / register page."""
-    return render_template("login.html")
+    return react_or_template("login.html")
 
 
 @app.route("/submit", methods=["GET"])
 def page_submit():
     """Submission page."""
-    return render_template("submit.html")
+    return react_or_template("submit.html")
 
 @app.route("/api/health", methods=["GET"])
-@limiter.limit("60 per minute")
+@limiter.exempt
 def health_check():
-    """Health check endpoint for monitoring."""
+    """Health check endpoint for monitoring.
+
+    Exempt from rate limiting: liveness/readiness probes and load-balancer
+    health checks poll frequently, and rate-limiting them causes false
+    "down" signals. The check itself is cheap (single-row read + cached
+    task list).
+    """
     try:
         components = {}
         
@@ -342,25 +594,25 @@ def health_check():
         
         response = HealthCheckResponse(
             status=overall_status,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             components=components
         )
         
         status_code = 200 if overall_status == "healthy" else 503
-        return jsonify(response.dict()), status_code
+        return jsonify(response.model_dump()), status_code
         
     except Exception as e:
         logger.error(f"Health check error: {e}", exc_info=True)
         return jsonify({
             "status": "unhealthy",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "error": "Health check failed"
         }), 500
 
 @app.route("/api/submit", methods=["POST"])
 @limiter.limit(f"{SUBMISSIONS_PER_HOUR} per hour", key_func=get_token_identity)
 @limiter.limit(f"{SUBMISSIONS_PER_DAY} per day", key_func=get_token_identity)
-@auth.login_required
+@submission_auth_required
 def submit_prediction():
     """Submit predictions for evaluation (requires authentication)."""
     request_id = getattr(g, 'request_id', None)
@@ -751,7 +1003,7 @@ def spatial_manifest():
 @app.route("/api/tasks/<task_id>/submit", methods=["POST"])
 @limiter.limit(f"{SUBMISSIONS_PER_HOUR} per hour", key_func=get_token_identity)
 @limiter.limit(f"{SUBMISSIONS_PER_DAY} per day", key_func=get_token_identity)
-@auth.login_required
+@submission_auth_required
 def submit_task(task_id):
     """Submit one task's predictions, score them, and update the model entry."""
     request_id = getattr(g, "request_id", None)
@@ -774,12 +1026,15 @@ def submit_task(task_id):
         model_name = request.form["model_name"].strip()
         if not model_name or len(model_name) > 255:
             return jsonify({"error": "Invalid model_name"}), 400
+        model_meta, meta_error = _submission_model_meta(task_id)
+        if meta_error:
+            return jsonify({"error": meta_error}), 400
 
         filepath = UPLOADS_DIR / safe_filename
         file.save(str(filepath))
 
         try:
-            score = task_scorers[task_id].score(filepath, model_name=model_name)
+            score = task_scorers[task_id].score(filepath, model_name=model_name, model_meta=model_meta)
         except (ValueError, FileNotFoundError) as e:
             logger.warning(f"Task scoring failed: {e}", extra={"request_id": request_id})
             try:
@@ -859,8 +1114,8 @@ def model_report(model_name):
         return jsonify({"error": "Failed to retrieve report"}), 500
 
 if __name__ == "__main__":
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "5000"))
+    host = os.getenv("HOST", os.getenv("FLASK_HOST", "0.0.0.0"))
+    port = int(os.getenv("PORT", os.getenv("FLASK_PORT", "5050")))
     use_dev_server = os.getenv("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
 
     if use_dev_server:

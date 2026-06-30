@@ -1,6 +1,6 @@
 # Project Handover — Combined VLM Leaderboard
 
-_Last updated: 2026-06-18_
+_Last updated: 2026-06-30_
 
 This document is the single source of truth for picking up this project. It
 describes what the system is, how it is laid out, how to run it, what has been
@@ -56,7 +56,7 @@ Leaderboard-Project/                  <- repo root
       build_tasks.py                  <- builds tasks/<id>/ bundles (questions, GT, templates)
       build_golden_set.py             <- legacy data loaders (still used by build_tasks)
       file_security.py, database.py, logging_config.py
-    frontend/                         <- index.html + static/ (2-tab UI, canvas charts, no JS deps)
+    frontend/                         <- React/Vite UI + shared static CSS/assets
     tasks/                            <- GENERATED bundles served to the UI
       do_you_see_me/  minds_eye/  spatial/
     dysm_harness/                     <- user harness for Do-You-See-Me
@@ -64,7 +64,7 @@ Leaderboard-Project/                  <- repo root
     spatial_harness/                  <- user + maintainer harness for Task 3 (VLMEvalKit-backed)
     requirements.txt
     run.bat / run.sh
-    .env.example                      <- copy to .env and set API_TOKENS
+    .env.example                      <- copy to .env; set SECRET_KEY and optional OAuth/judge vars
 ```
 
 \* `backend/validators.py` was renamed to `request_models.py` because the name
@@ -120,14 +120,26 @@ working recipe (already applied on this machine):
 
 From `Combined-Leaderboard/`:
 
-```powershell
-$env:API_TOKENS = 'your-secret-token'   # bearer token required for submissions
-& "C:\Users\b-rthawkar\mc3\envs\leaderboard\python.exe" backend\web\app.py
+```bash
+cp .env.example .env
+# Edit .env and set SECRET_KEY. Optional: OPENAI_API_KEY, OAuth client vars.
+python backend/web/app.py
 ```
 
-- Serves **Waitress** on `0.0.0.0:5000` (no auto-reload — restart to apply edits).
+- Serves **Waitress** on `0.0.0.0:5050` by default (no auto-reload — restart to apply edits).
 - Set `$env:FLASK_DEBUG=1` to use the Flask dev server with reload instead.
-- Check / free port 5000 before restarting.
+- Check / free port 5050 before restarting.
+- Submission auth is enabled by default; set `DISABLE_SUBMISSION_AUTH=true` only for temporary local UI testing.
+
+For frontend development:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The Vite dev server proxies `/api` to `http://localhost:5050`.
 
 **Endpoints (selected):**
 `GET /api/health`, `/api/sections`, `/api/tasks/<id>/info|questions|template.<fmt>`,

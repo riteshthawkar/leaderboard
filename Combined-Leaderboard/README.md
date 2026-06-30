@@ -1,320 +1,98 @@
-# Combined Leaderboard - Vision Benchmark Evaluation System
+# Combined Leaderboard
 
-A comprehensive web-based leaderboard system for evaluating Vision Language Models (VLMs) on two major benchmarks: **Mind's-Eye** (reasoning tasks) and **Do-You-See-Me** (perceptual tasks).
+React + Flask application for the MSR visual cognition and spatial reasoning leaderboard. It evaluates VLM submissions across Do-You-See-Me, Mind's-Eye, and Spatial Reasoning, then exposes track-aware rankings, metadata filters, comparison views, and model reports.
 
-## Features
+## Current Architecture
 
-✅ **Dual Benchmark Support**
-- **Mind's-Eye**: 8 cognitive reasoning tasks (mental rotation, abstract reasoning, paper folding, etc.)
-- **Do-You-See-Me**: 7 visual perception dimensions (shape/color discrimination, form constancy, etc.)
+- `frontend/` - React/Vite app with Tailwind/shadcn-style primitives and bklit/visx chart components.
+- `backend/web/app.py` - Flask API and React build host.
+- `backend/leaderboard_store.py` - JSON-backed per-model task store used by the React leaderboard.
+- `backend/scoring/task_scorer.py` - per-task scoring and spatial diagnostics.
+- `tasks/` - public question bundles, hidden ground truth, and submission templates.
+- `dysm_harness/`, `minds_eye_harness/`, `spatial_harness/` - user-facing response-generation harnesses.
 
-✅ **Instant Evaluation**
-- Upload predictions in CSV or JSON format
-- Automatic scoring against ground truth
-- Per-task and overall accuracy calculation
-- Detailed results with answer comparisons
+Legacy Jinja templates still exist as a fallback when the React build is absent, but the primary UI is the Vite app.
 
-✅ **Smart Answer Extraction**
-- Handles multiple answer formats (options A-F, numeric, text)
-- Option extraction from verbose responses
-- Case-insensitive text comparison
-- Optional Ollama integration for advanced normalization
+## Quick Start
 
-✅ **Leaderboard Rankings**
-- Global rankings by overall accuracy
-- Per-task leaderboards
-- Model submission history
-- Detailed statistics
-
-✅ **Web Interface**
-- Clean, responsive design
-- Real-time leaderboard updates
-- Submission form with validation
-- Task filtering and sorting
-- Submission details view
-
-## Project Structure
-
-```
-Combined-Leaderboard/
-├── backend/
-│   ├── config.py                 # Configuration and paths
-│   ├── leaderboard_manager.py    # Leaderboard storage/retrieval
-│   ├── models/
-│   │   └── submission.py         # Data models
-│   ├── data_handlers/
-│   │   ├── ground_truth.py       # Ground truth loading
-│   │   └── submission.py         # Prediction parsing
-│   ├── utils/
-│   │   └── answer_extractor.py   # Answer normalization
-│   ├── scoring/
-│   │   └── engine.py             # Main scoring engine
-│   └── web/
-│       └── app.py                # Flask web application
-├── frontend/
-│   ├── templates/
-│   │   └── index.html            # Main webpage
-│   └── static/
-│       ├── css/
-│       │   └── style.css         # Styling
-│       └── js/
-│           └── main.js           # Frontend logic
-├── uploads/                      # User submissions
-├── results/                      # Evaluation results
-├── requirements.txt              # Python dependencies
-└── README.md                     # This file
-```
-
-## Installation
-
-### Prerequisites
-- Python 3.8+
-- Git
-- The Mind's-Eye and Do-You-See-Me repositories
-
-### Setup
-
-1. **Clone the repository** (or copy to your workspace)
 ```bash
 cd Combined-Leaderboard
-```
-
-2. **Create a Python virtual environment**
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. **Install dependencies**
-```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-```
-
-4. **Configure environment variables**
-```bash
 cp .env.example .env
-# Edit .env with your paths and settings
+# Edit .env and set SECRET_KEY. Optional: OPENAI_API_KEY and OAuth client vars.
+python backend/web/app.py
 ```
 
-5. **Run the application**
-```bash
-cd backend/web
-python -m flask run
-```
+The backend defaults to `http://localhost:5050` so the Vite dev proxy works without extra configuration.
 
-The leaderboard will be available at `http://localhost:5000`
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file with:
-
-```env
-# Repository paths
-DO_YOU_SEE_ME_ROOT=/path/to/Do-You-See-Me
-MINDS_EYE_ROOT=/path/to/Mind-s-Eye
-
-# Flask configuration
-FLASK_ENV=development
-FLASK_DEBUG=False
-
-# Ollama configuration (optional)
-MINDS_EYE_OPTION_EXTRACTOR_MODEL=gemma3:4b
-MINDS_EYE_OLLAMA_BASE_URL=http://localhost:11434
-
-# Upload settings
-MAX_UPLOAD_SIZE=50  # MB
-```
-
-## Usage
-
-### Submission Format
-
-#### CSV Format
-```csv
-image_name,task_name,prediction
-image_0.png,mental_rotation,A
-image_1.png,mental_rotation,C
-image_2.png,abstract,B
-```
-
-#### JSON Format
-```json
-{
-  "mental_rotation": {
-    "image_0.png": "A",
-    "image_1.png": "C"
-  },
-  "abstract": {
-    "image_2.png": "B"
-  }
-}
-```
-
-Or alternative format:
-```json
-[
-  {"image_name": "image_0.png", "task_name": "mental_rotation", "prediction": "A"},
-  {"image_name": "image_1.png", "task_name": "mental_rotation", "prediction": "C"}
-]
-```
-
-### API Endpoints
-
-#### Submit Predictions
-```bash
-POST /api/submit
-Content-Type: multipart/form-data
-
-- file: prediction file (CSV or JSON)
-- model_name: name of model
-- benchmark: 'do_you_see_me' or 'minds_eye'
-- task_name: (optional) specific task
-```
-
-#### Get Leaderboard
-```bash
-GET /api/leaderboard?benchmark=minds_eye&limit=25&task=mental_rotation
-```
-
-#### Get Submission Details
-```bash
-GET /api/submission/{submission_id}
-```
-
-#### Get Model Submissions
-```bash
-GET /api/model/{model_name}
-```
-
-#### List Available Tasks
-```bash
-GET /api/tasks?benchmark=minds_eye
-```
-
-#### Get Statistics
-```bash
-GET /api/statistics?benchmark=do_you_see_me
-```
-
-## Benchmarks
-
-### Mind's-Eye Tasks
-
-1. **Slippage** - Concept violation detection
-2. **Abstract Reasoning** - Odd-one-out analogies
-3. **Mental Rotation** - 3D object rotation selection
-4. **Mental Composition** - 2D net to 3D matching
-5. **Paper Folding** - Hole pattern prediction
-6. **Dynamic Isomorphism** - Temporal transformation
-7. **Symmetric Structures** - Symmetry violation detection
-8. **Hierarchical Isomorphism** - Recursive structure violation
-
-### Do-You-See-Me Dimensions
-
-1. **Shape Discrimination** (2D & 3D)
-2. **Shape-Color Discrimination** (2D & 3D)
-3. **Visual Form Constancy** (2D & 3D)
-4. **Letter Disambiguation** (2D & 3D)
-5. **Visual Figure-Ground** (2D only)
-6. **Visual Closure** (2D only)
-7. **Visual Spatial** (2D & 3D)
-
-## Answer Extraction Strategy
-
-The system uses a multi-strategy approach for comparing answers:
-
-1. **Option Extraction** (for A-F answers)
-   - Regex pattern matching: `(A)`, `Option B`, etc.
-   - Optional Ollama-based normalization
-
-2. **Numeric Comparison** (for numeric answers)
-   - Extract first number from text
-   - Direct comparison
-
-3. **Text Matching** (fallback)
-   - Case-insensitive comparison
-   - Whitespace normalization
-
-## Scoring
-
-- **Metric**: Exact match (1.0 = correct, 0.0 = incorrect)
-- **Per-task accuracy**: Mean score across all samples
-- **Overall accuracy**: Mean across all tasks
-- **Standard deviation**: Calculated per task
-
-## Development
-
-### Adding a New Benchmark
-
-1. Create ground truth loader in `data_handlers/ground_truth.py`
-2. Add benchmark enum to `models/submission.py`
-3. Update `config.py` with task definitions
-4. Implement scoring method in `scoring/engine.py`
-
-### Testing
+In another terminal:
 
 ```bash
-cd backend
-python -c "from scoring.engine import ScoringEngine; e = ScoringEngine(); print('Engine loaded')"
+cd Combined-Leaderboard/frontend
+npm install
+npm run dev
 ```
 
-## Troubleshooting
+Open the Vite URL, usually `http://localhost:5173`. If that port is busy, Vite will choose the next free port.
 
-### Ground truth files not found
-- Verify `DO_YOU_SEE_ME_ROOT` and `MINDS_EYE_ROOT` environment variables
-- Check that `dataset_info.csv` and `annotations.json` exist in the expected paths
+For a production frontend build:
 
-### Predictions not matching
-- Verify CSV/JSON format matches expected structure
-- Check image names match ground truth exactly
-- Review comparison reasoning in results
-
-### Ollama errors
-- Ensure Ollama is running: `ollama serve`
-- Pull required model: `ollama pull gemma3:4b`
-- Check `MINDS_EYE_OLLAMA_BASE_URL` is correct
-
-## Performance Notes
-
-- Ground truth files are cached on first load
-- Leaderboard is stored in JSON (consider database for scale)
-- Submission processing is sequential (suitable for < 1000 submissions/day)
-- Max upload size: 50 MB (configurable)
-
-## Future Enhancements
-
-- [ ] Database backend (SQLite/PostgreSQL)
-- [ ] Batch evaluation with progress tracking
-- [ ] Model comparison tools
-- [ ] Difficulty-based rankings
-- [ ] Advanced filtering (by date, accuracy range, etc.)
-- [ ] Export functionality (CSV, PDF reports)
-- [ ] User authentication and model management
-- [ ] Automated benchmark refresh
-
-## Citation
-
-If you use this leaderboard system, please cite:
-
-```bibtex
-@misc{combined_leaderboard_2024,
-  title={Combined Vision Benchmark Leaderboard},
-  author={Your Name},
-  year={2024}
-}
+```bash
+cd Combined-Leaderboard/frontend
+npm run build
 ```
 
-Also cite the original benchmarks:
+The build writes to `frontend/static/react-app/`, which Flask serves automatically.
 
-- **Do-You-See-Me**: [Original Paper](link-to-paper)
-- **Mind's-Eye**: [Original Paper](link-to-paper)
+## Production Defaults
 
-## License
+- Submission auth is enabled by default. Keep `DISABLE_SUBMISSION_AUTH=false` for production.
+- Set `DISABLE_SUBMISSION_AUTH=true` only for short local UI testing.
+- Normal submissions use registered user bearer tokens from `/login`.
+- `API_TOKENS` is optional admin/legacy access, not required for ordinary users.
+- Google and Microsoft buttons are visible, but OAuth works only when the corresponding client IDs/secrets and callback URLs are configured.
+- Use persistent storage for `users.db` and `results/leaderboard_store.json` in deployment.
+- Use Redis for `LIMITER_STORAGE_URI` when running more than one process or container.
 
-See LICENSE file in parent directory
+## Important Environment Variables
 
-## Support
+| Variable | Purpose |
+|---|---|
+| `SECRET_KEY` | Required Flask secret for production. |
+| `FLASK_PORT` | Backend port; defaults to `5050`. |
+| `OPENAI_API_KEY` | Enables GPT-4o extraction/judging; deterministic fallback is used when unset. |
+| `DISABLE_SUBMISSION_AUTH` | Keep `false` unless doing temporary local testing. |
+| `CORS_ORIGINS` | Comma-separated allowed origins. |
+| `LIMITER_STORAGE_URI` | Use `redis://...` for production rate limits. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Enables Google OAuth. |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Enables Microsoft OAuth. |
+| `OAUTH_REDIRECT_BASE_URL` | Public base URL for OAuth callbacks. |
 
-For issues, questions, or contributions, please open an issue or contact the development team.
+## Submission Flow
+
+1. Register or sign in at `/login`.
+2. Download questions/templates from `/submit`.
+3. Run the model locally, ideally through the harness for that benchmark.
+4. Upload JSON or CSV predictions plus required metadata.
+5. The backend scores the file, stores the task result, and updates the leaderboard.
+
+Required metadata includes organization, source status, parameter count, base model, training/fine-tuning summary, CoT usage, method description, prompt template, and change log.
+
+## Spatial Ground Truth
+
+`backend/build_tasks.py` creates a small synthetic spatial bundle so the app can boot. Do not use that for official spatial results. For real spatial scoring, run `spatial_harness/build_ground_truth.py` against the official dataset sources and replace `tasks/spatial/ground_truth.json` before launch.
+
+## Useful Checks
+
+```bash
+cd Combined-Leaderboard/frontend
+npm run build
+
+cd ..
+python3 -m py_compile backend/web/app.py backend/leaderboard_store.py backend/auth_db.py
+curl -fsS http://localhost:5050/api/health
+```
+
+Known non-blocker: the frontend build currently emits a Vite warning that the main JS chunk is larger than 500 kB. Code splitting can be added later if startup weight becomes a problem.

@@ -300,7 +300,7 @@
       ctx.fillText("Submit Visual Cognition tasks to see capability profiles.", cv.width / 2, cv.height / 2);
       return;
     }
-    var cx = cv.width / 2, cy = cv.height / 2 + 6, R = Math.min(cx, cy) - 70;
+    var cx = cv.width / 2, cy = cv.height / 2 + 6, R = Math.min(cx, cy) - 96;
     var border = getCss("--border"), muted = getCss("--text-muted");
 
     ctx.strokeStyle = border;
@@ -322,9 +322,15 @@
       var x = cx + R * Math.cos(ang), y = cy + R * Math.sin(ang);
       ctx.strokeStyle = border;
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke();
-      var lx = cx + (R + 22) * Math.cos(ang), ly = cy + (R + 14) * Math.sin(ang);
+      var lx = cx + (R + 18) * Math.cos(ang), ly = cy + (R + 12) * Math.sin(ang);
       ctx.textAlign = Math.abs(Math.cos(ang)) < 0.3 ? "center" : (Math.cos(ang) > 0 ? "left" : "right");
-      ctx.fillText(prettyLabel(name).slice(0, 16), lx, ly);
+      var words = prettyLabel(name).split(" ");
+      if (words.length > 1) {
+        ctx.fillText(words[0], lx, ly - 6);
+        ctx.fillText(words.slice(1).join(" "), lx, ly + 6);
+      } else {
+        ctx.fillText(words[0], lx, ly);
+      }
     });
 
     var rows = state.vc.filter(function (r) { return state.selectedCaps.indexOf(r.model_name) >= 0; });

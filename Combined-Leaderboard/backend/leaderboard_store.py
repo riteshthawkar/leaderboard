@@ -11,7 +11,9 @@ lock so concurrent submissions don't corrupt it.
 """
 
 import json
+import logging
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -23,6 +25,8 @@ from config import (
     SECTIONS,
 )
 from models.tasks import TaskScore
+
+logger = logging.getLogger(__name__)
 
 
 def _norm_name(name: str) -> str:
@@ -87,7 +91,33 @@ class LeaderboardStore:
                 entry["model_meta"] = {**entry.get("model_meta", {}), **score.model_meta}
             entry["tasks"][score.task_id] = record
             self._write(data)
+            self._append_history(record, submitted_by)
         return record
+
+    def _append_history(self, record: dict, submitted_by: Optional[str]) -> None:
+        """Append an immutable audit-log line for every accepted submission.
+
+        The main store is an upsert keyed by model name (no history retained),
+        so this JSONL file is the permanent record of who submitted what and
+        when. Best-effort: a logging failure must never fail a submission.
+        """
+        try:
+            history_file = self.store_file.parent / "submission_history.jsonl"
+            entry = {
+                "logged_at": datetime.now(timezone.utc).isoformat(),
+                "model_name": record.get("model_name"),
+                "task_id": record.get("task_id"),
+                "submission_id": record.get("submission_id"),
+                "submitted_by": submitted_by,
+                "submitted_at": record.get("submitted_at"),
+                "accuracy": record.get("accuracy"),
+                "total_samples": record.get("total_samples"),
+                "correct_samples": record.get("correct_samples"),
+            }
+            with open(history_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry) + "\n")
+        except Exception:
+            logger.warning("Failed to append submission history", exc_info=True)
 
     # ------------------------------------------------------------- compute
     @staticmethod

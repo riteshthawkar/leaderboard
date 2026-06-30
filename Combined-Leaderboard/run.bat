@@ -36,7 +36,7 @@ echo.
 REM Run the Flask app
 echo Starting Combined Leaderboard Server...
 echo.
-echo Server running at http://localhost:5000
+if "%FLASK_PORT%"=="" set FLASK_PORT=5050
+echo Server running at http://localhost:%FLASK_PORT%
 echo.
-cd backend\web
-python -m flask run
+python backend\web\app.py

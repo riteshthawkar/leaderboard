@@ -7,13 +7,24 @@
 {% block content %}
 <section class="page-hero bench-accent">
     <div class="container">
-        <span class="eyebrow" style="color:var(--dysm);background:var(--dysm-soft)">Perception · arXiv:2506.02022</span>
+        <span class="eyebrow" style="color:var(--dysm)">Visual Perception</span>
         <h1>Do You See Me</h1>
         <p class="hero-sub">2,612 questions. Seven perceptual subtasks in 2D and photorealistic 3D. Parametric difficulty &mdash; grounded in human vision tests (TVPS, MVPT).</p>
         <div class="hero-cta">
             <a href="{{ url_for('page_leaderboard') }}" class="btn brand">Perception rankings</a>
             <a href="{{ url_for('page_submit') }}" class="btn">Submit a model</a>
             <a href="https://arxiv.org/abs/2506.02022" target="_blank" rel="noopener" class="btn ghost">Read paper ↗</a>
+        </div>
+    </div>
+</section>
+
+<section class="stats-section">
+    <div class="container">
+        <div class="stat-band cols-4 bench-accent">
+            <div class="stat-cell"><span class="n">[01]</span><span class="v">1,758</span><span class="l">Images across 2D and photorealistic 3D scenes</span></div>
+            <div class="stat-cell"><span class="n">[02]</span><span class="v">2,612</span><span class="l">Questions spanning seven perceptual subtasks</span></div>
+            <div class="stat-cell"><span class="n">[03]</span><span class="v">96.5%</span><span class="l">Human macro accuracy on the same tasks</span></div>
+            <div class="stat-cell"><span class="n">[04]</span><span class="v">&lt;50%</span><span class="l">Best MLLM average — far below the human floor</span></div>
         </div>
     </div>
 </section>
@@ -28,12 +39,13 @@
                 <ul class="spec-list" style="margin-top:20px">
                     <li><span class="k">Scale</span><span class="v">1,758 images &middot; 2,612 questions &middot; 7 subtasks</span></li>
                     <li><span class="k">Grounding</span><span class="v">Motor-free human vision tests (TVPS, MVPT)</span></li>
-                    <li><span class="k">Human baseline</span><span class="v">95.83% macro accuracy</span></li>
+                    <li><span class="k">Human baseline</span><span class="v">96.49% macro accuracy</span></li>
                 </ul>
             </div>
             <div class="card callout bench-accent standalone">
-                <h4>The headline gap</h4>                <div class="kpi-row">
-                    <div class="kpi"><div class="kpi-label">Human accuracy</div><div class="kpi-val pos">95.8%</div></div>
+                <h4>The headline gap</h4>
+                <div class="kpi-row">
+                    <div class="kpi"><div class="kpi-label">Human accuracy</div><div class="kpi-val pos">96.5%</div></div>
                     <div class="kpi"><div class="kpi-label">Best MLLM (avg)</div><div class="kpi-val neg">&lt;50%</div></div>
                 </div>
                 <p class="muted small">Macro average over 2D and 3D. Gap widens drastically at higher difficulty.</p>
@@ -88,6 +100,23 @@
                 <h3>SFT barely moves the needle</h3>
                 <p>Large-scale fine-tuning gained only ~11% and still fell far short of humans &mdash; the limits are foundational.</p>
             </div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="section-head">
+            <div class="section-tag" style="color:var(--dysm)">How it's built</div>
+            <h2>From human vision tests to a parametric benchmark</h2>
+            <p>Subtasks are generated synthetically so difficulty can be dialed continuously &mdash; no fixed test set to overfit.</p>
+        </div>
+        <div class="pipeline">
+            <div class="pipe-step"><span class="n">[01]</span><h4>Pick a skill</h4><p>Seven dimensions drawn from motor-free human vision tests (TVPS, MVPT).</p></div>
+            <div class="pipe-step"><span class="n">[02]</span><h4>Render scenes</h4><p>Procedural 2D and photorealistic 3D images at controlled clutter and occlusion.</p></div>
+            <div class="pipe-step"><span class="n">[03]</span><h4>Set difficulty</h4><p>Parametric knobs scale object count, transforms, and noise per item.</p></div>
+            <div class="pipe-step"><span class="n">[04]</span><h4>Ask &amp; verify</h4><p>Numeric, text, and MCQ questions with programmatic ground truth.</p></div>
+            <div class="pipe-step"><span class="n">[05]</span><h4>Anchor to humans</h4><p>Identical items run with people set a 96.5% reference baseline.</p></div>
         </div>
     </div>
 </section>

@@ -6,9 +6,11 @@ token (and therefore on the user account).
 """
 
 import secrets
+import hashlib
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy import create_engine, Column, String, DateTime, Integer
@@ -88,6 +90,35 @@ def login_user(username: str, password: str) -> Optional[str]:
         if match and user:
             return user.api_token
         return None
+
+
+def _oauth_username(provider: str, subject: str, email: Optional[str]) -> str:
+    provider_slug = re.sub(r"[^a-z0-9_-]+", "", provider.strip().lower()) or "oauth"
+    stem_source = (email or subject or "user").split("@")[0].lower()
+    stem = re.sub(r"[^a-z0-9_-]+", "-", stem_source).strip("-_") or "user"
+    digest = hashlib.sha256(f"{provider_slug}:{subject}".encode("utf-8")).hexdigest()[:10]
+    max_stem = max(8, 80 - len(provider_slug) - len(digest) - 2)
+    return f"{provider_slug}_{stem[:max_stem]}_{digest}"
+
+
+def oauth_login_user(provider: str, subject: str, email: Optional[str] = None) -> Optional[Tuple[str, str]]:
+    """Create or reuse a local user for an OAuth identity and return username/token."""
+    provider = provider.strip().lower()
+    subject = subject.strip()
+    if not provider or not subject:
+        return None
+    username = _oauth_username(provider, subject, email)
+    with _Session() as session:
+        user = session.query(User).filter_by(username=username).first()
+        if not user:
+            user = User(
+                username=username,
+                password_hash=generate_password_hash(secrets.token_urlsafe(32)),
+                api_token=secrets.token_urlsafe(32),
+            )
+            session.add(user)
+            session.commit()
+        return user.username, user.api_token
 
 
 def get_username_by_token(token: str) -> Optional[str]:

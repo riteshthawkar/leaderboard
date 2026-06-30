@@ -35,6 +35,11 @@ dist/
 .mypy_cache/
 .ruff_cache/
 
+# --- Frontend dependencies & build artifacts ---
+node_modules/
+Combined-Leaderboard/frontend/node_modules/
+Combined-Leaderboard/frontend/static/react-app/
+
 # --- Harness scratch / generated test artifacts ---
 **/_gray_cache/
 **/_dryrun_*.json
@@ -57,8 +62,5 @@ spatial_responses.json
 dysm_responses.json
 minds_eye_responses.json
 
-# --- OS / editor ---
-.DS_Store
-Thumbs.db
-.idea/
-*.swp
+visual_intelligence_benchmark_leaderboard.md
+HANDOVER.md

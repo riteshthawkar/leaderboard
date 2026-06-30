@@ -7,13 +7,24 @@
 {% block content %}
 <section class="page-hero bench-accent">
     <div class="container">
-        <span class="eyebrow" style="color:var(--spatial);background:var(--spatial-soft)">Spatial reasoning · arXiv:2604.16060</span>
+        <span class="eyebrow" style="color:var(--spatial)">Visual Spacital Reasoning</span>
         <h1>When Chain-of-Thought hurts spatial reasoning</h1>
         <p class="hero-sub">17 models. 13 spatial datasets. One uniform policy &mdash; showing CoT degrades spatial accuracy and models hallucinate spatial details even without images.</p>
         <div class="hero-cta">
             <a href="{{ url_for('page_leaderboard') }}" class="btn brand">Spatial rankings</a>
             <a href="{{ url_for('page_submit') }}" class="btn">Submit a model</a>
             <a href="https://arxiv.org/abs/2604.16060" target="_blank" rel="noopener" class="btn ghost">Read paper ↗</a>
+        </div>
+    </div>
+</section>
+
+<section class="stats-section">
+    <div class="container">
+        <div class="stat-band cols-4 bench-accent">
+            <div class="stat-cell"><span class="n">[01]</span><span class="v">17</span><span class="l">Models evaluated across spatial reasoning conditions</span></div>
+            <div class="stat-cell"><span class="n">[02]</span><span class="v">13</span><span class="l">Spatial datasets unified under one policy</span></div>
+            <div class="stat-cell"><span class="n">[03]</span><span class="v">-3%</span><span class="l">Average CoT accuracy change across benchmarks</span></div>
+            <div class="stat-cell"><span class="n">[04]</span><span class="v">7/8</span><span class="l">Reasoning models that trail their distilled backbone</span></div>
         </div>
     </div>
 </section>
@@ -25,6 +36,11 @@
                 <div class="section-tag" style="color:var(--spatial)">The premise</div>
                 <h2>Does text-centric reasoning transfer to space?</h2>
                 <p class="lede">Reasoning models excel at math and logic, but spatial reasoning requires geometric intuition and visual grounding &mdash; properties that verbose, text-based thinking doesn't provide.</p>
+                <ul class="spec-list" style="margin-top:20px">
+                    <li><span class="k">Benchmark suite</span><span class="v">Static 2D, 3D geometry, dynamic, and temporal spatial tasks</span></li>
+                    <li><span class="k">Diagnostic modes</span><span class="v">standard, CoT, no-image, and no-image++</span></li>
+                    <li><span class="k">Main question</span><span class="v">Whether reasoning traces improve visual grounding or amplify shortcuts</span></li>
+                </ul>
                 <div style="margin-top:20px; display:flex; flex-wrap:wrap; gap:8px">
                     <span class="chip">Qwen2.5-VL family</span>
                     <span class="chip">GThinker</span>
@@ -47,6 +63,23 @@
 </section>
 
 <section class="section alt">
+    <div class="container">
+        <div class="section-head">
+            <div class="section-tag" style="color:var(--spatial)">Evaluation design</div>
+            <h2>One spatial question, four conditions</h2>
+            <p>The paper separates real visual grounding from language priors by rerunning each item under interventions that remove or neutralize the image.</p>
+        </div>
+        <div class="pipeline">
+            <div class="pipe-step"><span class="n">[01]</span><h4>Standard</h4><p>Answer from the image and prompt using greedy deterministic decoding.</p></div>
+            <div class="pipe-step"><span class="n">[02]</span><h4>CoT</h4><p>Ask the model to reason step by step and measure whether accuracy improves or drops.</p></div>
+            <div class="pipe-step"><span class="n">[03]</span><h4>No-image</h4><p>Remove the visual input to estimate shortcut learning from textual priors.</p></div>
+            <div class="pipe-step"><span class="n">[04]</span><h4>No-image++</h4><p>Use a blank image plus abstention option to test hallucination resistance.</p></div>
+            <div class="pipe-step"><span class="n">[05]</span><h4>Judge</h4><p>Use GPT-4o to decide whether the final selected option matches ground truth.</p></div>
+        </div>
+    </div>
+</section>
+
+<section class="section">
     <div class="container">
         <div class="section-head">
             <div class="section-tag" style="color:var(--spatial)">Findings</div>
@@ -73,7 +106,7 @@
     </div>
 </section>
 
-<section class="section">
+<section class="section alt">
     <div class="container">
         <div class="section-head">
             <div class="section-tag" style="color:var(--spatial)">The data</div>
@@ -89,7 +122,7 @@
     </div>
 </section>
 
-<section class="section alt">
+<section class="section">
     <div class="container">
         <div class="grid cols-2" style="align-items:start">
             <div>

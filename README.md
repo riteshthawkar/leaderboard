@@ -42,7 +42,12 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env: set SECRET_KEY and optionally OPENAI_API_KEY
 
-python backend/web/app.py   # → http://localhost:5000
+python backend/web/app.py   # -> http://localhost:5050
+
+# In another terminal, run the React app during development
+cd frontend
+npm install
+npm run dev                 # -> http://localhost:5173, or the next free port
 ```
 
 > **Windows:** use `run.bat`  
@@ -53,10 +58,13 @@ python backend/web/app.py   # → http://localhost:5000
 | Variable | Required | Description |
 |---|---|---|
 | `SECRET_KEY` | Yes | Flask secret — generate with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `FLASK_PORT` | Local/dev | Backend port. Defaults to `5050` to match the Vite proxy. |
 | `OPENAI_API_KEY` | No | Enables GPT-4o judge; falls back to deterministic scoring if unset |
 | `CORS_ORIGINS` | Production | Comma-separated allowed origins, e.g. `https://yoursite.com` |
 | `LIMITER_STORAGE_URI` | Production | `redis://...` for persistent rate limits across restarts (default: `memory://`) |
 | `API_TOKENS` | Optional | Comma-separated admin tokens for bypass access |
+| `DISABLE_SUBMISSION_AUTH` | Local only | Keep `false` for production. Set `true` only for temporary unauthenticated UI testing. |
+| `GOOGLE_CLIENT_ID` / `MICROSOFT_CLIENT_ID` | Optional | Enables OAuth buttons when paired with provider secrets and callback URLs. |
 
 ---
 
@@ -76,19 +84,10 @@ leaderboard/
     │   │   └── ground_truth.py    # Ground truth loader
     │   └── constants.py           # Rate limits, file constraints
     ├── frontend/
-    │   ├── templates/
-    │   │   ├── base.html          # Shared layout (Geist Pixel font, dark theme)
-    │   │   ├── home.html
-    │   │   ├── leaderboard.html   # Auth-gated rankings
-    │   │   ├── submit.html        # Auth-gated submission forms
-    │   │   ├── login.html         # Register / login page
-    │   │   ├── benchmark_dysm.html
-    │   │   ├── benchmark_minds_eye.html
-    │   │   └── benchmark_spatial.html
-    │   └── static/
-    │       ├── css/site.css       # Design system (dark mono, ruled grid)
-    │       ├── js/main.js         # Leaderboard + submission logic
-    │       └── fonts/             # Self-hosted Geist Pixel, JetBrains Mono
+    │   ├── src/                   # React/Vite app: pages, components, data, API helpers
+    │   ├── static/css/site.css    # Shared design system used by React
+    │   ├── static/react-app/      # Production build output from npm run build
+    │   └── templates/             # Legacy Jinja fallback when React build is absent
     ├── tasks/                     # Ground truth + question sets per benchmark
     │   ├── do_you_see_me/
     │   ├── minds_eye/
@@ -190,7 +189,7 @@ See `.env.example` for all configuration options.
 **Self-hosted (nginx + Waitress):**
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:5000;
+    proxy_pass http://127.0.0.1:5050;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $remote_addr;
 }
