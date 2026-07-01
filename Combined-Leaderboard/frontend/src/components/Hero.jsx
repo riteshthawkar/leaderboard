@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import heroBg from "../../assets/bg-2.png";
 
 export function HomeHero() {
   return (
-    <section className="hero">
+    <section className="hero hero--art">
+      <div className="home-hero-art" style={{ backgroundImage: `url(${heroBg})` }} aria-hidden="true" />
       <div className="container">
         <span className="eyebrow">Microsoft Research · Multimodal Evaluation</span>
         <h1>

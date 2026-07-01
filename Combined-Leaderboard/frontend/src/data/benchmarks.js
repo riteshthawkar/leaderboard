@@ -11,7 +11,7 @@ export const benchmarkPages = {
     authors: "Aditya Kanade · Tanuja Ganu",
     cta: "Perception rankings",
     subtitle:
-      "2,612 questions. Seven perceptual subtasks in 2D and photorealistic 3D. Parametric difficulty — grounded in human vision tests (TVPS, MVPT).",
+      "Tests whether a model truly sees an image before it reasons, isolating core perception like shape, color binding, letters, and figure detection across cluttered 2D and photorealistic 3D scenes.",
     stats: [
       ["1,758", "Images across 2D and photorealistic 3D scenes"],
       ["2,612", "Questions spanning seven perceptual subtasks"],
@@ -137,7 +137,7 @@ export const benchmarkPages = {
     authors: "Rohit Sinha · Sai Srinivas Kancheti · Vineeth N Balasubramanian · Tanuja Ganu",
     cta: "Imagery rankings",
     subtitle:
-      "8 visuo-cognitive tasks — mental rotation, paper folding, shape composition — organized under an Abstraction–Relation–Transformation taxonomy.",
+      "Tests whether a model can form and manipulate mental images, from spotting hidden patterns and mapping relations to rotating, folding, and composing shapes in the mind.",
     stats: [["8", "Visuo-cognitive tasks across abstraction, relation, and transformation"], ["3", "Taxonomy axes for probing mental image manipulation"], ["80%", "Human accuracy across the benchmark"], ["<50%", "Top MLLM performance, with largest gaps on transformation"]],
     premise: {
       tag: "Why this benchmark exists",
@@ -207,7 +207,7 @@ export const benchmarkPages = {
     paperUrl: "https://arxiv.org/abs/2604.16060",
     authors: "Sai Srinivas Kancheti · Aditya Kanade · Vineeth N Balasubramanian · Tanuja Ganu",
     cta: "Spatial rankings",
-    subtitle: "17 models. 13 spatial datasets. One uniform policy — showing CoT degrades spatial accuracy and models hallucinate spatial details even without images.",
+    subtitle: "Tests whether models ground their answers in what they actually see, exposing how verbal step by step reasoning can erode spatial accuracy and how models invent spatial detail when the image is taken away.",
     stats: [["17", "Models evaluated across spatial reasoning conditions"], ["13", "Spatial datasets unified under one policy"], ["-3%", "Average CoT accuracy change across benchmarks"], ["7/8", "Reasoning models that trail their distilled backbone"]],
     premise: { tag: "Why this benchmark exists", title: "Text-style chain-of-thought is not the same as spatial reasoning", body: "The paper asks whether the reasoning paradigm that helps math and logic also helps visual spatial tasks. Its central finding is that language-heavy reasoning can degrade spatial accuracy and amplify shortcuts when geometric grounding is required.", specs: [["Evaluation scope", "Seventeen models across thirteen spatial benchmarks"], ["Interventions", "Standard, CoT, no-image, and No-Image++ conditions"], ["Core question", "Whether answers are grounded in the image or reconstructed from textual priors"]], calloutTitle: "Core contribution", calloutItems: [["01", "Shows CoT can hurt spatial accuracy", "The paper challenges the assumption that more verbal reasoning is always beneficial for multimodal tasks."], ["02", "Introduces No-Image++", "A blank-image plus abstention setup exposes hallucinated spatial detail when visual evidence is absent."], ["03", "Separates grounding from shortcut learning", "Running the same task under image-removed conditions reveals whether a model is using the image or dataset priors."],], note: "The important page message is diagnostic: spatial reasoning needs vision-centric grounding, not only longer text rationales.", chips: ["Qwen2.5-VL family", "GThinker", "Vision-R1", "ViGoRL", "Qwen3-VL", "+12 more models"] },
     evaluation: { tag: "Evaluation design", title: "Four evaluation conditions for each spatial question", body: "The paper separates real visual grounding from language priors by rerunning each item under interventions that remove or neutralize the image.", steps: [["Standard", "Answer from the image and prompt using greedy deterministic decoding."], ["CoT", "Ask the model to reason step by step and measure whether accuracy improves or drops."], ["No-image", "Remove the visual input to estimate shortcut learning from textual priors."], ["No-image++", "Use a blank image plus abstention option to test hallucination resistance."], ["Judge", "Use GPT-4o to decide whether the final selected option matches ground truth."]] },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CapabilityRadar } from "@/components/Charts";
+import { BarChart, CapabilityRadar, chartPalette } from "@/components/Charts";
 import { PageHero } from "@/components/Hero";
 import { TabBar } from "@/components/ui/tabs";
 import { getJSON } from "@/lib/api";
@@ -360,6 +360,31 @@ function nextSortState(current, key, defaultDirection = "desc") {
   return { key, direction: defaultDirection };
 }
 
+const COLUMN_DESCRIPTIONS = {
+  model: "Name of the evaluated vision-language model.",
+  org: "Organization or team that produced the model.",
+  type: "Model access type — e.g. open weights, proprietary API, or research preview.",
+  params: "Approximate parameter count (model size).",
+  base: "Base model or backbone the system is built on.",
+  cot: "Whether chain-of-thought prompting was used during evaluation.",
+  rankMetric: "Score currently used to rank models in this view.",
+  vci: "Visual Cognition Index — combined 0–100 score across perception and imagery.",
+  perception:
+    "Accuracy on Do-You-See-Me perception tasks (low-level visual understanding).",
+  imagery: "Accuracy on Mind's-Eye mental-imagery and visualization tasks.",
+  spatial: "Overall accuracy on spatial-reasoning benchmarks.",
+  gap: "Perception minus imagery accuracy (positive = stronger perception).",
+  samples: "Number of scored question instances.",
+  scope: "Accuracy over the currently selected spatial benchmark scope.",
+  macro: "Macro-averaged accuracy across datasets, shown with its standard deviation.",
+  cot_delta: "Accuracy change from chain-of-thought vs. standard prompting.",
+  shortcut:
+    "Shortcut reliance — accuracy when the image is withheld (lower is better).",
+  hallucination:
+    "Hallucination resistance — robustness to absent or misleading visuals (higher is better).",
+  coverage: "Share of datasets / conditions the model was evaluated on.",
+};
+
 function SortHeader({
   label,
   sortKey,
@@ -369,9 +394,11 @@ function SortHeader({
   defaultDirection = "desc",
 }) {
   const active = sort.key === sortKey;
+  const description = COLUMN_DESCRIPTIONS[sortKey];
   return (
     <th
       className={`${className} sortable-th ${active ? "is-active" : ""}`.trim()}
+      data-tip={description || undefined}
       aria-sort={
         active
           ? sort.direction === "asc"
@@ -471,6 +498,12 @@ function compareColumnValue(row, sortKey) {
       Number(Boolean(row.spatial))
     );
   return row.visual?.vci ?? row.spatial?.accuracy;
+}
+
+function heatPct(value) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const ratio = value > 1 ? value / 100 : value;
+  return `${Math.round(ratio * 100)}%`;
 }
 
 function scoreColor(value, invert = false) {
@@ -699,443 +732,106 @@ function Heatmap({ rows, columns, valueFor, displayFor, emptyText }) {
   );
 }
 
-function VisualCapabilityHeatmap({ rows, capabilities }) {
+function VisualCapabilityChart({ rows, capabilities }) {
   return (
     <Heatmap
+      rows={rows}
       columns={capabilities}
-      displayFor={fmtPct}
-      emptyText="Capability heatmap appears when ranked models are available."
-      rows={rows.slice(0, 12)}
-      valueFor={(row, capability) => getVisualCapability(row, capability.id)}
+      valueFor={(row, column) => getVisualCapability(row, column.id)}
+      displayFor={heatPct}
+      emptyText="Capability profiles appear when ranked models are available."
     />
   );
 }
 
-function SpatialDatasetHeatmap({ rows, datasets }) {
+function SpatialDatasetChart({ rows, datasets }) {
   return (
     <Heatmap
+      rows={rows}
       columns={datasets.map((dataset) => ({ id: dataset, label: dataset }))}
-      displayFor={fmtPct}
-      emptyText="Dataset heatmap appears when spatial rankings are available."
-      rows={rows.slice(0, 12)}
-      valueFor={(row, dataset) => spatialDatasetValue(row, dataset.id)}
+      valueFor={(row, column) => spatialDatasetValue(row, column.id)}
+      displayFor={heatPct}
+      emptyText="Per-dataset accuracy appears when spatial rankings are available."
     />
   );
 }
 
-function PerceptionImageryScatter({ rows }) {
+function PerceptionImageryChart({ rows }) {
   const completeRows = rows.filter(
     (row) => row.perception_accuracy != null && row.imagery_accuracy != null,
   );
-  if (!completeRows.length)
-    return (
-      <div className="viz-empty">
-        Scatter plot requires models with both perception and imagery scores.
-      </div>
-    );
-  const width = 640;
-  const height = 360;
-  const margin = { top: 24, right: 34, bottom: 56, left: 62 };
-  const plotWidth = width - margin.left - margin.right;
-  const plotHeight = height - margin.top - margin.bottom;
-  const xFor = (value) => margin.left + value * plotWidth;
-  const yFor = (value) => margin.top + (1 - value) * plotHeight;
   return (
-    <svg
-      className="viz-svg"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label="Perception versus imagery scatter plot"
-    >
-      {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
-        <g key={tick}>
-          <line
-            className="viz-grid-line"
-            x1={xFor(tick)}
-            x2={xFor(tick)}
-            y1={margin.top}
-            y2={height - margin.bottom}
-          />
-          <line
-            className="viz-grid-line"
-            x1={margin.left}
-            x2={width - margin.right}
-            y1={yFor(tick)}
-            y2={yFor(tick)}
-          />
-          <text
-            className="viz-axis-tick"
-            x={xFor(tick)}
-            y={height - 30}
-            textAnchor="middle"
-          >
-            {asPercentPoint(tick)}
-          </text>
-          <text
-            className="viz-axis-tick"
-            x={34}
-            y={yFor(tick) + 4}
-            textAnchor="middle"
-          >
-            {asPercentPoint(tick)}
-          </text>
-        </g>
-      ))}
-      <line
-        className="viz-axis"
-        x1={margin.left}
-        x2={width - margin.right}
-        y1={height - margin.bottom}
-        y2={height - margin.bottom}
-      />
-      <line
-        className="viz-axis"
-        x1={margin.left}
-        x2={margin.left}
-        y1={margin.top}
-        y2={height - margin.bottom}
-      />
-      <text
-        className="viz-axis-label"
-        x={width / 2}
-        y={height - 8}
-        textAnchor="middle"
-      >
-        Do-You-See-Me perception accuracy
-      </text>
-      <text
-        className="viz-axis-label"
-        x={18}
-        y={height / 2}
-        textAnchor="middle"
-        transform={`rotate(-90 18 ${height / 2})`}
-      >
-        Mind's-Eye imagery accuracy
-      </text>
-      {completeRows.map((row, index) => (
-        <g key={row.model_name}>
-          <circle
-            className="scatter-point"
-            cx={xFor(row.perception_accuracy)}
-            cy={yFor(row.imagery_accuracy)}
-            r="8"
-            style={{
-              fill: scoreColor(row.vci),
-              stroke: index === 0 ? "var(--text)" : "var(--surface)",
-            }}
-          >
-            <title>{`${row.model_name}: perception ${fmtPct(row.perception_accuracy)}, imagery ${fmtPct(row.imagery_accuracy)}`}</title>
-          </circle>
-          <text
-            className="plot-label"
-            x={xFor(row.perception_accuracy) + 12}
-            y={yFor(row.imagery_accuracy) + 4}
-          >
-            {row.model_name}
-          </text>
-        </g>
-      ))}
-    </svg>
+    <BarChart
+      aspectRatio="16 / 8"
+      categories={completeRows.map((row) => ({ label: row.model_name, row }))}
+      emptyMessage="Needs models with both perception and imagery scores."
+      series={[
+        { key: "perception", label: "Perception", color: chartPalette[1], valueFor: (category) => category.row.perception_accuracy },
+        { key: "imagery", label: "Imagery", color: chartPalette[4], valueFor: (category) => category.row.imagery_accuracy },
+      ]}
+    />
   );
 }
 
-function CotDumbbellChart({ rows }) {
-  const data = rows
-    .filter(
-      (row) =>
-        row.diagnostics?.standard_accuracy != null &&
-        row.diagnostics?.cot_accuracy != null,
-    )
-    .slice(0, 12);
-  if (!data.length)
-    return (
-      <div className="viz-empty">
-        CoT dumbbell requires standard and CoT condition submissions.
-      </div>
-    );
-  const width = 640;
-  const height = Math.max(260, data.length * 42 + 70);
-  const margin = { top: 28, right: 40, bottom: 42, left: 140 };
-  const plotWidth = width - margin.left - margin.right;
-  const rowGap =
-    (height - margin.top - margin.bottom) / Math.max(1, data.length - 1);
-  const xFor = (value) => margin.left + value * plotWidth;
+function CotComparisonChart({ rows }) {
+  const data = rows.filter(
+    (row) =>
+      row.diagnostics?.standard_accuracy != null &&
+      row.diagnostics?.cot_accuracy != null,
+  );
   return (
-    <svg
-      className="viz-svg"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label="Standard versus chain-of-thought accuracy dumbbell chart"
-    >
-      {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
-        <g key={tick}>
-          <line
-            className="viz-grid-line"
-            x1={xFor(tick)}
-            x2={xFor(tick)}
-            y1={margin.top - 8}
-            y2={height - margin.bottom + 6}
-          />
-          <text
-            className="viz-axis-tick"
-            x={xFor(tick)}
-            y={height - 16}
-            textAnchor="middle"
-          >
-            {asPercentPoint(tick)}
-          </text>
-        </g>
-      ))}
-      {data.map((row, index) => {
-        const rowY = margin.top + index * rowGap;
-        const standardX = xFor(row.diagnostics.standard_accuracy);
-        const cotX = xFor(row.diagnostics.cot_accuracy);
-        const improved = row.diagnostics.cot_delta >= 0;
-        return (
-          <g key={row.model_name}>
-            <text
-              className="plot-label model-axis-label"
-              x={margin.left - 14}
-              y={rowY + 4}
-              textAnchor="end"
-            >
-              {row.model_name}
-            </text>
-            <line
-              className="dumbbell-line"
-              x1={standardX}
-              x2={cotX}
-              y1={rowY}
-              y2={rowY}
-              style={{ stroke: improved ? "#22c55e" : "#f43f5e" }}
-            />
-            <circle
-              className="dumbbell-dot standard"
-              cx={standardX}
-              cy={rowY}
-              r="6"
-            >
-              <title>{`Standard ${fmtPct(row.diagnostics.standard_accuracy)}`}</title>
-            </circle>
-            <circle
-              className="dumbbell-dot cot"
-              cx={cotX}
-              cy={rowY}
-              r="7"
-              style={{ fill: improved ? "#22c55e" : "#f43f5e" }}
-            >
-              <title>{`CoT ${fmtPct(row.diagnostics.cot_accuracy)} (${fmtDelta(row.diagnostics.cot_delta)} pts)`}</title>
-            </circle>
-          </g>
-        );
-      })}
-      <text
-        className="viz-axis-label"
-        x={width / 2}
-        y={height - 2}
-        textAnchor="middle"
-      >
-        Accuracy: standard dot to CoT dot
-      </text>
-    </svg>
+    <BarChart
+      aspectRatio="16 / 8"
+      categories={data.map((row) => ({ label: row.model_name, row }))}
+      emptyMessage="Needs standard and chain of thought submissions."
+      series={[
+        { key: "standard", label: "Standard", color: chartPalette[1], valueFor: (category) => category.row.diagnostics.standard_accuracy },
+        { key: "cot", label: "Chain of thought", color: chartPalette[2], valueFor: (category) => category.row.diagnostics.cot_accuracy },
+      ]}
+    />
   );
 }
 
-function RobustnessScatter({ rows }) {
+function RobustnessChart({ rows }) {
   const data = rows.filter(
     (row) =>
       row.diagnostics?.hallucination_resistance != null &&
       row.diagnostics?.shortcut_score != null,
   );
-  if (!data.length)
-    return (
-      <div className="viz-empty">
-        Robustness plot requires no-image and no-image++ diagnostics.
-      </div>
-    );
-  const width = 640;
-  const height = 360;
-  const margin = { top: 24, right: 34, bottom: 56, left: 62 };
-  const plotWidth = width - margin.left - margin.right;
-  const plotHeight = height - margin.top - margin.bottom;
-  const xFor = (value) => margin.left + value * plotWidth;
-  const yFor = (value) => margin.top + (1 - value) * plotHeight;
   return (
-    <svg
-      className="viz-svg"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label="Spatial robustness scatter plot"
-    >
-      {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
-        <g key={tick}>
-          <line
-            className="viz-grid-line"
-            x1={xFor(tick)}
-            x2={xFor(tick)}
-            y1={margin.top}
-            y2={height - margin.bottom}
-          />
-          <line
-            className="viz-grid-line"
-            x1={margin.left}
-            x2={width - margin.right}
-            y1={yFor(tick)}
-            y2={yFor(tick)}
-          />
-          <text
-            className="viz-axis-tick"
-            x={xFor(tick)}
-            y={height - 30}
-            textAnchor="middle"
-          >
-            {asPercentPoint(tick)}
-          </text>
-          <text
-            className="viz-axis-tick"
-            x={34}
-            y={yFor(tick) + 4}
-            textAnchor="middle"
-          >
-            {asPercentPoint(tick)}
-          </text>
-        </g>
-      ))}
-      <text
-        className="viz-axis-label"
-        x={width / 2}
-        y={height - 8}
-        textAnchor="middle"
-      >
-        Standard accuracy
-      </text>
-      <text
-        className="viz-axis-label"
-        x={18}
-        y={height / 2}
-        textAnchor="middle"
-        transform={`rotate(-90 18 ${height / 2})`}
-      >
-        Hallucination resistance
-      </text>
-      {data.map((row) => {
-        const delta = row.diagnostics.cot_delta ?? 0;
-        const fill = delta >= 0 ? "#22c55e" : "#f43f5e";
-        const radius = 6 + (row.diagnostics.shortcut_score || 0) * 9;
-        return (
-          <g key={row.model_name}>
-            <circle
-              className="scatter-point"
-              cx={xFor(row.accuracy)}
-              cy={yFor(row.diagnostics.hallucination_resistance)}
-              r={radius}
-              style={{ fill, opacity: 0.76 }}
-            >
-              <title>{`${row.model_name}: accuracy ${fmtPct(row.accuracy)}, shortcut ${fmtPct(row.diagnostics.shortcut_score)}, hallucination resistance ${fmtPct(row.diagnostics.hallucination_resistance)}`}</title>
-            </circle>
-            <text
-              className="plot-label"
-              x={xFor(row.accuracy) + radius + 5}
-              y={yFor(row.diagnostics.hallucination_resistance) + 4}
-            >
-              {row.model_name}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <BarChart
+      aspectRatio="16 / 8"
+      categories={data.map((row) => ({ label: row.model_name, row }))}
+      emptyMessage="Needs no-image and no-image++ diagnostics."
+      series={[
+        { key: "accuracy", label: "Standard accuracy", color: chartPalette[1], valueFor: (category) => category.row.accuracy },
+        { key: "hallucination", label: "Hallucination resistance", color: chartPalette[0], valueFor: (category) => category.row.diagnostics.hallucination_resistance },
+        { key: "shortcut", label: "Shortcut score", color: chartPalette[2], valueFor: (category) => category.row.diagnostics.shortcut_score },
+      ]}
+    />
   );
 }
 
-function ComparisonHeatmap({ rows }) {
-  const columns = [
-    {
-      id: "vci",
-      label: "VCI",
-      valueFor: (row) => row.visual?.vci,
-      displayFor: fmtVci,
-    },
-    {
-      id: "perception",
-      label: "Perception",
-      valueFor: (row) => row.visual?.perception_accuracy,
-      displayFor: fmtPct,
-    },
-    {
-      id: "imagery",
-      label: "Imagery",
-      valueFor: (row) => row.visual?.imagery_accuracy,
-      displayFor: fmtPct,
-    },
-    {
-      id: "spatial",
-      label: "Spatial",
-      valueFor: (row) => row.spatial?.accuracy,
-      displayFor: fmtPct,
-    },
-    {
-      id: "cot",
-      label: "CoT Δ",
-      valueFor: (row) =>
-        row.spatial?.diagnostics?.cot_delta == null
-          ? null
-          : Math.max(0, Math.min(1, 0.5 + row.spatial.diagnostics.cot_delta)),
-      displayFor: (_, row) =>
-        row.spatial?.diagnostics?.cot_delta == null
-          ? "—"
-          : `${fmtDelta(row.spatial.diagnostics.cot_delta)} pts`,
-    },
-    {
-      id: "shortcut",
-      label: "Shortcut ↓",
-      valueFor: (row) => row.spatial?.diagnostics?.shortcut_score,
-      displayFor: fmtPct,
-      invert: true,
-    },
-    {
-      id: "hallucination",
-      label: "Halluc. ↑",
-      valueFor: (row) => row.spatial?.diagnostics?.hallucination_resistance,
-      displayFor: fmtPct,
-    },
+function ComparisonChart({ rows }) {
+  const metrics = [
+    { label: "VCI", valueFor: (row) => row.visual?.vci },
+    { label: "Perception", valueFor: (row) => row.visual?.perception_accuracy },
+    { label: "Imagery", valueFor: (row) => row.visual?.imagery_accuracy },
+    { label: "Spatial", valueFor: (row) => row.spatial?.accuracy },
+    { label: "Hallucination", valueFor: (row) => row.spatial?.diagnostics?.hallucination_resistance },
   ];
-  if (!rows.length)
-    return (
-      <div className="viz-empty">No models match the comparison filters.</div>
-    );
   return (
-    <div className="heatmap-wrap">
-      <div
-        className="heatmap-grid"
-        style={{
-          gridTemplateColumns: `minmax(160px, 1.4fr) repeat(${columns.length}, minmax(82px, 1fr))`,
-        }}
-      >
-        <div className="heat-head sticky-col">Model</div>
-        {columns.map((column) => (
-          <div className="heat-head" key={column.id}>
-            {column.label}
-          </div>
-        ))}
-        {rows.map((row) => (
-          <div className="heat-row-frag" key={row.model_name}>
-            <div className="heat-label sticky-col">{row.model_name}</div>
-            {columns.map((column) => {
-              const value = column.valueFor(row);
-              return (
-                <div
-                  className="heat-cell"
-                  key={`${row.model_name}-${column.id}`}
-                  style={{ background: scoreColor(value, column.invert) }}
-                >
-                  {column.displayFor(value, row)}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
+    <BarChart
+      aspectRatio="16 / 7"
+      categories={metrics}
+      emptyMessage="No models match the comparison filters."
+      series={rows.map((row, index) => ({
+        key: row.model_name,
+        label: row.model_name,
+        color: chartPalette[index % chartPalette.length],
+        valueFor: (category) => category.valueFor(row),
+      }))}
+    />
   );
 }
 
@@ -1967,15 +1663,15 @@ export function ResearchLeaderboard() {
 
               <div className="dashboard-grid two-col">
                 <div className="viz-card wide">
-                  <h3>Capability heatmap</h3>
-                  <VisualCapabilityHeatmap
+                  <h3>Capability profile</h3>
+                  <VisualCapabilityChart
                     rows={filteredVisualRows}
                     capabilities={visibleCapabilities}
                   />
                 </div>
                 <div className="viz-card">
                   <h3>Perception vs imagery</h3>
-                  <PerceptionImageryScatter rows={filteredVisualRows} />
+                  <PerceptionImageryChart rows={filteredVisualRows} />
                 </div>
                 <div className="viz-card">
                   <h3>Top-model capability trace</h3>
@@ -2294,19 +1990,19 @@ export function ResearchLeaderboard() {
 
               <div className="dashboard-grid two-col">
                 <div className="viz-card wide">
-                  <h3>Spatial dataset heatmap</h3>
-                  <SpatialDatasetHeatmap
+                  <h3>Per-dataset accuracy</h3>
+                  <SpatialDatasetChart
                     rows={filteredSpatialRows}
                     datasets={spatialScopedDatasets}
                   />
                 </div>
                 <div className="viz-card">
                   <h3>CoT effect</h3>
-                  <CotDumbbellChart rows={filteredSpatialRows} />
+                  <CotComparisonChart rows={filteredSpatialRows} />
                 </div>
                 <div className="viz-card">
                   <h3>Grounding robustness</h3>
-                  <RobustnessScatter rows={filteredSpatialRows} />
+                  <RobustnessChart rows={filteredSpatialRows} />
                 </div>
               </div>
             </section>
@@ -2527,7 +2223,7 @@ export function ResearchLeaderboard() {
               <div className="dashboard-grid">
                 <div className="viz-card wide">
                   <h3>Cross-track profile matrix</h3>
-                  <ComparisonHeatmap rows={compareRows.slice(0, 14)} />
+                  <ComparisonChart rows={compareRows.slice(0, 14)} />
                 </div>
               </div>
             </section>

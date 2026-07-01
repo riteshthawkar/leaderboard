@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { PageHero } from "@/components/Hero";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FileDropzone } from "@/components/FileDropzone";
 import { getJSON, readUser } from "@/lib/api";
 import { fmtMeanStd, fmtPct } from "@/lib/utils";
 import { submitTasks } from "@/data/benchmarks";
@@ -41,10 +49,51 @@ function collectModelMeta(formData, task) {
   };
 }
 
+// Required text/select fields validated client-side (name -> human label).
+const REQUIRED_FIELDS = [
+  ["model_name", "Model name"],
+  ["organization", "Organisation"],
+  ["model_access", "Source status"],
+  ["parameter_count", "Parameter count"],
+  ["base_model", "Base model"],
+  ["training_data", "Training data and fine-tuning"],
+  ["cot_used", "CoT used?"],
+  ["method_description", "Method description"],
+  ["prompt_template", "Prompt template"],
+  ["changes_from_previous", "Changes from previous submission"],
+];
+
+function Field({ label, required = false, error, className = "", children, as: Tag = "label" }) {
+  return (
+    <Tag className={`field ${className} ${error ? "has-error" : ""}`.trim()}>
+      <span>
+        {label} {required && <em>*</em>}
+      </span>
+      {children}
+      {error && (
+        <span className="field-error" role="alert">
+          {error}
+        </span>
+      )}
+    </Tag>
+  );
+}
+
 export function Submit() {
   const user = readUser();
   const [taskInfo, setTaskInfo] = useState({});
   const [messages, setMessages] = useState({});
+  const [errors, setErrors] = useState({});
+  const clearFieldError = (taskId, name) => {
+    if (!name) return;
+    setErrors((current) => {
+      const taskErrors = current[taskId];
+      if (!taskErrors || !taskErrors[name]) return current;
+      const next = { ...taskErrors };
+      delete next[name];
+      return { ...current, [taskId]: next };
+    });
+  };
   useEffect(() => {
     Promise.all(
       submitTasks.map((task) =>
@@ -62,14 +111,38 @@ export function Submit() {
     const data = new FormData(form);
     data.set("model_name", fieldValue(data, "model_name"));
     const modelMeta = collectModelMeta(data, task);
-    if (wordCount(modelMeta.method_description) < 100) {
-      setMessages((current) => ({ ...current, [task.id]: { ok: false, text: "Method description must be at least 100 words." } }));
+    const fieldErrors = {};
+    for (const [name, label] of REQUIRED_FIELDS) {
+      if (!fieldValue(data, name)) fieldErrors[name] = `${label} is required.`;
+    }
+    if (!fieldErrors.method_description && wordCount(modelMeta.method_description) < 100) {
+      fieldErrors.method_description = "Method description must be at least 100 words.";
+    }
+    if (!fieldErrors.changes_from_previous && wordCount(modelMeta.changes_from_previous) < 50) {
+      fieldErrors.changes_from_previous = "Changes from previous submission must be at least 50 words.";
+    }
+    const responseFile = data.get("file");
+    if (!responseFile || !responseFile.name) {
+      fieldErrors.file = "A response file (JSON or CSV) is required.";
+    }
+    if (Object.keys(fieldErrors).length) {
+      setErrors((current) => ({ ...current, [task.id]: fieldErrors }));
+      const count = Object.keys(fieldErrors).length;
+      setMessages((current) => ({
+        ...current,
+        [task.id]: {
+          ok: false,
+          text: `Please complete ${count} required field${count > 1 ? "s" : ""} highlighted below.`,
+        },
+      }));
+      const firstInvalid = [...REQUIRED_FIELDS.map(([name]) => name), "file"].find(
+        (name) => fieldErrors[name],
+      );
+      const node = firstInvalid && form.querySelector(`[name="${firstInvalid}"]`);
+      if (node && typeof node.focus === "function") node.focus();
       return;
     }
-    if (wordCount(modelMeta.changes_from_previous) < 50) {
-      setMessages((current) => ({ ...current, [task.id]: { ok: false, text: "Changes from previous submission must be at least 50 words." } }));
-      return;
-    }
+    setErrors((current) => ({ ...current, [task.id]: {} }));
     data.set("model_meta", JSON.stringify(modelMeta));
     setMessages((current) => ({ ...current, [task.id]: { text: "Scoring…" } }));
     try {
@@ -155,11 +228,16 @@ export function Submit() {
             </div>
           </div>
           <div className="submit-task-grid">
-            {submitTasks.map((task) => {
+            {submitTasks.map((task, index) => {
               const grading = taskInfo[task.id]?.grading;
               const message = messages[task.id];
+              const taskErrors = errors[task.id] || {};
               return (
-                <Card standalone className="submit-card" key={task.id}>
+                <Fragment key={task.id}>
+                  {index > 0 && (
+                    <div className="submit-card-divider" aria-hidden="true" />
+                  )}
+                  <Card standalone className="submit-card">
                   <h2>{task.label}</h2>
                   <p className="muted small">{task.section}</p>
                   {grading && (
@@ -187,28 +265,31 @@ export function Submit() {
                         Template (CSV)
                       </a>
                     </Button>
+                    {task.harness && (
+                      <Button asChild variant="ghost">
+                        <a href="/api/spatial/manifest">Manifest (JSON)</a>
+                      </Button>
+                    )}
                   </div>
                   {task.harness && (
-                    <>
-                      <div className="dl-row">
-                        <Button asChild variant="ghost">
-                          <a href="/api/spatial/manifest">Manifest (JSON)</a>
-                        </Button>
-                      </div>
-                      <p className="muted small">
-                        Run the harness in <code>spatial_harness/</code> to
-                        produce the response file.
-                      </p>
-                    </>
+                    <p className="muted small">
+                      Run the harness in <code>spatial_harness/</code> to
+                      produce the response file.
+                    </p>
                   )}
                   <form
                     className="task-submit-form"
+                    noValidate
+                    onChange={(event) =>
+                      clearFieldError(task.id, event.target.name)
+                    }
                     onSubmit={(event) => submit(event, task)}
                   >
-                    <label className="field">
-                      <span>
-                        Model name <em>*</em>
-                      </span>
+                    <Field
+                      label="Model name"
+                      required
+                      error={taskErrors.model_name}
+                    >
                       <input
                         type="text"
                         name="model_name"
@@ -216,7 +297,7 @@ export function Submit() {
                         placeholder="e.g. GPT-4o"
                         required
                       />
-                    </label>
+                    </Field>
                     <div className="submission-metadata">
                       <div className="metadata-head">
                         <span className="deck-eyebrow">Required metadata</span>
@@ -227,10 +308,11 @@ export function Submit() {
                         </p>
                       </div>
                       <div className="metadata-grid">
-                        <label className="field">
-                          <span>
-                            Organisation <em>*</em>
-                          </span>
+                        <Field
+                          label="Organisation"
+                          required
+                          error={taskErrors.organization}
+                        >
                           <input
                             type="text"
                             name="organization"
@@ -238,26 +320,37 @@ export function Submit() {
                             placeholder="e.g. Microsoft Research"
                             required
                           />
-                        </label>
-                        <label className="field">
-                          <span>
-                            Source status <em>*</em>
-                          </span>
-                          <select name="model_access" defaultValue="" required>
-                            <option value="" disabled>
-                              Select status
-                            </option>
-                            {modelAccessOptions.map(([value, label]) => (
-                              <option value={value} key={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>
-                            Parameter count <em>*</em>
-                          </span>
+                        </Field>
+                        <Field
+                          label="Source status"
+                          required
+                          as="div"
+                          error={taskErrors.model_access}
+                        >
+                          <Select
+                            name="model_access"
+                            required
+                            onValueChange={() =>
+                              clearFieldError(task.id, "model_access")
+                            }
+                          >
+                            <SelectTrigger aria-label="Source status">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {modelAccessOptions.map(([value, label]) => (
+                                <SelectItem value={value} key={value}>
+                                  {label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field
+                          label="Parameter count"
+                          required
+                          error={taskErrors.parameter_count}
+                        >
                           <input
                             type="text"
                             name="parameter_count"
@@ -265,11 +358,12 @@ export function Submit() {
                             placeholder="e.g. 72B, undisclosed"
                             required
                           />
-                        </label>
-                        <label className="field">
-                          <span>
-                            Base model <em>*</em>
-                          </span>
+                        </Field>
+                        <Field
+                          label="Base model"
+                          required
+                          error={taskErrors.base_model}
+                        >
                           <input
                             type="text"
                             name="base_model"
@@ -277,85 +371,105 @@ export function Submit() {
                             placeholder="e.g. GPT-4o base"
                             required
                           />
-                        </label>
-                        <label className="field field-wide">
-                          <span>
-                            Training data and fine-tuning <em>*</em>
-                          </span>
+                        </Field>
+                        <Field
+                          label="Training data and fine-tuning"
+                          required
+                          className="field-wide"
+                          error={taskErrors.training_data}
+                        >
                           <textarea
                             name="training_data"
                             rows="4"
                             placeholder="Summarize pretraining, multimodal data, synthetic data, and fine-tuning relevant to this submission."
                             required
                           />
-                        </label>
-                        <label className="field">
-                          <span>
-                            CoT used? <em>*</em>
-                          </span>
-                          <select name="cot_used" defaultValue="" required>
-                            <option value="" disabled>
-                              Select usage
-                            </option>
-                            <option value="no">No</option>
-                            <option value="yes">Yes</option>
-                            <option value="mixed">Mixed / task-specific</option>
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>Paper / arXiv link</span>
+                        </Field>
+                        <Field
+                          label="CoT used?"
+                          required
+                          as="div"
+                          error={taskErrors.cot_used}
+                        >
+                          <Select
+                            name="cot_used"
+                            required
+                            onValueChange={() =>
+                              clearFieldError(task.id, "cot_used")
+                            }
+                          >
+                            <SelectTrigger aria-label="CoT used?">
+                              <SelectValue placeholder="Select usage" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="no">No</SelectItem>
+                              <SelectItem value="yes">Yes</SelectItem>
+                              <SelectItem value="mixed">
+                                Mixed / task-specific
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field label="Paper / arXiv link">
                           <input
                             type="url"
                             name="paper_url"
                             placeholder="https://arxiv.org/abs/..."
                           />
-                        </label>
-                        <label className="field field-wide">
-                          <span>
-                            Method description <em>*</em>
-                          </span>
+                        </Field>
+                        <Field
+                          label="Method description"
+                          required
+                          className="field-wide"
+                          error={taskErrors.method_description}
+                        >
                           <textarea
                             name="method_description"
                             rows="6"
                             placeholder="Describe prompting, decoding, image preprocessing, model version, ensembling, retrieval, or any other intervention. Minimum 100 words."
                             required
                           />
-                        </label>
-                        <label className="field field-wide">
-                          <span>
-                            Prompt template <em>*</em>
-                          </span>
+                        </Field>
+                        <Field
+                          label="Prompt template"
+                          required
+                          className="field-wide"
+                          error={taskErrors.prompt_template}
+                        >
                           <textarea
                             name="prompt_template"
                             rows="5"
                             placeholder="Paste the prompt template used to generate predictions for this benchmark."
                             required
                           />
-                        </label>
-                        <label className="field field-wide">
-                          <span>
-                            Changes from previous submission <em>*</em>
-                          </span>
+                        </Field>
+                        <Field
+                          label="Changes from previous submission"
+                          required
+                          className="field-wide"
+                          error={taskErrors.changes_from_previous}
+                        >
                           <textarea
                             name="changes_from_previous"
                             rows="5"
                             placeholder="Explain what changed since the previous submission, or state this is the first submission and describe the setup. Minimum 50 words."
                             required
                           />
-                        </label>
+                        </Field>
                       </div>
                     </div>
-                    <label className="field">
-                      <span>
-                        Response file (JSON/CSV) <em>*</em>
-                      </span>
-                      <input
-                        type="file"
+                    <Field
+                      label="Response file (JSON/CSV)"
+                      required
+                      error={taskErrors.file}
+                    >
+                      <FileDropzone
                         name="file"
                         accept=".json,.csv"
                         required
+                        hint="JSON or CSV · one answer per question id"
                       />
-                    </label>
+                    </Field>
                     <Button type="submit" variant="primary">
                       Submit {task.label}
                     </Button>
@@ -369,6 +483,7 @@ export function Submit() {
                     )}
                   </form>
                 </Card>
+                </Fragment>
               );
             })}
           </div>

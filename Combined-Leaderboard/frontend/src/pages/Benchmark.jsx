@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHero } from "@/components/Hero";
+import { BenchmarkModelChart } from "@/components/Charts";
 import { Citation } from "@/components/Citation";
 import { FindingGrid, Pipeline, ResultStrip, SampleGrid, ScoringBlock, SectionHead, SpecList, StatBand } from "@/components/Sections";
 import { Card } from "@/components/ui/card";
@@ -8,6 +9,12 @@ import { benchmarkPages } from "@/data/benchmarks";
 import { getJSON } from "@/lib/api";
 
 const keyBySlug = { "do-you-see-me": "dysm", "minds-eye": "minds_eye", spatial: "spatial" };
+
+const benchmarkChart = {
+  dysm: { endpoint: "/api/leaderboard/visual-cognition", metricKey: "perception_accuracy", metricLabel: "Perception accuracy", color: "#6366f1" },
+  minds_eye: { endpoint: "/api/leaderboard/visual-cognition", metricKey: "imagery_accuracy", metricLabel: "Imagery accuracy", color: "#a855f7" },
+  spatial: { endpoint: "/api/leaderboard/spatial", metricKey: "accuracy", metricLabel: "Spatial accuracy", color: "#14b8a6" },
+};
 
 function PremiseCallout({ premise, pageId }) {
   return (
@@ -97,6 +104,32 @@ function FindingsSection({ page, className = "section" }) {
   return <section className={className}><div className="container"><SectionHead {...page.findings} accent={page.accent} /><FindingGrid cards={page.findings.cards} /></div></section>;
 }
 
+function ModelPerformanceSection({ page, rows, className = "section" }) {
+  const config = benchmarkChart[page.id];
+  if (!config) return null;
+  return (
+    <section className={`${className} model-performance-section`}>
+      <div className="container">
+        <SectionHead
+          tag="Leaderboard"
+          title="Model performance on this benchmark"
+          body={`How ranked models score on ${page.navLabel}, measured by ${config.metricLabel.toLowerCase()} per submitted model.`}
+          accent={page.accent}
+        />
+        <div className="viz-card benchmark-chart-card">
+          <BenchmarkModelChart
+            rows={rows}
+            metricFor={(row) => row[config.metricKey]}
+            metricLabel={config.metricLabel}
+            color={config.color}
+            emptyMessage="Model scores will appear here once submissions are ranked for this benchmark."
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SpatialDataSection({ page, datasets }) {
   return (
     <section className="section alt">
@@ -112,8 +145,14 @@ export function Benchmark() {
   const { slug } = useParams();
   const page = benchmarkPages[keyBySlug[slug]] || benchmarkPages.dysm;
   const [datasets, setDatasets] = useState([]);
+  const [modelRows, setModelRows] = useState([]);
   useEffect(() => {
     if (page.id === "spatial") getJSON("/api/tasks/spatial/info").then((info) => setDatasets(info.datasets || [])).catch(() => setDatasets([]));
+  }, [page.id]);
+  useEffect(() => {
+    const config = benchmarkChart[page.id];
+    if (!config) { setModelRows([]); return; }
+    getJSON(config.endpoint).then((data) => setModelRows(data.leaderboard || [])).catch(() => setModelRows([]));
   }, [page.id]);
 
   return (
@@ -121,6 +160,7 @@ export function Benchmark() {
       <PageHero {...page} />
       <StatBand stats={page.stats} />
       <PremiseSection page={page} />
+      <ModelPerformanceSection page={page} rows={modelRows} className="section alt" />
       <SamplesSection page={page} />
       <TaskTableSection page={page} />
       <TaxonomySection page={page} />
