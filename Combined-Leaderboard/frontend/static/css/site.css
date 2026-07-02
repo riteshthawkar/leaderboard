@@ -79,6 +79,7 @@
     --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
     --font: 'Geist Pixel', system-ui, -apple-system, sans-serif;
     --display: 'Geist Pixel', 'JetBrains Mono', ui-monospace, monospace;
+    --num: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 [data-theme="dark"] {
@@ -264,10 +265,90 @@ code { font-family: var(--mono); font-size: .9em; background: var(--surface-2); 
 .page-hero .container { position: relative; z-index: 1; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; }
 .page-hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; }
 .page-hero .hero-cta { margin-top: 24px; }
+/* per-benchmark hero motif (monochrome SVG line-art, theme-aware via currentColor) */
+.page-hero-art {
+    position: absolute; top: 0; bottom: 0; z-index: 0; pointer-events: none;
+    right: max(0px, calc((100% - var(--maxw)) / 2));
+    width: min(760px, 58%);
+    display: flex; align-items: center; justify-content: flex-end; overflow: hidden;
+}
+.page-hero-art[data-variant="dysm"] {
+    color: var(--dysm);
+    left: max(0px, calc((100% - var(--maxw)) / 2));
+    right: max(0px, calc((100% - var(--maxw)) / 2));
+    width: auto;
+}
+.page-hero-art[data-variant="minds_eye"] {
+    color: var(--me);
+    left: max(0px, calc((100% - var(--maxw)) / 2));
+    right: max(0px, calc((100% - var(--maxw)) / 2));
+    width: auto;
+}
+.page-hero-art[data-variant="spatial"] {
+    color: var(--spatial);
+    left: max(0px, calc((100% - var(--maxw)) / 2));
+    right: max(0px, calc((100% - var(--maxw)) / 2));
+    width: auto;
+}
+.page-hero-art .hero-art-svg {
+    height: min(86%, 560px); width: auto; margin-right: clamp(8px, 4vw, 84px); opacity: .62;
+    -webkit-mask-image: radial-gradient(130% 100% at 100% 50%, #000 40%, transparent 80%);
+            mask-image: radial-gradient(130% 100% at 100% 50%, #000 40%, transparent 80%);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .hero-art-spin { transform-box: fill-box; transform-origin: center; animation: hero-art-spin 48s linear infinite; }
+}
+@keyframes hero-art-spin { to { transform: rotate(360deg); } }
+/* spatial page: full-width isometric floor + room scanner */
+.page-hero-art[data-variant="spatial"] .hero-art-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: .72;
+    -webkit-mask-image: radial-gradient(150% 150% at 68% 72%, #000 40%, transparent 84%);
+            mask-image: radial-gradient(150% 150% at 68% 72%, #000 40%, transparent 84%);
+}
+.page-hero-art[data-variant="minds_eye"] .hero-art-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: .7;
+    -webkit-mask-image: radial-gradient(150% 150% at 70% 60%, #000 42%, transparent 86%);
+            mask-image: radial-gradient(150% 150% at 70% 60%, #000 42%, transparent 86%);
+}
+/* dysm page: full-width technical grid + single scanned A4 frame */
+.page-hero-art[data-variant="dysm"] .hero-art-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: .72;
+    -webkit-mask-image: radial-gradient(150% 150% at 82% 50%, #000 46%, transparent 90%);
+            mask-image: radial-gradient(150% 150% at 82% 50%, #000 46%, transparent 90%);
+}
+.detect-flash, .detect-box { --slot: 1.9s; --cycle: 19s; opacity: 0; }
+/* flash = the object's own structure, brighter: drop the opaque backdrops so the
+   per-face tints stack over the normal object (keeps top>left>right shading) and
+   light up the edges — enough to stand out without going flat/solid. */
+.detect-flash [fill="var(--surface-2)"] { fill: none; }
+.detect-flash :is(polygon, path, ellipse, circle, line) { stroke: currentColor; stroke-opacity: 1; }
+.detect-rect { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 7 5; }
+.detect-tag { fill: currentColor; }
+.detect-tag-text { fill: var(--bg); font-family: var(--mono); font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) {
+    .detect-flash { animation: detect-pulse var(--cycle) ease-in-out infinite; animation-delay: calc(var(--di) * var(--slot)); }
+    .detect-box { animation: detect-pulse var(--cycle) ease-in-out infinite; animation-delay: calc(var(--di) * var(--slot)); }
+    .detect-rect { animation: detect-march .7s linear infinite; }
+}
+@keyframes detect-pulse {
+    0% { opacity: 0; }
+    1.4% { opacity: 1; }
+    8.6% { opacity: 1; }
+    10% { opacity: 0; }
+    100% { opacity: 0; }
+}
+@keyframes detect-march { to { stroke-dashoffset: -24; } }
+@media (max-width: 720px) {
+    .page-hero-art { width: 78%; }
+    .page-hero-art .hero-art-svg { opacity: .3; }
+}
 /* paper pages: larger heading that grows to fill the frame on big windows, tighter heading-to-subtext gap */
 body[data-page="dysm"] .page-hero h1,
 body[data-page="minds_eye"] .page-hero h1,
 body[data-page="spatial"] .page-hero h1 { font-size: clamp(2rem, 5.6vw, 4.4rem); max-width: 100%; margin-bottom: 0; line-height: 1.05; }
+body[data-page="dysm"] .page-hero h1,
+body[data-page="minds_eye"] .page-hero h1,
+body[data-page="spatial"] .page-hero h1 { max-width: 680px; }
 body[data-page="dysm"] .page-hero .hero-sub,
 body[data-page="minds_eye"] .page-hero .hero-sub,
 body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
@@ -361,6 +442,7 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
     font-size: 2.6rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1;
     display: block; margin-bottom: 12px;
 }
+.leaderboard-stats .stat-cell .v { font-family: var(--num); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .stat-cell .l {
     font-size: .82rem; color: var(--text-muted); font-weight: 400; display: block;
 }
@@ -601,6 +683,7 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 .lb-table tbody tr.clickable { cursor: pointer; transition: background .12s; }
 .lb-table tbody tr.clickable:hover { background: var(--brand-soft); }
 .lb-table td.num, .lb-table th.num { text-align: right; font-family: var(--mono); }
+.lb-table td.num { font-family: var(--num); font-variant-numeric: tabular-nums; }
 .lb-table .vci-val { font-weight: 700; color: var(--brand-strong); }
 .lb-table.small { font-size: .82rem; }
 .lb-table.small th, .lb-table.small td { padding: 8px 12px; }
@@ -609,7 +692,7 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 
 .rank-badge {
     display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 0;
-    background: var(--surface-2); font-weight: 700; font-size: .82rem; font-family: var(--mono);
+    background: var(--surface-2); font-weight: 700; font-size: .82rem; font-family: var(--num); font-variant-numeric: tabular-nums;
 }
 .rank-1 { background: #fafafa; color: #000; }
 .rank-2 { background: #a1a1aa; color: #000; }
@@ -730,6 +813,9 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 .viz-radar-area:hover { fill-opacity: .26; }
 .viz-radar-dot { cursor: default; }
 .viz-radar-label { font-size: .68rem; }
+/* Inter figures for leaderboard chart tick/value labels (benchmark pages keep --mono) */
+.leaderboard-section .viz-axis-text,
+.leaderboard-section .viz-bar-label { font-family: var(--num); font-variant-numeric: tabular-nums; }
 .viz-tooltip { position: absolute; transform: translate(-50%, -100%); margin-top: -6px; pointer-events: none; z-index: 6; min-width: 128px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 28px rgba(0, 0, 0, .22); }
 .viz-tooltip-title { font-size: .72rem; font-weight: 700; color: var(--text); margin-bottom: 5px; font-family: var(--mono); }
 .viz-tooltip-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: .74rem; line-height: 1.55; }
@@ -739,7 +825,9 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 /* Per-benchmark performance chart card: fill width, generous height + padding */
 .benchmark-chart-card { margin-top: 26px; padding: 26px 28px 22px; }
 .benchmark-chart-card .bklit-chart-wrap { margin-top: 4px; }
-.benchmark-chart-card .bklit-chart-wrap > div:first-child { min-height: 340px; max-height: 460px; }
+/* Explicit height (not aspect-ratio + max-height) so Safari doesn't render the
+   chart oversized on wide screens, where its max-height clamp is unreliable. */
+.benchmark-chart-card .bklit-chart-wrap > div:first-child { height: 400px; }
 .viz-card .bklit-chart-wrap > div:first-child { min-height: 240px; max-height: 400px; }
 .viz-card.wide .bklit-chart-wrap > div:first-child { min-height: 300px; max-height: 460px; }
 .pick-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -824,6 +912,11 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 .control-deck-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .deck-eyebrow { color: var(--text-faint); font-size: .7rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
 .control-deck h3 { margin: 3px 0 0; font-size: 1.14rem; }
+.deck-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 15px; }
+.deck-meta span { position: relative; color: var(--text-muted); font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.deck-meta span + span::before { content: "·"; position: absolute; left: -9px; color: var(--text-faint); }
+.sample-data-banner { margin: 0 0 18px; padding: 11px 15px; border: 1px solid var(--border); border-left: 3px solid var(--brand); border-radius: var(--radius); background: var(--surface-2); color: var(--text-muted); font-size: .82rem; line-height: 1.5; }
+.sample-data-banner strong { color: var(--text); font-weight: 700; }
 .segment-control { display: flex; flex-wrap: wrap; gap: 1px; padding: 3px; border: 1px solid var(--border); background: var(--surface-2); width: fit-content; max-width: 100%; }
 .segment-control button {
     min-height: 36px; padding: 8px 13px; border: 0; border-radius: 0; background: transparent; color: var(--text-muted);
@@ -893,9 +986,9 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 }
 .control-field input:focus, .control-field select:focus { outline: none; border-color: var(--brand-strong); box-shadow: 0 0 0 3px var(--brand-soft); }
 .leaderboard-table { margin-bottom: 28px; }
-.sortable-th { padding: 0; }
+.lb-table th.sortable-th { padding: 0; }
 .sortable-th > button {
-    display: flex; align-items: center; gap: 7px; width: 100%; min-height: 42px; padding: 12px 14px;
+    display: flex; align-items: center; gap: 7px; width: 100%; min-height: 42px; padding: 12px 16px;
     border: 0; background: transparent; color: inherit; font: inherit; font-size: inherit; font-weight: inherit;
     letter-spacing: inherit; text-transform: inherit; text-align: inherit; cursor: pointer;
 }
@@ -934,6 +1027,7 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 .viz-card { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 20px; }
 .viz-card h3 { margin: 0 0 8px; font-size: 1rem; }
 .viz-empty { display: grid; place-items: center; min-height: 180px; color: var(--text-faint); font-family: var(--mono); font-size: .84rem; text-align: center; border: 1px dashed var(--border); background: var(--surface-2); }
+.viz-note { margin: 8px 0 0; text-align: center; font-size: .72rem; color: var(--text-muted); }
 .heatmap-wrap { max-width: 100%; max-height: 460px; overflow: auto; padding-bottom: 4px; }
 .heatmap-grid { display: grid; gap: 1px; min-width: max-content; background: var(--border); border: 1px solid var(--border); }
 .heat-row-frag { display: contents; }
@@ -942,7 +1036,7 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 .heat-label { position: sticky; left: 0; z-index: 2; font-weight: 700; color: var(--text); box-shadow: 1px 0 0 var(--border); }
 .heat-label.sticky-col { z-index: 3; }
 .heat-head.sticky-col { left: 0; z-index: 5; }
-.heat-cell { justify-content: center; color: #fff; font-family: var(--mono); font-size: .78rem; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,.38); }
+.heat-cell { justify-content: center; color: #fff; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: .78rem; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,.38); }
 .viz-svg { display: block; width: 100%; height: auto; min-height: 260px; }
 .viz-grid-line { stroke: color-mix(in srgb, var(--text) 10%, transparent); stroke-width: 1; }
 .viz-axis { stroke: color-mix(in srgb, var(--text) 28%, transparent); stroke-width: 1.2; }
@@ -1138,6 +1232,7 @@ body[data-page="spatial"] .page-hero .hero-sub { margin-top: 12px; }
 @media (max-width: 600px) {
     .section { padding: 52px 0; }
     .section.tight { padding: 36px 0; }
+    .benchmark-chart-card .bklit-chart-wrap > div:first-child { height: 300px; }
     .section-head { padding-top: 6px; margin-bottom: 24px; }
     .stat-band, .grid.ruled, .result-strip { grid-template-columns: 1fr; margin-left: 0; margin-right: 0; }
     .stat-band.cols-4 { grid-template-columns: 1fr; }

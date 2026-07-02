@@ -88,7 +88,7 @@ export function Layout() {
             <div className="footer-col"><h5>Papers</h5><a href="https://arxiv.org/abs/2506.02022" target="_blank" rel="noreferrer">Do You See Me ↗</a><a href="https://arxiv.org/abs/2604.16054" target="_blank" rel="noreferrer">Mind's Eye ↗</a><a href="https://arxiv.org/abs/2604.16060" target="_blank" rel="noreferrer">CoT Degrades Spatial ↗</a></div>
           </div>
           <div className="footer-bottom">
-            <span>Benchmarks © Microsoft Research. Leaderboard for non-commercial research use. Scores graded by a single GPT-4o judge.</span>
+            <span>Benchmarks © Microsoft Research. Leaderboard for non-commercial research use.</span>
             <div className="footer-meta">
               <span className="status-pill" title="Backend status"><span className={`status-dot ${online ? "ok" : ""}`} /><span>{online ? "Online" : "Offline"}</span></span>
               <button className="icon-btn" id="theme_toggle" type="button" aria-label="Toggle dark mode" title="Toggle theme" onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}</button>

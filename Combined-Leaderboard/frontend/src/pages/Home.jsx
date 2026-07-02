@@ -14,7 +14,7 @@ export function Home() {
       Promise.all(["do_you_see_me", "minds_eye", "spatial"].map((id) => getJSON(`/api/tasks/${id}/info`).catch(() => ({})))),
     ]).then(([stats, infos]) => {
       const total = infos.reduce((sum, info) => sum + (info.total_samples || 0), 0);
-      setQuestions(total ? total.toLocaleString() : "2,612+");
+      setQuestions(total ? total.toLocaleString() : "380+");
       setModels(Math.max(stats.visual_cognition_models || 0, stats.spatial_models || 0) || "0");
     });
   }, []);
@@ -24,11 +24,11 @@ export function Home() {
       <HomeHero />
       <section className="stats-section"><div className="container"><div className="stat-band">
         <div className="stat-cell"><span className="n">[01]</span><span className="v">3</span><span className="l">Benchmarks unified under one scoring protocol</span></div>
-        <div className="stat-cell"><span className="n">[02]</span><span className="v">{questions}</span><span className="l">Evaluation questions across all three tasks</span></div>
+        <div className="stat-cell"><span className="n">[02]</span><span className="v">{questions}</span><span className="l">Public sample questions across all three benchmarks</span></div>
         <div className="stat-cell"><span className="n">[03]</span><span className="v">{models}</span><span className="l">Multimodal LLMs ranked on the leaderboard</span></div>
         <div className="stat-cell"><span className="n">[04]</span><span className="v">29</span><span className="l">Distinct task variants and diagnostic conditions</span></div>
         <div className="stat-cell"><span className="n">[05]</span><span className="v">&lt;50%</span><span className="l">Best MLLM accuracy — far below human level</span></div>
-        <div className="stat-cell"><span className="n">[06]</span><span className="v">96%</span><span className="l">Human accuracy on the same perception tasks</span></div>
+        <div className="stat-cell"><span className="n">[06]</span><span className="v">96.5%</span><span className="l">Human accuracy on the same perception tasks</span></div>
       </div></div></section>
 
       <section className="section" id="overview"><div className="container"><div className="section-head"><div className="section-tag">Overview</div><h2>One leaderboard. Three benchmarks.</h2><p className="lede">MLLMs reason well but often misread the image. Three complementary benchmarks isolate <em>where</em> visual understanding breaks down — one consistent, reproducible protocol.</p></div>

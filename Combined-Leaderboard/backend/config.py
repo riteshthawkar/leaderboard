@@ -12,7 +12,9 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 # Load environment variables from the Combined-Leaderboard/.env file (if present)
 # before any os.getenv() lookups below. This is where the judge API key lives.
-load_dotenv(PROJECT_ROOT / ".env")
+# The .env lives in the Combined-Leaderboard package dir (this file's grandparent),
+# which is NOT PROJECT_ROOT (the workspace root, one level further up).
+load_dotenv(Path(__file__).parent.parent / ".env")
 BACKEND_DIR = PROJECT_ROOT / "backend"
 UPLOADS_DIR = PROJECT_ROOT / "uploads"
 RESULTS_DIR = PROJECT_ROOT / "results"

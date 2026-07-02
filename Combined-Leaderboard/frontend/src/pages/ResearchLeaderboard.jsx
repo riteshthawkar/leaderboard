@@ -50,6 +50,29 @@ const spatialMetricOptions = [
   { value: "hallucination", label: "Hallucination resistance" },
 ];
 
+// A metric maps to an existing dedicated column when possible, so ranking by it
+// simply sorts that column instead of adding a duplicate "rank metric" column.
+// Metrics with no dedicated column (capability / dataset) fall back to it.
+function visualRankSortKey(metric) {
+  return (
+    { vci: "vci", perception: "perception", imagery: "imagery", gap: "gap" }[
+      metric
+    ] || "rankMetric"
+  );
+}
+
+function spatialRankSortKey(metric) {
+  return (
+    {
+      accuracy: "scope",
+      macro: "macro",
+      cot_delta: "cot_delta",
+      shortcut: "shortcut",
+      hallucination: "hallucination",
+    }[metric] || "rankMetric"
+  );
+}
+
 const spatialDatasetTypes = {
   BLINK: "2D",
   "CV-Bench (2D)": "2D",
@@ -756,20 +779,35 @@ function SpatialDatasetChart({ rows, datasets }) {
   );
 }
 
+const NARROW_CHART_MODEL_CAP = 12;
+
+function ChartModelNote({ shown, total }) {
+  if (total <= shown) return null;
+  return (
+    <p className="viz-note">
+      Top {shown} of {total} models — full ranking in the table above.
+    </p>
+  );
+}
+
 function PerceptionImageryChart({ rows }) {
   const completeRows = rows.filter(
     (row) => row.perception_accuracy != null && row.imagery_accuracy != null,
   );
+  const shownRows = completeRows.slice(0, NARROW_CHART_MODEL_CAP);
   return (
-    <BarChart
-      aspectRatio="16 / 8"
-      categories={completeRows.map((row) => ({ label: row.model_name, row }))}
-      emptyMessage="Needs models with both perception and imagery scores."
-      series={[
-        { key: "perception", label: "Perception", color: chartPalette[1], valueFor: (category) => category.row.perception_accuracy },
-        { key: "imagery", label: "Imagery", color: chartPalette[4], valueFor: (category) => category.row.imagery_accuracy },
-      ]}
-    />
+    <>
+      <BarChart
+        aspectRatio="16 / 8"
+        categories={shownRows.map((row) => ({ label: row.model_name, row }))}
+        emptyMessage="Needs models with both perception and imagery scores."
+        series={[
+          { key: "perception", label: "Perception", color: chartPalette[1], valueFor: (category) => category.row.perception_accuracy },
+          { key: "imagery", label: "Imagery", color: chartPalette[4], valueFor: (category) => category.row.imagery_accuracy },
+        ]}
+      />
+      <ChartModelNote shown={NARROW_CHART_MODEL_CAP} total={completeRows.length} />
+    </>
   );
 }
 
@@ -779,16 +817,20 @@ function CotComparisonChart({ rows }) {
       row.diagnostics?.standard_accuracy != null &&
       row.diagnostics?.cot_accuracy != null,
   );
+  const shownRows = data.slice(0, NARROW_CHART_MODEL_CAP);
   return (
-    <BarChart
-      aspectRatio="16 / 8"
-      categories={data.map((row) => ({ label: row.model_name, row }))}
-      emptyMessage="Needs standard and chain of thought submissions."
-      series={[
-        { key: "standard", label: "Standard", color: chartPalette[1], valueFor: (category) => category.row.diagnostics.standard_accuracy },
-        { key: "cot", label: "Chain of thought", color: chartPalette[2], valueFor: (category) => category.row.diagnostics.cot_accuracy },
-      ]}
-    />
+    <>
+      <BarChart
+        aspectRatio="16 / 8"
+        categories={shownRows.map((row) => ({ label: row.model_name, row }))}
+        emptyMessage="Needs standard and chain of thought submissions."
+        series={[
+          { key: "standard", label: "Standard", color: chartPalette[1], valueFor: (category) => category.row.diagnostics.standard_accuracy },
+          { key: "cot", label: "Chain of thought", color: chartPalette[2], valueFor: (category) => category.row.diagnostics.cot_accuracy },
+        ]}
+      />
+      <ChartModelNote shown={NARROW_CHART_MODEL_CAP} total={data.length} />
+    </>
   );
 }
 
@@ -798,17 +840,21 @@ function RobustnessChart({ rows }) {
       row.diagnostics?.hallucination_resistance != null &&
       row.diagnostics?.shortcut_score != null,
   );
+  const shownRows = data.slice(0, NARROW_CHART_MODEL_CAP);
   return (
-    <BarChart
-      aspectRatio="16 / 8"
-      categories={data.map((row) => ({ label: row.model_name, row }))}
-      emptyMessage="Needs no-image and no-image++ diagnostics."
-      series={[
-        { key: "accuracy", label: "Standard accuracy", color: chartPalette[1], valueFor: (category) => category.row.accuracy },
-        { key: "hallucination", label: "Hallucination resistance", color: chartPalette[0], valueFor: (category) => category.row.diagnostics.hallucination_resistance },
-        { key: "shortcut", label: "Shortcut score", color: chartPalette[2], valueFor: (category) => category.row.diagnostics.shortcut_score },
-      ]}
-    />
+    <>
+      <BarChart
+        aspectRatio="16 / 8"
+        categories={shownRows.map((row) => ({ label: row.model_name, row }))}
+        emptyMessage="Needs no-image and no-image++ diagnostics."
+        series={[
+          { key: "accuracy", label: "Standard accuracy", color: chartPalette[1], valueFor: (category) => category.row.accuracy },
+          { key: "hallucination", label: "Hallucination resistance", color: chartPalette[0], valueFor: (category) => category.row.diagnostics.hallucination_resistance },
+          { key: "shortcut", label: "Shortcut score", color: chartPalette[2], valueFor: (category) => category.row.diagnostics.shortcut_score },
+        ]}
+      />
+      <ChartModelNote shown={NARROW_CHART_MODEL_CAP} total={data.length} />
+    </>
   );
 }
 
@@ -863,11 +909,11 @@ export function ResearchLeaderboard() {
   });
   const [compareSearch, setCompareSearch] = useState("");
   const [visualSort, setVisualSort] = useState({
-    key: "rankMetric",
+    key: "vci",
     direction: "desc",
   });
   const [spatialSort, setSpatialSort] = useState({
-    key: "rankMetric",
+    key: "scope",
     direction: "desc",
   });
   const [compareSort, setCompareSort] = useState({
@@ -1133,6 +1179,10 @@ export function ResearchLeaderboard() {
         : spatialMetricOptions.find(
             (option) => option.value === spatialFilters.metric,
           )?.label || "Metric";
+  const showVisualRankColumn =
+    visualRankSortKey(visualFilters.metric) === "rankMetric";
+  const showSpatialRankColumn =
+    spatialRankSortKey(spatialFilters.metric) === "rankMetric";
   const visualScopeLabel = visualBenchmarkLabel(visualFilters.benchmark);
   const spatialScopeLabel =
     spatialFilters.dataset !== "all"
@@ -1223,14 +1273,14 @@ export function ResearchLeaderboard() {
       metric,
     }));
     setVisualSort({
-      key: "rankMetric",
+      key: visualRankSortKey(metric),
       direction: metricSortDirection(metric, visualFilters.direction),
     });
   };
   const setVisualMetric = (metric) => {
     setVisualFilters((current) => ({ ...current, metric }));
     setVisualSort({
-      key: "rankMetric",
+      key: visualRankSortKey(metric),
       direction: metricSortDirection(metric, visualFilters.direction),
     });
   };
@@ -1238,21 +1288,21 @@ export function ResearchLeaderboard() {
     const metric = capability === "all" ? visualFilters.metric : "capability";
     setVisualFilters((current) => ({ ...current, capability, metric }));
     setVisualSort({
-      key: "rankMetric",
+      key: visualRankSortKey(metric),
       direction: metricSortDirection(metric, visualFilters.direction),
     });
   };
   const setVisualDirection = (direction) => {
     setVisualFilters((current) => ({ ...current, direction }));
     setVisualSort({
-      key: "rankMetric",
+      key: visualRankSortKey(visualFilters.metric),
       direction: metricSortDirection(visualFilters.metric, direction),
     });
   };
   const setSpatialMetric = (metric) => {
     setSpatialFilters((current) => ({ ...current, metric }));
     setSpatialSort({
-      key: "rankMetric",
+      key: spatialRankSortKey(metric),
       direction: metricSortDirection(metric, spatialFilters.direction),
     });
   };
@@ -1265,7 +1315,7 @@ export function ResearchLeaderboard() {
       metric,
     }));
     setSpatialSort({
-      key: "rankMetric",
+      key: spatialRankSortKey(metric),
       direction: metricSortDirection(metric, spatialFilters.direction),
     });
   };
@@ -1276,12 +1326,12 @@ export function ResearchLeaderboard() {
       dataset: "all",
       metric: "accuracy",
     }));
-    setSpatialSort({ key: "rankMetric", direction: "desc" });
+    setSpatialSort({ key: spatialRankSortKey("accuracy"), direction: "desc" });
   };
   const setSpatialDirection = (direction) => {
     setSpatialFilters((current) => ({ ...current, direction }));
     setSpatialSort({
-      key: "rankMetric",
+      key: spatialRankSortKey(spatialFilters.metric),
       direction: metricSortDirection(spatialFilters.metric, direction),
     });
   };
@@ -1390,6 +1440,13 @@ export function ResearchLeaderboard() {
     },
   ];
 
+  const isSampleData = useMemo(() => {
+    const names = [...visualRows, ...spatialRows].map(
+      (row) => (row.model_name || "").trim(),
+    );
+    return names.length > 0 && names.every((name) => /[-_\s]demo$/i.test(name));
+  }, [visualRows, spatialRows]);
+
   return (
     <>
       <PageHero
@@ -1400,6 +1457,13 @@ export function ResearchLeaderboard() {
       <section className="section leaderboard-section">
         <div className="container">
           <TabBar tabs={trackTabs} active={tab} onChange={setTab} />
+
+          {isSampleData && (
+            <div className="sample-data-banner" role="note">
+              <strong>Sample data</strong> — these entries are illustrative
+              placeholders. Real rankings will populate as models are submitted.
+            </div>
+          )}
 
           {tab === "vc" && (
             <section className="tab-panel is-active">
@@ -1557,17 +1621,19 @@ export function ResearchLeaderboard() {
                         onSort={handleVisualSort}
                         defaultDirection="asc"
                       />
-                      <SortHeader
-                        label={visualMetricLabel}
-                        sortKey="rankMetric"
-                        sort={visualSort}
-                        onSort={handleVisualSort}
-                        className="num"
-                        defaultDirection={metricSortDirection(
-                          visualFilters.metric,
-                          "auto",
-                        )}
-                      />
+                      {showVisualRankColumn && (
+                        <SortHeader
+                          label={visualMetricLabel}
+                          sortKey="rankMetric"
+                          sort={visualSort}
+                          onSort={handleVisualSort}
+                          className="num"
+                          defaultDirection={metricSortDirection(
+                            visualFilters.metric,
+                            "auto",
+                          )}
+                        />
+                      )}
                       <SortHeader
                         label="VCI"
                         sortKey="vci"
@@ -1624,13 +1690,15 @@ export function ResearchLeaderboard() {
                           <td>{modelParams(row.model_meta)}</td>
                           <td>{modelBase(row.model_meta)}</td>
                           <td>{modelCot(row.model_meta)}</td>
-                          <td className="num vci-val">
-                            {visualMetricDisplay(
-                              row,
-                              visualFilters.metric,
-                              visualFilters.capability,
-                            )}
-                          </td>
+                          {showVisualRankColumn && (
+                            <td className="num vci-val">
+                              {visualMetricDisplay(
+                                row,
+                                visualFilters.metric,
+                                visualFilters.capability,
+                              )}
+                            </td>
+                          )}
                           <td className="num">{fmtVci(row.vci)}</td>
                           <td className="num">
                             {fmtPct(row.perception_accuracy)}
@@ -1652,7 +1720,10 @@ export function ResearchLeaderboard() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="13" className="empty-row">
+                        <td
+                          colSpan={showVisualRankColumn ? 13 : 12}
+                          className="empty-row"
+                        >
                           No models match these filters.
                         </td>
                       </tr>
@@ -1846,17 +1917,19 @@ export function ResearchLeaderboard() {
                         onSort={handleSpatialSort}
                         defaultDirection="asc"
                       />
-                      <SortHeader
-                        label={spatialMetricLabel}
-                        sortKey="rankMetric"
-                        sort={spatialSort}
-                        onSort={handleSpatialSort}
-                        className="num"
-                        defaultDirection={metricSortDirection(
-                          spatialFilters.metric,
-                          "auto",
-                        )}
-                      />
+                      {showSpatialRankColumn && (
+                        <SortHeader
+                          label={spatialMetricLabel}
+                          sortKey="rankMetric"
+                          sort={spatialSort}
+                          onSort={handleSpatialSort}
+                          className="num"
+                          defaultDirection={metricSortDirection(
+                            spatialFilters.metric,
+                            "auto",
+                          )}
+                        />
+                      )}
                       <SortHeader
                         label="Scope accuracy"
                         sortKey="scope"
@@ -1933,15 +2006,17 @@ export function ResearchLeaderboard() {
                           <td>{modelType(row.model_meta)}</td>
                           <td>{modelParams(row.model_meta)}</td>
                           <td>{modelBase(row.model_meta)}</td>
-                          <td className="num vci-val">
-                            {spatialMetricDisplay(
-                              row,
-                              spatialFilters.metric,
-                              spatialFilters.dataset,
-                              spatialScopedDatasets,
-                              spatialScopeActive,
-                            )}
-                          </td>
+                          {showSpatialRankColumn && (
+                            <td className="num vci-val">
+                              {spatialMetricDisplay(
+                                row,
+                                spatialFilters.metric,
+                                spatialFilters.dataset,
+                                spatialScopedDatasets,
+                                spatialScopeActive,
+                              )}
+                            </td>
+                          )}
                           <td className="num">
                             {fmtPct(
                               spatialScopeActive
@@ -1979,7 +2054,10 @@ export function ResearchLeaderboard() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="15" className="empty-row">
+                        <td
+                          colSpan={showSpatialRankColumn ? 15 : 14}
+                          className="empty-row"
+                        >
                           No models match these filters.
                         </td>
                       </tr>

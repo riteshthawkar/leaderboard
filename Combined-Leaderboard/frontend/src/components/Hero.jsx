@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { HeroArt } from "@/components/HeroArt";
 import heroBg from "../../assets/bg-2.png";
 
 export function HomeHero() {
@@ -24,9 +25,10 @@ export function HomeHero() {
   );
 }
 
-export function PageHero({ eyebrow, title, subtitle, cta, paperUrl, authors, accent, showMeta = false }) {
+export function PageHero({ eyebrow, title, subtitle, cta, paperUrl, authors, accent, showMeta = false, id }) {
   return (
     <section className="page-hero bench-accent">
+      <HeroArt variant={id} />
       <div className="container">
         <span className="eyebrow" style={accent ? { color: accent } : undefined}>{eyebrow}</span>
         <h1>{title}</h1>
