@@ -136,4 +136,5 @@ class HealthCheckResponse(BaseModel):
     status: str  # "healthy" or "unhealthy"
     timestamp: str
     components: Dict[str, str] = Field(default_factory=dict)
+    grading: Optional[str] = None  # "openai" (LLM judge) or "deterministic" (fallback)
     details: Optional[str] = None

@@ -84,6 +84,16 @@ if not _secret:
     _secret = secrets.token_hex(32)
 app.secret_key = _secret
 
+# Grading mode: the GPT-4o LLM judge needs OPENAI_API_KEY; without it the scorer
+# transparently falls back to deterministic string/numeric matching. Surface that
+# at startup so a degraded-grading deployment is visible in the logs.
+if not os.getenv("OPENAI_API_KEY", "").strip():
+    logger.warning(
+        "OPENAI_API_KEY not set \u2014 LLM grading (GPT-4o) is DISABLED; submissions "
+        "will be scored with the deterministic fallback. Set OPENAI_API_KEY in "
+        ".env to enable LLM grading."
+    )
+
 # CORS configuration
 CORS(app, resources={
     r"/api/*": {
@@ -589,13 +599,16 @@ def health_check():
             logger.error(f"Ground truth health check failed: {e}")
             components["ground_truth"] = "unhealthy"
         
-        # Determine overall status
+        # Determine overall status. Grading mode is informational and does NOT
+        # affect health — deterministic fallback is a valid operating mode.
         overall_status = "healthy" if all(v == "healthy" for v in components.values()) else "degraded"
-        
+        grading_mode = "openai" if os.getenv("OPENAI_API_KEY", "").strip() else "deterministic"
+
         response = HealthCheckResponse(
             status=overall_status,
             timestamp=datetime.now(timezone.utc).isoformat(),
-            components=components
+            components=components,
+            grading=grading_mode,
         )
         
         status_code = 200 if overall_status == "healthy" else 503
@@ -694,7 +707,7 @@ def submit_prediction():
             logger.error(f"Scoring failed: {e}", extra={"request_id": request_id}, exc_info=True)
             try:
                 filepath.unlink(missing_ok=True)
-            except:
+            except OSError:
                 pass
             return jsonify({"error": f"Scoring failed: {str(e)}"}), 400
 
