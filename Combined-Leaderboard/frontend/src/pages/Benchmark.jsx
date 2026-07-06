@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageHero } from "@/components/Hero";
-import { BenchmarkModelChart } from "@/components/Charts";
+import { BenchmarkModelChart, BarChart } from "@/components/Charts";
 import { Citation } from "@/components/Citation";
 import { FindingGrid, Pipeline, ResultStrip, SampleGrid, ScoringBlock, SectionHead, SpecList, StatBand } from "@/components/Sections";
 import { Card } from "@/components/ui/card";
@@ -104,6 +104,74 @@ function FindingsSection({ page, className = "section" }) {
   return <section className={className}><div className="container"><SectionHead {...page.findings} accent={page.accent} /><FindingGrid cards={page.findings.cards} /></div></section>;
 }
 
+const FIG_POS = "#14b8a6";
+const FIG_NEG = "#e11d48";
+const FIG_BASE = "#6366f1";
+
+function FigureChart({ chart }) {
+  const scale = chart.scale ?? 1;
+  const suffix = chart.suffix ?? (chart.kind === "diverging" ? " pts" : "%");
+  const aspect = chart.wide ? "24 / 7" : "16 / 10";
+  const digits = chart.digits ?? (chart.kind === "diverging" ? 1 : 0);
+  if (chart.kind === "grouped") {
+    return (
+      <BarChart
+        aspectRatio={aspect}
+        categories={chart.categories.map((label) => ({ label }))}
+        series={chart.series.map((entry, seriesIndex) => ({ key: entry.key || `s${seriesIndex}`, label: entry.label, color: entry.color, valueFor: (_category, index) => entry.values[index] }))}
+        valueScale={scale}
+        valueSuffix={suffix}
+        valueDigits={digits}
+        showLegend
+      />
+    );
+  }
+  const diverging = chart.kind === "diverging";
+  return (
+    <BarChart
+      aspectRatio={aspect}
+      categories={chart.bars.map(([label]) => ({ label }))}
+      series={[{
+        key: "v",
+        label: chart.unit || "",
+        color: chart.color || (diverging ? FIG_POS : FIG_BASE),
+        colorFor: (_category, index) => {
+          const bar = chart.bars[index];
+          if (diverging) return bar[1] >= 0 ? FIG_POS : FIG_NEG;
+          return bar[2] || chart.color || FIG_BASE;
+        },
+        valueFor: (_category, index) => chart.bars[index][1],
+      }]}
+      valueScale={scale}
+      valueSuffix={suffix}
+      valueDigits={digits}
+      showLegend={false}
+    />
+  );
+}
+
+function FindingsFiguresSection({ page, className = "section findings-figures" }) {
+  if (!page.figures?.charts?.length) return null;
+  const f = page.figures;
+  return (
+    <section className={className}>
+      <div className="container">
+        <SectionHead tag={f.tag} title={f.title} body={f.body} accent={page.accent} />
+        <div className="figure-grid">
+          {f.charts.map((chart, index) => (
+            <div className={`figure-card${chart.wide ? " is-wide" : ""}`} key={chart.title || index}>
+              <h3>{chart.title}</h3>
+              <p className="figure-caption">{chart.caption}</p>
+              <FigureChart chart={chart} />
+              {chart.source && <p className="figure-source">{chart.source}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ModelPerformanceSection({ page, rows, className = "section" }) {
   const config = benchmarkChart[page.id];
   if (!config) return null;
@@ -168,6 +236,7 @@ export function Benchmark() {
       <BuildSection page={page} />
       <ResultsSection page={page} />
       <FindingsSection page={page} />
+      <FindingsFiguresSection page={page} />
       {page.id === "spatial" && <SpatialDataSection page={page} datasets={datasets} />}
       <ScoringBlock scoring={page.scoring} className={page.id === "spatial" ? "section" : "section alt"} />
       <Citation citation={page.citation} />

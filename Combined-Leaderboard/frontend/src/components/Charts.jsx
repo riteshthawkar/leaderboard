@@ -28,6 +28,11 @@ function topRoundedPath(x, y, width, height, radius) {
   return `M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`;
 }
 
+function bottomRoundedPath(x, y, width, height, radius) {
+  const r = Math.max(0, Math.min(radius, width / 2, height));
+  return `M${x},${y} L${x + width},${y} L${x + width},${y + height - r} Q${x + width},${y + height} ${x + width - r},${y + height} L${x + r},${y + height} Q${x},${y + height} ${x},${y + height - r} Z`;
+}
+
 function formatPct(value, { scale = 100, suffix = "%", digits = 1 } = {}) {
   if (value == null || !Number.isFinite(value)) return "—";
   return `${(value * scale).toFixed(digits)}${suffix}`;
@@ -119,6 +124,7 @@ export function BarChart({
   aspectRatio = "16 / 9",
   valueScale = 100,
   valueSuffix = "%",
+  valueDigits = 0,
   emptyMessage = "No data available yet.",
   showLegend = true,
 }) {
@@ -145,6 +151,16 @@ export function BarChart({
     );
   }, [categories, series, ready]);
 
+  const minValue = useMemo(() => {
+    if (!ready) return 0;
+    const values = [];
+    categories.forEach((category, index) => series.forEach((entry) => values.push(entry.valueFor(category, index))));
+    const finite = values.filter((value) => Number.isFinite(value));
+    const min = finite.length ? Math.min(...finite) : 0;
+    if (min >= 0) return 0;
+    return -niceMax(finite.filter((value) => value < 0).map((value) => Math.abs(value)));
+  }, [categories, series, ready]);
+
   if (!ready || !hasValue) return <EmptyChart aspectRatio={aspectRatio} message={emptyMessage} />;
 
   const grouped = series.length > 1;
@@ -159,10 +175,12 @@ export function BarChart({
               grouped={grouped}
               height={height}
               maxValue={maxValue}
+              minValue={minValue}
               series={series}
               setTip={setTip}
               valueScale={valueScale}
               valueSuffix={valueSuffix}
+              valueDigits={valueDigits}
               width={width}
             />
           )}
@@ -174,7 +192,7 @@ export function BarChart({
   );
 }
 
-function BarChartSvg({ categories, grouped, height, maxValue, series, setTip, valueScale, valueSuffix, width }) {
+function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, series, setTip, valueScale, valueSuffix, valueDigits = 0, width }) {
   if (width < 10 || height < 10) return null;
   const labels = categories.map((category) => String(category.label ?? ""));
   const left = 46;
@@ -194,11 +212,12 @@ function BarChartSvg({ categories, grouped, height, maxValue, series, setTip, va
   const groupScale = grouped
     ? scaleBand({ domain: series.map((entry) => entry.key), range: [0, xScale.bandwidth()], padding: 0.16 })
     : null;
-  const yScale = scaleLinear({ domain: [0, maxValue], range: [innerHeight, 0] });
-  const yTicks = yScale.ticks(4);
+  const yScale = scaleLinear({ domain: [Math.min(0, minValue), maxValue], range: [innerHeight, 0] });
+  const zeroY = yScale(0);
+  const yTicks = yScale.ticks(minValue < 0 ? 6 : 4);
   const totalBars = categories.length * series.length;
   const showValueLabels = totalBars <= 9;
-  const tickFmt = (value) => `${Math.round(value * valueScale)}${valueSuffix}`;
+  const tickFmt = (value) => `${+(value * valueScale).toFixed(1)}${valueSuffix}`;
   const tooltipRows = (category, index) =>
     series.map((entry) => ({
       color: entry.color,
@@ -217,7 +236,7 @@ function BarChartSvg({ categories, grouped, height, maxValue, series, setTip, va
             </text>
           </g>
         ))}
-        <line className="viz-axis-line" x1={0} x2={innerWidth} y1={innerHeight} y2={innerHeight} />
+        <line className="viz-axis-line" x1={0} x2={innerWidth} y1={zeroY} y2={zeroY} />
         {categories.map((category, index) => {
           const groupX = xScale(String(index)) ?? 0;
           return (
@@ -225,26 +244,34 @@ function BarChartSvg({ categories, grouped, height, maxValue, series, setTip, va
               {series.map((entry) => {
                 const value = entry.valueFor(category, index);
                 const has = value != null && Number.isFinite(value);
+                if (!has) return null;
+                const clamped = Math.max(Math.min(0, minValue), Math.min(value, maxValue));
                 const barWidth = grouped ? groupScale.bandwidth() : xScale.bandwidth();
                 const barX = grouped ? groupScale(entry.key) ?? 0 : 0;
-                const barY = has ? yScale(Math.max(0, Math.min(value, maxValue))) : innerHeight;
-                const barHeight = has ? innerHeight - barY : 0;
-                if (!has || barHeight <= 0) return null;
+                const negative = clamped < 0;
+                const barTop = yScale(Math.max(0, clamped));
+                const barBottom = yScale(Math.min(0, clamped));
+                const barHeight = barBottom - barTop;
+                const fill = entry.colorFor ? entry.colorFor(category, index) : entry.color;
                 const centerX = left + groupX + barX + barWidth / 2;
                 const rows = tooltipRows(category, index);
-                const onHover = () => setTip({ left: centerX, top: top + barY - 10, title: category.label, rows });
+                const onHover = () => setTip({ left: centerX, top: top + barTop - 10, title: category.label, rows });
                 return (
                   <g key={entry.key}>
-                    <path
-                      className="viz-bar"
-                      d={topRoundedPath(barX, barY, barWidth, barHeight, Math.min(5, barWidth / 2))}
-                      fill={entry.color}
-                      onMouseEnter={onHover}
-                      onMouseMove={onHover}
-                    />
+                    {barHeight > 0 && (
+                      <path
+                        className="viz-bar"
+                        d={negative
+                          ? bottomRoundedPath(barX, barTop, barWidth, barHeight, Math.min(5, barWidth / 2))
+                          : topRoundedPath(barX, barTop, barWidth, barHeight, Math.min(5, barWidth / 2))}
+                        fill={fill}
+                        onMouseEnter={onHover}
+                        onMouseMove={onHover}
+                      />
+                    )}
                     {showValueLabels && (
-                      <text className="viz-bar-label" textAnchor="middle" x={barX + barWidth / 2} y={barY - 6}>
-                        {formatPct(value, { scale: valueScale, suffix: valueSuffix, digits: 0 })}
+                      <text className="viz-bar-label" textAnchor="middle" x={barX + barWidth / 2} y={negative ? barBottom + 13 : barTop - 6}>
+                        {formatPct(value, { scale: valueScale, suffix: valueSuffix, digits: valueDigits })}
                       </text>
                     )}
                   </g>
