@@ -82,6 +82,18 @@ KEEP_MODEL_CACHE=1 bash evaluation/run_visual_suite.sh
 
 Use `bash evaluation/run_visual_suite.sh --help` for the complete short reference. The conservative defaults use one active request and 88 percent of GPU memory. Increase concurrency only after proving the selected model has adequate memory headroom.
 
+### Multiple independent GPUs
+
+Use the multi-GPU wrapper to run one model per explicitly selected physical GPU while sharing the same Python environment, dataset cache, and output directory. `GPU_IDS` and `MODEL_LIST` are positional and must contain the same number of values:
+
+```bash
+GPU_IDS=1,3,5,7 \
+MODEL_LIST=qwen35-9b,internvl35-8b,qwen3-vl-8b,minicpm-v46 \
+  bash evaluation/run_visual_suite_multi_gpu.sh
+```
+
+The wrapper validates every GPU index, requires at least 22,000 MiB of free memory on each selected GPU, allocates a distinct local API port per worker, and refuses duplicate GPUs or active worker PID files. Set `DRY_RUN=1` to validate the mapping without starting model servers.
+
 ### Outputs
 
 Each model writes to `evaluation/results/visual_suite/<model-slug>/`:
