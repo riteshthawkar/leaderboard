@@ -40,6 +40,10 @@ MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-60}"
 MIN_SYSTEM_RAM_GB="${MIN_SYSTEM_RAM_GB:-28}"
 MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-22000}"
 VLLM_DTYPE="${VLLM_DTYPE:-auto}"
+HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
+HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
+
+VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
 
 MODEL_SPECS=(
   'qwen35-9b|Qwen/Qwen3.5-9B|c202236235762e1c871ad0ccb60c8ee5ba337b9a|bnb4|noncot|256|32768|{"enable_thinking":false}'
@@ -77,6 +81,7 @@ Common overrides:
   KEEP_MODEL_CACHE=1                 Retain downloaded model weights
   GPU_ID=1                           Use a different physical GPU
   VLLM_DTYPE=float16                 Use FP16 on GPUs without BF16 support
+  HF_HUB_DISABLE_XET=0               Re-enable Hugging Face Xet downloads
   MAX_MODEL_LEN=32768                Override every model's context limit (advanced)
   DRY_RUN=1                          Print the selected plan without setup
 
@@ -170,11 +175,14 @@ validate_settings() {
     || die "MIN_FREE_GPU_MEMORY_MIB must be positive."
   [[ "$VLLM_DTYPE" == "auto" || "$VLLM_DTYPE" == "float16" || "$VLLM_DTYPE" == "bfloat16" ]] \
     || die "VLLM_DTYPE must be auto, float16, or bfloat16."
+  [[ "$HF_HUB_DOWNLOAD_TIMEOUT" =~ ^[0-9]+$ ]] && (( HF_HUB_DOWNLOAD_TIMEOUT > 0 )) \
+    || die "HF_HUB_DOWNLOAD_TIMEOUT must be positive."
   validate_flag "SMOKE_ONLY" "$SMOKE_ONLY"
   validate_flag "FORCE" "$FORCE"
   validate_flag "DRY_RUN" "$DRY_RUN"
   validate_flag "KEEP_MODEL_CACHE" "$KEEP_MODEL_CACHE"
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
+  validate_flag "HF_HUB_DISABLE_XET" "$HF_HUB_DISABLE_XET"
   [[ -n "$(selected_tracks)" ]] || die "TRACKS must select do_you_see_me, minds_eye, or all."
   (( $(selected_model_count) > 0 )) || die "MODELS did not match any configured model slug."
 }
@@ -299,11 +307,28 @@ verify_vllm_cli() {
 
 prepare_dataset() {
   log "Downloading or validating the pinned public visual dataset"
-  HF_TOKEN="${HF_TOKEN:-}" HF_HUB_DISABLE_TELEMETRY=1 \
+  HF_TOKEN="${HF_TOKEN:-}" \
+    HF_HUB_DISABLE_TELEMETRY=1 \
+    HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+    HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" \
     "$PYTHON_BIN" -m evaluation.prepare_visual_data \
       --output "$DATASET_DIR" \
       --repo-id "$DATASET_REPO_ID" \
       --revision "$DATASET_REVISION"
+}
+
+apply_model_compatibility_patches() {
+  if ! is_enabled "$MODELS" "minicpm-v46"; then
+    return 0
+  fi
+  log "Applying audited MiniCPM vLLM compatibility patch"
+  "$PYTHON_BIN" -m evaluation.common.patch_vllm_weights_mapper
+}
+
+model_compatibility_patch() {
+  if [[ "$1" == "minicpm-v46" ]]; then
+    printf '%s\n' "$VLLM_STACKED_WEIGHT_PATCH_ID"
+  fi
 }
 
 port_is_available() {
@@ -396,6 +421,8 @@ start_server() {
       HF_HOME="$model_cache" \
       HF_TOKEN="${HF_TOKEN:-}" \
       HF_HUB_DISABLE_TELEMETRY=1 \
+      HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" \
       TOKENIZERS_PARALLELISM=false \
       CUDA_VISIBLE_DEVICES="$GPU_ID" \
       PYTHONUNBUFFERED=1 \
@@ -406,6 +433,8 @@ start_server() {
       HF_HOME="$model_cache" \
       HF_TOKEN="${HF_TOKEN:-}" \
       HF_HUB_DISABLE_TELEMETRY=1 \
+      HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" \
       TOKENIZERS_PARALLELISM=false \
       CUDA_VISIBLE_DEVICES="$GPU_ID" \
       PYTHONUNBUFFERED=1 \
@@ -575,6 +604,7 @@ write_manifest() {
   MANIFEST_VLLM_VERSION="$VLLM_VERSION" \
   MANIFEST_BNB_VERSION="$BITSANDBYTES_VERSION" \
   MANIFEST_OPENAI_VERSION="$OPENAI_VERSION" \
+  MANIFEST_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
   "$PYTHON_BIN" - <<'PY'
 import hashlib
 import json
@@ -630,6 +660,15 @@ manifest = {
     "gpu": os.environ["MANIFEST_GPU"],
     "tracks": track_data,
 }
+compatibility_patch = os.environ["MANIFEST_COMPATIBILITY_PATCH"]
+if compatibility_patch:
+    patch_source = project_root / "evaluation" / "common" / "patch_vllm_weights_mapper.py"
+    manifest["compatibility_patches"] = [
+        {
+            "id": compatibility_patch,
+            "source_sha256": hashlib.sha256(patch_source.read_bytes()).hexdigest(),
+        }
+    ]
 temporary = path.with_suffix(".json.tmp")
 temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 os.replace(temporary, path)
@@ -652,6 +691,7 @@ ensure_run_config() {
   RUN_CONFIG_DATASET_REPO_ID="$DATASET_REPO_ID" \
   RUN_CONFIG_DATASET_REVISION="$DATASET_REVISION" \
   RUN_CONFIG_VLLM_VERSION="$VLLM_VERSION" \
+  RUN_CONFIG_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
   RUN_CONFIG_FORCE="$FORCE" \
   "$PYTHON_BIN" - <<'PY'
 import json
@@ -682,6 +722,11 @@ source_hashes["runner"] = {
     "visual_pipeline": sha256(project_root / "evaluation" / "common" / "visual_pipeline.py"),
     "vllm_runner": sha256(project_root / "evaluation" / "common" / "vllm_runner.py"),
 }
+compatibility_patch = os.environ["RUN_CONFIG_COMPATIBILITY_PATCH"]
+if compatibility_patch:
+    source_hashes["compatibility_patch"] = sha256(
+        project_root / "evaluation" / "common" / "patch_vllm_weights_mapper.py"
+    )
 desired = {
     "schema_version": 2,
     "model_id": os.environ["RUN_CONFIG_MODEL_ID"],
@@ -699,11 +744,14 @@ desired = {
     },
     "source_hashes": source_hashes,
 }
+if compatibility_patch:
+    desired["compatibility_patches"] = [compatibility_patch]
 force = os.environ["RUN_CONFIG_FORCE"] == "1"
 artifacts = list(path.parent.glob("*.diagnostics.jsonl")) + list(
     path.parent.glob("*_submission.jsonl")
 )
 
+write_desired = force or not path.is_file()
 if force:
     for artifact in artifacts:
         artifact.unlink(missing_ok=True)
@@ -717,17 +765,19 @@ elif path.is_file():
             "Set FORCE=1 to replace its artifacts safely."
         ) from exc
     if existing != desired and not force:
-        raise SystemExit(
-            f"Run configuration changed for {path.parent.name}. Set FORCE=1 to start "
-            "a clean run instead of mixing checkpoints from different configurations."
-        )
+        if artifacts:
+            raise SystemExit(
+                f"Run configuration changed for {path.parent.name}. Set FORCE=1 to start "
+                "a clean run instead of mixing checkpoints from different configurations."
+            )
+        write_desired = True
 elif artifacts and not force:
     raise SystemExit(
         f"Existing evaluation artifacts for {path.parent.name} have no run fingerprint. "
         "Set FORCE=1 to replace them safely."
     )
 
-if force or not path.is_file():
+if write_desired:
     temporary = path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(desired, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(temporary, path)
@@ -835,6 +885,7 @@ main() {
   preflight_host
   mkdir -p "$OUTPUT_ROOT" "$CACHE_ROOT/models"
   setup_environment
+  apply_model_compatibility_patches
   verify_vllm_cli
   prepare_dataset
 

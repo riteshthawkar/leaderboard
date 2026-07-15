@@ -57,6 +57,8 @@ The pinned Qwen and GLM processors can emit between 12,288 and 16,384 visual tok
 - Diagnostics are saved atomically every 25 new responses. Re-running the same command keeps valid responses and retries only missing, failed, or unparseable samples.
 - Each full track receives up to three retry passes. One failed model does not prevent later models from running, but the script returns a nonzero exit status if any model remains failed.
 - Exact model and dataset revisions are pinned. A run fingerprint prevents checkpoints from different prompts, revisions, dtypes, or context limits from being mixed.
+- Hugging Face Xet downloads are disabled by default in favor of the standard HTTP path because Xet reconstruction failures can abort large parallel model downloads. Set `HF_HUB_DISABLE_XET=0` to opt back in.
+- MiniCPM-V-4.6 applies a version-checked vLLM 0.25.1 stacked-weight mapping correction. Its identifier and patch-source hash are recorded in the model run configuration and final manifest.
 - Model caches are deleted after each attempted model by default to keep disk use bounded. Set `KEEP_MODEL_CACHE=1` when retaining completed or failed weights is more important than disk use.
 - Canonical submission JSONL is created only after complete question coverage, exact ordering, schema, and nonempty answers have passed validation.
 
