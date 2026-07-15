@@ -40,15 +40,15 @@ The default sequence is:
 
 | Slug | Model | Loading | Prompt |
 | --- | --- | --- | --- |
-| `qwen35-9b` | `Qwen/Qwen3.5-9B` | 4-bit BitsAndBytes | Non-CoT with thinking disabled |
+| `qwen35-9b` | `Qwen/Qwen3.5-9B` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT with thinking disabled |
 | `internvl35-8b` | `OpenGVLab/InternVL3_5-8B` | Full precision with a 4,096-token context | Non-CoT |
-| `glm41v-9b-thinking` | `zai-org/GLM-4.1V-9B-Thinking` | 4-bit BitsAndBytes | CoT |
-| `minicpm-v46` | `openbmb/MiniCPM-V-4.6` | 4-bit BitsAndBytes | Non-CoT |
-| `qwen25-vl-7b` | `Qwen/Qwen2.5-VL-7B-Instruct` | 4-bit BitsAndBytes | Non-CoT |
-| `qwen3-vl-8b` | `Qwen/Qwen3-VL-8B-Instruct` | 4-bit BitsAndBytes | Non-CoT |
+| `glm41v-9b-thinking` | `zai-org/GLM-4.1V-9B-Thinking` | 4-bit BitsAndBytes, 32,768-token context | CoT |
+| `minicpm-v46` | `openbmb/MiniCPM-V-4.6` | 4-bit BitsAndBytes, 8,192-token context | Non-CoT |
+| `qwen25-vl-7b` | `Qwen/Qwen2.5-VL-7B-Instruct` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT |
+| `qwen3-vl-8b` | `Qwen/Qwen3-VL-8B-Instruct` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT |
 | `phi4-multimodal` | `microsoft/Phi-4-multimodal-instruct` | BF16, or FP16 when BF16 is unavailable | Non-CoT |
 
-InternVL3.5 remains full precision because its vLLM model class does not support the BitsAndBytes loader. Phi-4 multimodal also remains full precision because its built-in vision adapter is incompatible with BitsAndBytes quantization. Both use a 4,096-token context to fit a 24 GB card; the other models use an 8,192-token server context. Quantized runs must be disclosed as 4-bit inference in the leaderboard method description because quantization can affect scores.
+The pinned Qwen and GLM processors can emit between 12,288 and 16,384 visual tokens for the high-resolution Mind's Eye composites. Those quantized models therefore use a 32,768-token context so the image, prompt, and response budget fit without changing the benchmark image. InternVL3.5 remains full precision because its vLLM model class does not support the BitsAndBytes loader. Phi-4 multimodal also remains full precision because its built-in vision adapter is incompatible with BitsAndBytes quantization. Both use a 4,096-token context to fit a 24 GB card. Quantized runs must be disclosed as 4-bit inference in the leaderboard method description because quantization can affect scores.
 
 ### Reliability behavior
 

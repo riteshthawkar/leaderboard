@@ -70,6 +70,9 @@ def test_visual_suite_dry_run_selects_every_model_and_track():
     )
     assert "full" in internvl_line
     assert "context=4096" in internvl_line
+    for slug in ("qwen35-9b", "glm41v-9b-thinking", "qwen25-vl-7b", "qwen3-vl-8b"):
+        line = next(item for item in result.stdout.splitlines() if slug in item)
+        assert "context=32768" in line
 
 
 def test_visual_suite_dry_run_honors_model_track_and_context_overrides():

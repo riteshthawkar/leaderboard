@@ -42,12 +42,12 @@ MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-22000}"
 VLLM_DTYPE="${VLLM_DTYPE:-auto}"
 
 MODEL_SPECS=(
-  'qwen35-9b|Qwen/Qwen3.5-9B|c202236235762e1c871ad0ccb60c8ee5ba337b9a|bnb4|noncot|256|8192|{"enable_thinking":false}'
+  'qwen35-9b|Qwen/Qwen3.5-9B|c202236235762e1c871ad0ccb60c8ee5ba337b9a|bnb4|noncot|256|32768|{"enable_thinking":false}'
   'internvl35-8b|OpenGVLab/InternVL3_5-8B|9bb6a56ad9cc69db95e2d4eeb15a52bbcac4ef79|full|noncot|256|4096|{}'
-  'glm41v-9b-thinking|zai-org/GLM-4.1V-9B-Thinking|9e9a4c5e94f4a095c353f4152d520a2644a553b2|bnb4|cot|4096|8192|{}'
+  'glm41v-9b-thinking|zai-org/GLM-4.1V-9B-Thinking|9e9a4c5e94f4a095c353f4152d520a2644a553b2|bnb4|cot|4096|32768|{}'
   'minicpm-v46|openbmb/MiniCPM-V-4.6|8169864629825dc1d755a5aa1cd8b5935dcbc83f|bnb4|noncot|256|8192|{}'
-  'qwen25-vl-7b|Qwen/Qwen2.5-VL-7B-Instruct|cc594898137f460bfe9f0759e9844b3ce807cfb5|bnb4|noncot|256|8192|{}'
-  'qwen3-vl-8b|Qwen/Qwen3-VL-8B-Instruct|0c351dd01ed87e9c1b53cbc748cba10e6187ff3b|bnb4|noncot|256|8192|{}'
+  'qwen25-vl-7b|Qwen/Qwen2.5-VL-7B-Instruct|cc594898137f460bfe9f0759e9844b3ce807cfb5|bnb4|noncot|256|32768|{}'
+  'qwen3-vl-8b|Qwen/Qwen3-VL-8B-Instruct|0c351dd01ed87e9c1b53cbc748cba10e6187ff3b|bnb4|noncot|256|32768|{}'
   'phi4-multimodal|microsoft/Phi-4-multimodal-instruct|93f923e1a7727d1c4f446756212d9d3e8fcc5d81|full|noncot|256|4096|{}'
 )
 
@@ -77,7 +77,7 @@ Common overrides:
   KEEP_MODEL_CACHE=1                 Retain downloaded model weights
   GPU_ID=1                           Use a different physical GPU
   VLLM_DTYPE=float16                 Use FP16 on GPUs without BF16 support
-  MAX_MODEL_LEN=4096                 Override every model's context limit
+  MAX_MODEL_LEN=32768                Override every model's context limit (advanced)
   DRY_RUN=1                          Print the selected plan without setup
 
 The script is resumable. Re-running it keeps validated diagnostic rows and
