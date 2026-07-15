@@ -18,11 +18,12 @@ OUTPUT_ROOT="${OUTPUT_ROOT:-$PROJECT_ROOT/evaluation/results/visual_suite}"
 LOG_DIR="${LOG_DIR:-$OUTPUT_ROOT/_worker_logs}"
 VLLM_DTYPE="${VLLM_DTYPE:-bfloat16}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.88}"
-KEEP_MODEL_CACHE="${KEEP_MODEL_CACHE:-1}"
+KEEP_MODEL_CACHE="${KEEP_MODEL_CACHE:-0}"
 FORCE="${FORCE:-0}"
 CONTINUE_ON_MODEL_ERROR="${CONTINUE_ON_MODEL_ERROR:-0}"
 STAGGER_SECONDS="${STAGGER_SECONDS:-20}"
 MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-22000}"
+MIN_FREE_DISK_GB_PER_MODEL="${MIN_FREE_DISK_GB_PER_MODEL:-32}"
 DRY_RUN="${DRY_RUN:-0}"
 
 usage() {
@@ -37,6 +38,8 @@ Optional overrides:
   BASE_PORT=8011
   TRACKS=all
   STAGGER_SECONDS=20
+  MIN_FREE_DISK_GB_PER_MODEL=32
+  KEEP_MODEL_CACHE=0
   DRY_RUN=1
 
 GPU_IDS and MODEL_LIST must contain the same number of comma-separated values.
@@ -89,6 +92,8 @@ main() {
   [[ "$STAGGER_SECONDS" =~ ^[0-9]+$ ]] || die "STAGGER_SECONDS must be a non-negative integer."
   [[ "$MIN_FREE_GPU_MEMORY_MIB" =~ ^[0-9]+$ ]] && (( MIN_FREE_GPU_MEMORY_MIB > 0 )) \
     || die "MIN_FREE_GPU_MEMORY_MIB must be positive."
+  [[ "$MIN_FREE_DISK_GB_PER_MODEL" =~ ^[0-9]+$ ]] && (( MIN_FREE_DISK_GB_PER_MODEL > 0 )) \
+    || die "MIN_FREE_DISK_GB_PER_MODEL must be positive."
   validate_flag "KEEP_MODEL_CACHE" "$KEEP_MODEL_CACHE"
   validate_flag "FORCE" "$FORCE"
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
@@ -105,6 +110,14 @@ main() {
   (( ${#gpus[@]} == ${#models[@]} )) \
     || die "GPU_IDS contains ${#gpus[@]} values but MODEL_LIST contains ${#models[@]}."
   (( BASE_PORT + ${#gpus[@]} - 1 < 65536 )) || die "The allocated port range exceeds 65535."
+
+  local free_kib free_gib required_free_gib
+  free_kib="$(df -Pk "$PROJECT_ROOT" | awk 'NR == 2 {print $4}')"
+  [[ "$free_kib" =~ ^[0-9]+$ ]] || die "Could not determine free disk space for $PROJECT_ROOT."
+  free_gib=$((free_kib / 1024 / 1024))
+  required_free_gib=$((${#gpus[@]} * MIN_FREE_DISK_GB_PER_MODEL))
+  (( free_gib >= required_free_gib )) || die \
+    "Only ${free_gib} GiB is free. ${#gpus[@]} parallel model(s) require at least ${required_free_gib} GiB (${MIN_FREE_DISK_GB_PER_MODEL} GiB per model)."
 
   local index gpu model port details total_memory free_memory pid_file existing_pid
   local -A selected_gpus=()
@@ -130,6 +143,10 @@ main() {
       || die "Could not parse memory information for GPU $gpu: $details"
     (( free_memory >= MIN_FREE_GPU_MEMORY_MIB )) \
       || die "GPU $gpu has only ${free_memory}/${total_memory} MiB free; choose a free GPU."
+    if [[ "$model" == "glm46v-flash" ]]; then
+      (( total_memory >= 39000 && free_memory >= 38000 )) \
+        || die "glm46v-flash requires a free 40 GB-class GPU; GPU $gpu has ${free_memory}/${total_memory} MiB free."
+    fi
     MODELS="$model" DRY_RUN=1 GPU_ID="$gpu" PORT="$port" \
       VENV_DIR="$VENV_DIR" CACHE_ROOT="$CACHE_ROOT" DATASET_DIR="$DATASET_DIR" \
       OUTPUT_ROOT="$OUTPUT_ROOT" bash "$RUNNER" >/dev/null
@@ -185,6 +202,7 @@ PY
       TRACKS="$TRACKS" \
       VLLM_DTYPE="$VLLM_DTYPE" \
       GPU_MEMORY_UTILIZATION="$GPU_MEMORY_UTILIZATION" \
+      MIN_FREE_DISK_GB="$MIN_FREE_DISK_GB_PER_MODEL" \
       KEEP_MODEL_CACHE="$KEEP_MODEL_CACHE" \
       FORCE="$FORCE" \
       CONTINUE_ON_MODEL_ERROR="$CONTINUE_ON_MODEL_ERROR" \

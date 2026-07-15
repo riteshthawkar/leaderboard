@@ -17,7 +17,7 @@ The backend and frontend do not import these evaluation packages at runtime. The
 
 ### GPU host prerequisites
 
-- Linux with a working NVIDIA driver and a 24 GB-class GPU.
+- Linux with a working NVIDIA driver and a 24 GB-class GPU. The full-precision GLM-4.6V-Flash entry requires a free 40 GB-class GPU.
 - At least 32 GB of system RAM, with no other memory-heavy model process running.
 - Python 3.10 through 3.14 with the `venv` module.
 - `git`, `curl`, and at least 60 GiB of free disk space.
@@ -42,13 +42,13 @@ The default sequence is:
 | --- | --- | --- | --- |
 | `qwen35-9b` | `Qwen/Qwen3.5-9B` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT with thinking disabled |
 | `internvl35-8b` | `OpenGVLab/InternVL3_5-8B` | Full precision with a 4,096-token context | Non-CoT |
-| `glm41v-9b-thinking` | `zai-org/GLM-4.1V-9B-Thinking` | 4-bit BitsAndBytes, 32,768-token context | CoT |
+| `glm46v-flash` | `zai-org/GLM-4.6V-Flash` | BF16, 32,768-token context | CoT with hybrid thinking enabled |
 | `minicpm-v46` | `openbmb/MiniCPM-V-4.6` | 4-bit BitsAndBytes, 8,192-token context | Non-CoT |
 | `qwen25-vl-7b` | `Qwen/Qwen2.5-VL-7B-Instruct` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT |
 | `qwen3-vl-8b` | `Qwen/Qwen3-VL-8B-Instruct` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT |
 | `phi4-multimodal` | `microsoft/Phi-4-multimodal-instruct` | BF16, or FP16 when BF16 is unavailable | Non-CoT |
 
-The pinned Qwen and GLM processors can emit between 12,288 and 16,384 visual tokens for the high-resolution Mind's Eye composites. Those quantized models therefore use a 32,768-token context so the image, prompt, and response budget fit without changing the benchmark image. InternVL3.5 remains full precision because its vLLM model class does not support the BitsAndBytes loader. Phi-4 multimodal also remains full precision because its built-in vision adapter is incompatible with BitsAndBytes quantization. Both use a 4,096-token context to fit a 24 GB card. Quantized runs must be disclosed as 4-bit inference in the leaderboard method description because quantization can affect scores.
+The pinned Qwen and GLM processors can emit between 12,288 and 16,384 visual tokens for the high-resolution Mind's Eye composites, so they use a 32,768-token context to fit the image, prompt, and response budget without changing the benchmark image. GLM-4.6V-Flash uses its full BF16 checkpoint to avoid quantization effects and therefore requires a free 40 GB-class GPU. InternVL3.5 remains full precision because its vLLM model class does not support the BitsAndBytes loader. Phi-4 multimodal also remains full precision because its built-in vision adapter is incompatible with BitsAndBytes quantization. Both use a 4,096-token context to fit a 24 GB card. Quantized runs must be disclosed as 4-bit inference in the leaderboard method description because quantization can affect scores.
 
 ### Reliability behavior
 
@@ -94,7 +94,7 @@ MODEL_LIST=qwen35-9b,internvl35-8b,qwen3-vl-8b,minicpm-v46 \
   bash evaluation/run_visual_suite_multi_gpu.sh
 ```
 
-The wrapper validates every GPU index, requires at least 22,000 MiB of free memory on each selected GPU, allocates a distinct local API port per worker, and refuses duplicate GPUs or active worker PID files. Set `DRY_RUN=1` to validate the mapping without starting model servers.
+The wrapper validates every GPU index, requires at least 22,000 MiB of free memory on each selected GPU, allocates a distinct local API port per worker, and refuses duplicate GPUs or active worker PID files. It also reserves 32 GiB of free disk per concurrently selected model before launching any workers. Model caches are removed after each attempt by default; set `KEEP_MODEL_CACHE=1` only when the host has enough disk to retain every concurrent checkpoint. Set `DRY_RUN=1` to validate the mapping without starting model servers.
 
 ### Outputs
 

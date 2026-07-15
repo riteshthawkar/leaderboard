@@ -48,7 +48,7 @@ VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
 MODEL_SPECS=(
   'qwen35-9b|Qwen/Qwen3.5-9B|c202236235762e1c871ad0ccb60c8ee5ba337b9a|bnb4|noncot|256|32768|{"enable_thinking":false}'
   'internvl35-8b|OpenGVLab/InternVL3_5-8B|9bb6a56ad9cc69db95e2d4eeb15a52bbcac4ef79|full|noncot|256|4096|{}'
-  'glm41v-9b-thinking|zai-org/GLM-4.1V-9B-Thinking|9e9a4c5e94f4a095c353f4152d520a2644a553b2|bnb4|cot|4096|32768|{}'
+  'glm46v-flash|zai-org/GLM-4.6V-Flash|411bb4d77144a3f03accbf4b780f5acb8b7cde4e|full|cot|4096|32768|{}'
   'minicpm-v46|openbmb/MiniCPM-V-4.6|8169864629825dc1d755a5aa1cd8b5935dcbc83f|bnb4|noncot|256|8192|{}'
   'qwen25-vl-7b|Qwen/Qwen2.5-VL-7B-Instruct|cc594898137f460bfe9f0759e9844b3ce807cfb5|bnb4|noncot|256|32768|{}'
   'qwen3-vl-8b|Qwen/Qwen3-VL-8B-Instruct|0c351dd01ed87e9c1b53cbc748cba10e6187ff3b|bnb4|noncot|256|32768|{}'
@@ -220,6 +220,10 @@ preflight_host() {
   [[ "$free_memory_mib" =~ ^[0-9]+$ ]] || die "Could not read free memory for GPU $GPU_ID."
   (( free_memory_mib >= MIN_FREE_GPU_MEMORY_MIB )) \
     || die "GPU $GPU_ID has only ${free_memory_mib} MiB free. Stop other GPU jobs or lower MIN_FREE_GPU_MEMORY_MIB only after verifying memory requirements."
+  if is_enabled "$MODELS" "glm46v-flash"; then
+    (( memory_mib >= 39000 && free_memory_mib >= 38000 )) \
+      || die "GLM-4.6V-Flash uses full-precision weights and requires a free 40 GB-class GPU. GPU $GPU_ID has ${free_memory_mib}/${memory_mib} MiB free."
+  fi
   GPU_NAME="$(nvidia-smi -i "$GPU_ID" --query-gpu=name --format=csv,noheader | head -n 1 | xargs)"
 
   compute_cap="$(nvidia-smi -i "$GPU_ID" --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -n 1 | xargs || true)"
