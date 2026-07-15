@@ -348,6 +348,22 @@ stop_server() {
   sleep 5
 }
 
+report_startup_progress() {
+  local elapsed="$1" latest=""
+  if [[ -s "$SERVER_LOG" ]]; then
+    latest="$(
+      tail -c 16384 "$SERVER_LOG" 2>/dev/null \
+        | tr '\r' '\n' \
+        | awk 'NF { line = $0 } END { print line }'
+    )" || true
+  fi
+
+  log "Waiting for model download and startup (${elapsed}s elapsed); log: $SERVER_LOG"
+  if [[ -n "$latest" ]]; then
+    printf '  Latest vLLM log: %.300s\n' "$latest"
+  fi
+}
+
 start_server() {
   local slug="$1" model_id="$2" revision="$3" quantization="$4" model_cache="$5" model_max_len="$6"
   SERVER_LOG="$OUTPUT_ROOT/$slug/vllm.log"
@@ -374,6 +390,7 @@ start_server() {
   fi
 
   log "Starting $model_id at revision ${revision:0:12} ($quantization)"
+  log "Model startup log: $SERVER_LOG"
   if command -v setsid >/dev/null; then
     setsid env \
       HF_HOME="$model_cache" \
@@ -412,7 +429,7 @@ start_server() {
     sleep 5
     elapsed=$((elapsed + 5))
     if (( elapsed % 60 == 0 )); then
-      log "Waiting for model download and startup (${elapsed}s elapsed)"
+      report_startup_progress "$elapsed"
     fi
   done
 

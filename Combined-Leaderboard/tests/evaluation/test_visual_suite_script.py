@@ -50,6 +50,8 @@ def test_visual_suite_uses_current_vllm_request_logging_default():
     assert "--disable-log-requests" not in script
     assert "verify_vllm_cli" in script
     assert "serve --help=all" in script
+    assert "report_startup_progress" in script
+    assert "Latest vLLM log" in script
 
 
 def test_visual_suite_dry_run_selects_every_model_and_track():
