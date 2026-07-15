@@ -1,0 +1,1 @@
+Inspect the image carefully and reason step by step inside <think> and </think>. Then return only the final answer inside <answer> and </answer>, using the response format requested by the question.

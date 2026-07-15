@@ -1,0 +1,1 @@
+Inspect the image and its answer choices carefully. Reason step by step inside <think> and </think>. Then return only the uppercase option letter inside <answer> and </answer>.

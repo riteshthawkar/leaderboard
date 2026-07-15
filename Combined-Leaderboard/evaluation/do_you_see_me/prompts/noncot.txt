@@ -1,0 +1,1 @@
+Inspect the image carefully and answer the question directly. Follow the response format requested by the question. Return only the final answer without an explanation.

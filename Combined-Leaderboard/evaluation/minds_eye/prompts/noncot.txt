@@ -1,0 +1,1 @@
+Inspect the image and its answer choices carefully. Return only the uppercase option letter selected by the question, without an explanation.
