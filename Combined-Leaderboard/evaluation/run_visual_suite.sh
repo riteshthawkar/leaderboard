@@ -273,7 +273,7 @@ PY
 
 verify_vllm_cli() {
   local help_text option
-  if ! help_text="$("$VLLM_BIN" serve --help 2>&1)"; then
+  if ! help_text="$("$VLLM_BIN" serve --help=all 2>&1)"; then
     die "Could not inspect the installed vLLM serve command. Recreate $VENV_DIR and rerun."
   fi
   for option in \
