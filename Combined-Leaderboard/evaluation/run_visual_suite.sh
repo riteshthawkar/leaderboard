@@ -271,6 +271,32 @@ print(f"Environment ready: vLLM {vllm.__version__}, PyTorch {torch.__version__},
 PY
 }
 
+verify_vllm_cli() {
+  local help_text option
+  if ! help_text="$("$VLLM_BIN" serve --help 2>&1)"; then
+    die "Could not inspect the installed vLLM serve command. Recreate $VENV_DIR and rerun."
+  fi
+  for option in \
+    --host \
+    --port \
+    --served-model-name \
+    --revision \
+    --dtype \
+    --gpu-memory-utilization \
+    --max-model-len \
+    --max-num-seqs \
+    --limit-mm-per-prompt \
+    --generation-config \
+    --trust-remote-code \
+    --enforce-eager \
+    --quantization \
+    --load-format; do
+    [[ "$help_text" == *"$option"* ]] \
+      || die "Installed vLLM $VLLM_VERSION does not expose required option $option."
+  done
+  log "vLLM serve CLI compatibility preflight passed"
+}
+
 prepare_dataset() {
   log "Downloading or validating the pinned public visual dataset"
   HF_TOKEN="${HF_TOKEN:-}" HF_HUB_DISABLE_TELEMETRY=1 \
@@ -341,7 +367,6 @@ start_server() {
     --limit-mm-per-prompt '{"image":1}'
     --generation-config vllm
     --trust-remote-code
-    --disable-log-requests
     --enforce-eager
   )
   if [[ "$quantization" == "bnb4" ]]; then
@@ -793,6 +818,7 @@ main() {
   preflight_host
   mkdir -p "$OUTPUT_ROOT" "$CACHE_ROOT/models"
   setup_environment
+  verify_vllm_cli
   prepare_dataset
 
   local selected_count=0 spec slug model_id revision quantization prompt_mode max_tokens model_max_len chat_kwargs

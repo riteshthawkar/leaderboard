@@ -53,6 +53,7 @@ InternVL3.5 remains full precision because its vLLM model class does not support
 ### Reliability behavior
 
 - Every track starts with a strict 20-sample smoke test. A model with empty or unparseable responses does not proceed to the full track.
+- The installed `vllm serve` CLI is checked before dataset or model downloads, so incompatible command options fail once and fail early.
 - Diagnostics are saved atomically every 25 new responses. Re-running the same command keeps valid responses and retries only missing, failed, or unparseable samples.
 - Each full track receives up to three retry passes. One failed model does not prevent later models from running, but the script returns a nonzero exit status if any model remains failed.
 - Exact model and dataset revisions are pinned. A run fingerprint prevents checkpoints from different prompts, revisions, dtypes, or context limits from being mixed.

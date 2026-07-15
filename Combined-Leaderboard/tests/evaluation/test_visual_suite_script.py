@@ -44,6 +44,13 @@ def test_visual_suite_shell_is_valid():
     assert result.returncode == 0, result.stderr
 
 
+def test_visual_suite_uses_current_vllm_request_logging_default():
+    script = SCRIPT.read_text(encoding="utf-8")
+
+    assert "--disable-log-requests" not in script
+    assert "verify_vllm_cli" in script
+
+
 def test_visual_suite_dry_run_selects_every_model_and_track():
     result = _dry_run()
 
