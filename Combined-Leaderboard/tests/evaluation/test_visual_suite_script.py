@@ -70,7 +70,7 @@ def test_visual_suite_dry_run_selects_every_model_and_track():
     )
     assert "full" in internvl_line
     assert "context=4096" in internvl_line
-    for slug in ("qwen35-9b", "glm41v-9b-thinking", "qwen25-vl-7b", "qwen3-vl-8b"):
+    for slug in ("qwen35-9b", "glm46v-flash", "qwen25-vl-7b", "qwen3-vl-8b"):
         line = next(item for item in result.stdout.splitlines() if slug in item)
         assert "context=32768" in line
 
@@ -131,12 +131,15 @@ def test_force_removes_stale_checkpoints_before_replacing_run_fingerprint(tmp_pa
     assert not stale_submission.exists()
     assert not stale_manifest.exists()
     run_config = json.loads((model_dir / ".run_config.json").read_text(encoding="utf-8"))
-    assert run_config["schema_version"] == 2
+    assert run_config["schema_version"] == 3
     assert run_config["model_revision"] == "revision-a"
     assert set(run_config["source_hashes"]["runner"]) == {
+        "diagnostics_finalizer",
         "visual_pipeline",
         "vllm_runner",
     }
+
+    stale_diagnostics.write_text("checkpoint\n", encoding="utf-8")
 
     mismatch = _run_sourced(
         "\n".join(
@@ -151,3 +154,54 @@ def test_force_removes_stale_checkpoints_before_replacing_run_fingerprint(tmp_pa
     )
     assert mismatch.returncode != 0
     assert "Run configuration changed" in mismatch.stderr
+
+
+def test_known_final_answer_parser_migration_preserves_existing_checkpoints(tmp_path):
+    output_root = tmp_path / "outputs"
+    model_dir = output_root / "test-model"
+    result = _run_sourced(
+        "\n".join(
+            (
+                'PYTHON_BIN="$(command -v python3)"',
+                f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
+                "VLLM_DTYPE=bfloat16",
+                "FORCE=0",
+                "ensure_run_config test-model test/model revision-a bnb4 noncot 256 8192 '{}'",
+            )
+        )
+    )
+    assert result.returncode == 0, result.stderr
+
+    path = model_dir / ".run_config.json"
+    legacy = json.loads(path.read_text(encoding="utf-8"))
+    legacy["schema_version"] = 2
+    legacy.pop("unparseable_answers")
+    legacy.pop("pipeline_revision")
+    legacy["source_hashes"]["runner"] = {
+        "visual_pipeline": "abc3ca5afc225fa280e0877abe7d57c77d1ce80e33d13c59832aa3897160011a",
+        "vllm_runner": "e444570a1edf9c496de5f1149a3e4f648f9892cd95deeae77f24553f0f55f51c",
+    }
+    path.write_text(json.dumps(legacy), encoding="utf-8")
+    (model_dir / "do_you_see_me.diagnostics.jsonl").write_text(
+        "checkpoint\n", encoding="utf-8"
+    )
+
+    migrated = _run_sourced(
+        "\n".join(
+            (
+                'PYTHON_BIN="$(command -v python3)"',
+                f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
+                "VLLM_DTYPE=bfloat16",
+                "FORCE=0",
+                "ensure_run_config test-model test/model revision-a bnb4 noncot 256 8192 '{}'",
+            )
+        )
+    )
+
+    assert migrated.returncode == 0, migrated.stderr
+    current = json.loads(path.read_text(encoding="utf-8"))
+    assert current["schema_version"] == 3
+    assert current["pipeline_revision"] == (
+        "strict-final-answer-parser-and-invalid-sentinel-v1"
+    )
+    assert (model_dir / "do_you_see_me.diagnostics.jsonl").exists()

@@ -56,6 +56,7 @@ The pinned Qwen and GLM processors can emit between 12,288 and 16,384 visual tok
 - The installed `vllm serve` CLI is checked before dataset or model downloads, so incompatible command options fail once and fail early.
 - Diagnostics are saved atomically every 25 new responses. Re-running the same command keeps valid responses and retries only missing, failed, or unparseable samples.
 - Each full track receives up to three retry passes. One failed model does not prevent later models from running, but the script returns a nonzero exit status if any model remains failed.
+- After all configured retry passes, persistent model responses that cannot be converted to the required answer type are written as `__INVALID_MODEL_RESPONSE__` and score as incorrect. Coverage, API, timeout, and inference errors still fail the run. Raw outputs remain in diagnostics for audit.
 - Exact model and dataset revisions are pinned. A run fingerprint prevents checkpoints from different prompts, revisions, dtypes, or context limits from being mixed.
 - Hugging Face Xet downloads are disabled by default in favor of the standard HTTP path because Xet reconstruction failures can abort large parallel model downloads. Set `HF_HUB_DISABLE_XET=0` to opt back in.
 - MiniCPM-V-4.6 applies a version-checked vLLM 0.25.1 stacked-weight mapping correction. Its identifier and patch-source hash are recorded in the model run configuration and final manifest.

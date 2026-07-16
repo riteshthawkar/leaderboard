@@ -44,6 +44,11 @@ HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
 HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
 
 VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
+UNPARSEABLE_ANSWER_POLICY_ID="sentinel-after-exhausted-retries-v1"
+INVALID_MODEL_RESPONSE="__INVALID_MODEL_RESPONSE__"
+PIPELINE_REVISION_ID="strict-final-answer-parser-and-invalid-sentinel-v1"
+LEGACY_VISUAL_PIPELINE_SHA256="abc3ca5afc225fa280e0877abe7d57c77d1ce80e33d13c59832aa3897160011a"
+LEGACY_VLLM_RUNNER_SHA256="e444570a1edf9c496de5f1149a3e4f648f9892cd95deeae77f24553f0f55f51c"
 
 MODEL_SPECS=(
   'qwen35-9b|Qwen/Qwen3.5-9B|c202236235762e1c871ad0ccb60c8ee5ba337b9a|bnb4|noncot|256|32768|{"enable_thinking":false}'
@@ -583,6 +588,16 @@ run_track() {
       sleep 15
     fi
   done
+
+  log "Finalizing persistent unparseable $slug/$track responses as incorrect"
+  if "$PYTHON_BIN" -m evaluation.common.finalize_visual_diagnostics \
+    --questions "$questions" \
+    --diagnostics "$diagnostics" \
+    --out "$output" \
+    && validate_submission "$output" "$questions"; then
+    rm -f -- "$smoke_diagnostics"
+    return 0
+  fi
   return 1
 }
 
@@ -609,6 +624,9 @@ write_manifest() {
   MANIFEST_BNB_VERSION="$BITSANDBYTES_VERSION" \
   MANIFEST_OPENAI_VERSION="$OPENAI_VERSION" \
   MANIFEST_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
+  MANIFEST_UNPARSEABLE_POLICY="$UNPARSEABLE_ANSWER_POLICY_ID" \
+  MANIFEST_INVALID_SENTINEL="$INVALID_MODEL_RESPONSE" \
+  MANIFEST_PIPELINE_REVISION="$PIPELINE_REVISION_ID" \
   "$PYTHON_BIN" - <<'PY'
 import hashlib
 import json
@@ -628,17 +646,21 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     if not output.is_file():
         continue
     payload = output.read_bytes()
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line]
     track_data[track] = {
         "submission_file": output.name,
         "diagnostics_file": diagnostics.name,
-        "row_count": len(output.read_text(encoding="utf-8").splitlines()),
+        "row_count": len(rows),
+        "unparseable_response_count": sum(
+            row.get("answer") == os.environ["MANIFEST_INVALID_SENTINEL"] for row in rows
+        ),
         "sha256": hashlib.sha256(payload).hexdigest(),
         "question_bundle_sha256": hashlib.sha256(questions.read_bytes()).hexdigest(),
         "prompt_sha256": hashlib.sha256(prompt.read_bytes()).hexdigest(),
     }
 
 manifest = {
-    "schema_version": 2,
+    "schema_version": 3,
     "created_at": datetime.now(timezone.utc).isoformat(),
     "model_id": os.environ["MANIFEST_MODEL_ID"],
     "model_revision": os.environ["MANIFEST_REVISION"],
@@ -656,6 +678,14 @@ manifest = {
         "seed": 0,
         "temperature": 0,
     },
+    "unparseable_answers": {
+        "policy": os.environ["MANIFEST_UNPARSEABLE_POLICY"],
+        "sentinel": os.environ["MANIFEST_INVALID_SENTINEL"],
+        "finalizer_source_sha256": hashlib.sha256(
+            (project_root / "evaluation" / "common" / "finalize_visual_diagnostics.py").read_bytes()
+        ).hexdigest(),
+    },
+    "pipeline_revision": os.environ["MANIFEST_PIPELINE_REVISION"],
     "max_model_len": int(os.environ["MANIFEST_MAX_MODEL_LEN"]),
     "dependencies": {
         "bitsandbytes": os.environ["MANIFEST_BNB_VERSION"],
@@ -696,8 +726,14 @@ ensure_run_config() {
   RUN_CONFIG_DATASET_REVISION="$DATASET_REVISION" \
   RUN_CONFIG_VLLM_VERSION="$VLLM_VERSION" \
   RUN_CONFIG_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
+  RUN_CONFIG_UNPARSEABLE_POLICY="$UNPARSEABLE_ANSWER_POLICY_ID" \
+  RUN_CONFIG_INVALID_SENTINEL="$INVALID_MODEL_RESPONSE" \
+  RUN_CONFIG_PIPELINE_REVISION="$PIPELINE_REVISION_ID" \
+  RUN_CONFIG_LEGACY_VISUAL_PIPELINE_SHA256="$LEGACY_VISUAL_PIPELINE_SHA256" \
+  RUN_CONFIG_LEGACY_VLLM_RUNNER_SHA256="$LEGACY_VLLM_RUNNER_SHA256" \
   RUN_CONFIG_FORCE="$FORCE" \
   "$PYTHON_BIN" - <<'PY'
+import copy
 import json
 import os
 from pathlib import Path
@@ -725,6 +761,9 @@ source_hashes = {
 source_hashes["runner"] = {
     "visual_pipeline": sha256(project_root / "evaluation" / "common" / "visual_pipeline.py"),
     "vllm_runner": sha256(project_root / "evaluation" / "common" / "vllm_runner.py"),
+    "diagnostics_finalizer": sha256(
+        project_root / "evaluation" / "common" / "finalize_visual_diagnostics.py"
+    ),
 }
 compatibility_patch = os.environ["RUN_CONFIG_COMPATIBILITY_PATCH"]
 if compatibility_patch:
@@ -732,7 +771,7 @@ if compatibility_patch:
         project_root / "evaluation" / "common" / "patch_vllm_weights_mapper.py"
     )
 desired = {
-    "schema_version": 2,
+    "schema_version": 3,
     "model_id": os.environ["RUN_CONFIG_MODEL_ID"],
     "model_revision": os.environ["RUN_CONFIG_REVISION"],
     "serving_engine": {"name": "vllm", "version": os.environ["RUN_CONFIG_VLLM_VERSION"]},
@@ -747,6 +786,11 @@ desired = {
         "revision": os.environ["RUN_CONFIG_DATASET_REVISION"],
     },
     "source_hashes": source_hashes,
+    "unparseable_answers": {
+        "policy": os.environ["RUN_CONFIG_UNPARSEABLE_POLICY"],
+        "sentinel": os.environ["RUN_CONFIG_INVALID_SENTINEL"],
+    },
+    "pipeline_revision": os.environ["RUN_CONFIG_PIPELINE_REVISION"],
 }
 if compatibility_patch:
     desired["compatibility_patches"] = [compatibility_patch]
@@ -769,12 +813,25 @@ elif path.is_file():
             "Set FORCE=1 to replace its artifacts safely."
         ) from exc
     if existing != desired and not force:
-        if artifacts:
+        legacy = copy.deepcopy(desired)
+        legacy["schema_version"] = 2
+        legacy.pop("unparseable_answers", None)
+        legacy.pop("pipeline_revision", None)
+        legacy["source_hashes"]["runner"] = {
+            "visual_pipeline": os.environ[
+                "RUN_CONFIG_LEGACY_VISUAL_PIPELINE_SHA256"
+            ],
+            "vllm_runner": os.environ["RUN_CONFIG_LEGACY_VLLM_RUNNER_SHA256"],
+        }
+        if existing == legacy:
+            write_desired = True
+        elif artifacts:
             raise SystemExit(
                 f"Run configuration changed for {path.parent.name}. Set FORCE=1 to start "
                 "a clean run instead of mixing checkpoints from different configurations."
             )
-        write_desired = True
+        else:
+            write_desired = True
 elif artifacts and not force:
     raise SystemExit(
         f"Existing evaluation artifacts for {path.parent.name} have no run fingerprint. "

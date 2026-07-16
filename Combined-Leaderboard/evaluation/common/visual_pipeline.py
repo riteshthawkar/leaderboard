@@ -267,6 +267,10 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
     answer_blocks = re.findall(r"<answer>(.*?)</answer>", text, flags=re.I | re.S)
     if answer_blocks:
         text = answer_blocks[-1].strip()
+    elif re.search(r"<think>", text, flags=re.I) and not re.search(
+        r"</think>", text, flags=re.I
+    ):
+        return ""
     elif "</think>" in text.lower():
         text = re.split(r"</think>", text, flags=re.I)[-1].strip()
 
@@ -277,11 +281,35 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
         )
         return values[-1].replace(",", "") if values else ""
     if answer_type == "mcq_index_1_4":
-        values = re.findall(r"(?<!\d)([1-4])(?!\d)", text)
-        return values[-1] if values else ""
+        exact = re.fullmatch(r"[\[(]?([1-4])[\])]?[.,:]?", text, flags=re.I)
+        if exact:
+            return exact.group(1)
+        explicit = re.findall(
+            r"(?i)(?:(?:final\s+)?(?:answer|response)|(?:selected\s+)?(?:option|choice)|(?:choose|select(?:ed)?))"
+            r"\s*(?:is|:|=|-)?\s*[\[(]?([1-4])[\])]?(?=\W|$)",
+            text,
+        )
+        if explicit:
+            return explicit[-1]
+        final_line = text.splitlines()[-1].strip() if text.splitlines() else ""
+        line_match = re.fullmatch(
+            r"[\[(]?([1-4])[\])]?[.,:]?", final_line, flags=re.I
+        )
+        return line_match.group(1) if line_match else ""
     if answer_type == "mcq_letter":
-        values = re.findall(r"\b([A-Fa-f])\b", text)
-        return values[-1].upper() if values else ""
+        exact = re.fullmatch(r"[\[(]?([A-Fa-f])[\])]?[.,:]?", text)
+        if exact:
+            return exact.group(1).upper()
+        explicit = re.findall(
+            r"(?i)(?:(?:final\s+)?(?:answer|response)|(?:selected\s+)?(?:option|choice)|(?:choose|select(?:ed)?))"
+            r"\s*(?:is|:|=|-)?\s*[\[(]?([A-F])[\])]?(?=\W|$)",
+            text,
+        )
+        if explicit:
+            return explicit[-1].upper()
+        final_line = text.splitlines()[-1].strip() if text.splitlines() else ""
+        line_match = re.fullmatch(r"[\[(]?([A-Fa-f])[\])]?[.,:]?", final_line)
+        return line_match.group(1).upper() if line_match else ""
 
     text = re.sub(
         r"^(?:final\s+)?(?:answer|response)\s*(?:is|:)?\s*",
