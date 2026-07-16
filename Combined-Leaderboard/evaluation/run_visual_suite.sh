@@ -37,7 +37,7 @@ MODEL_START_TIMEOUT_SECONDS="${MODEL_START_TIMEOUT_SECONDS:-7200}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.88}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-auto}"
 CONCURRENCY="${CONCURRENCY:-1}"
-MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-50}"
+MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-96}"
 MIN_SYSTEM_RAM_GB="${MIN_SYSTEM_RAM_GB:-28}"
 MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-38000}"
 VLLM_DTYPE="${VLLM_DTYPE:-bfloat16}"
@@ -551,6 +551,18 @@ report_startup_progress() {
   fi
 }
 
+report_startup_failure() {
+  if grep -Fq 'No space left on device' "$SERVER_LOG" 2>/dev/null; then
+    printf 'Model startup failed because the cache filesystem ran out of space. Free disk space, run fewer models concurrently, or set CACHE_ROOT to a larger mounted filesystem.\n' >&2
+  elif grep -Fq 'Disk quota exceeded' "$SERVER_LOG" 2>/dev/null; then
+    printf 'Model startup failed because the account disk quota was exceeded. Free quota or set CACHE_ROOT to a filesystem with sufficient quota.\n' >&2
+  elif grep -Eq 'CUDA out of memory|torch\.OutOfMemoryError' "$SERVER_LOG" 2>/dev/null; then
+    printf 'Model startup failed because the assigned GPU group ran out of memory. Confirm the GPUs are otherwise unused and that the requested tensor-parallel topology matches GPU_IDS.\n' >&2
+  fi
+  printf 'Model server exited during startup. Last log lines:\n' >&2
+  tail -n 80 "$SERVER_LOG" >&2 || true
+}
+
 start_server() {
   local slug="$1" model_id="$2" revision="$3" loading="$4" model_cache="$5" model_max_len="$6"
   [[ "$loading" == "unquantized" ]] || die "Refusing unsupported weight loading mode: $loading"
@@ -600,8 +612,7 @@ start_server() {
   local elapsed=0 identity_mismatches=0 served_models=""
   while (( elapsed < MODEL_START_TIMEOUT_SECONDS )); do
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-      printf 'Model server exited during startup. Last log lines:\n' >&2
-      tail -n 80 "$SERVER_LOG" >&2 || true
+      report_startup_failure
       stop_server
       return 1
     fi

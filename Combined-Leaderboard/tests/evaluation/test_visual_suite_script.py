@@ -131,6 +131,25 @@ def test_server_identity_check_rejects_another_model_on_the_port():
     assert result.returncode == 0, result.stderr
 
 
+def test_startup_failure_reports_exhausted_cache_filesystem(tmp_path):
+    server_log = tmp_path / "vllm.log"
+    server_log.write_text(
+        "OSError: [Errno 28] No space left on device\n", encoding="utf-8"
+    )
+    result = _run_sourced(
+        "\n".join(
+            (
+                f"SERVER_LOG={shlex.quote(str(server_log))}",
+                "report_startup_failure",
+            )
+        )
+    )
+
+    assert result.returncode == 0
+    assert "cache filesystem ran out of space" in result.stderr
+    assert "set CACHE_ROOT to a larger mounted filesystem" in result.stderr
+
+
 def test_smoke_gate_retries_only_invalid_responses(tmp_path):
     output_root = tmp_path / "outputs"
     questions = tmp_path / "questions.jsonl"
@@ -335,6 +354,7 @@ def test_multi_gpu_dry_run_supports_one_model_per_gpu_and_tensor_parallel(tmp_pa
             "GPU_GROUPS": "0,1;2,3",
             "MODEL_LIST": "internvl35-8b,minicpm-v46",
             "MIN_FREE_DISK_GB_PER_MODEL": "1",
+            "MIN_FREE_DISK_RESERVE_GB": "1",
             "DRY_RUN": "1",
         }
     )
@@ -352,4 +372,5 @@ def test_multi_gpu_dry_run_supports_one_model_per_gpu_and_tensor_parallel(tmp_pa
     assert "GPUs 0,1" in result.stdout and "TP=2" in result.stdout
     assert "GPUs 2,3" in result.stdout
     assert "unquantized BF16" in result.stdout
+    assert "required 3 GiB (1 GiB host reserve + 1 GiB x 2 models)" in result.stdout
     assert "no workers were started" in result.stdout

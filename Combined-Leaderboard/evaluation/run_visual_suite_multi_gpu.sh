@@ -25,7 +25,8 @@ FORCE="${FORCE:-0}"
 CONTINUE_ON_MODEL_ERROR="${CONTINUE_ON_MODEL_ERROR:-0}"
 STAGGER_SECONDS="${STAGGER_SECONDS:-20}"
 MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-38000}"
-MIN_FREE_DISK_GB_PER_MODEL="${MIN_FREE_DISK_GB_PER_MODEL:-50}"
+MIN_FREE_DISK_GB_PER_MODEL="${MIN_FREE_DISK_GB_PER_MODEL:-32}"
+MIN_FREE_DISK_RESERVE_GB="${MIN_FREE_DISK_RESERVE_GB:-64}"
 DRY_RUN="${DRY_RUN:-0}"
 
 usage() {
@@ -115,6 +116,8 @@ main() {
     || die "MIN_FREE_GPU_MEMORY_MIB must be positive."
   [[ "$MIN_FREE_DISK_GB_PER_MODEL" =~ ^[0-9]+$ ]] && (( MIN_FREE_DISK_GB_PER_MODEL > 0 )) \
     || die "MIN_FREE_DISK_GB_PER_MODEL must be positive."
+  [[ "$MIN_FREE_DISK_RESERVE_GB" =~ ^[0-9]+$ ]] && (( MIN_FREE_DISK_RESERVE_GB > 0 )) \
+    || die "MIN_FREE_DISK_RESERVE_GB must be positive."
   validate_flag "KEEP_MODEL_CACHE" "$KEEP_MODEL_CACHE"
   validate_flag "FORCE" "$FORCE"
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
@@ -142,9 +145,12 @@ main() {
   free_kib="$(df -Pk "$PROJECT_ROOT" | awk 'NR == 2 {print $4}')"
   [[ "$free_kib" =~ ^[0-9]+$ ]] || die "Could not determine free disk space."
   free_gib=$((free_kib / 1024 / 1024))
-  required_free_gib=$((${#groups[@]} * MIN_FREE_DISK_GB_PER_MODEL))
+  required_free_gib=$((MIN_FREE_DISK_RESERVE_GB + ${#groups[@]} * MIN_FREE_DISK_GB_PER_MODEL))
   (( free_gib >= required_free_gib )) \
-    || die "Only ${free_gib} GiB is free; ${#groups[@]} workers require at least ${required_free_gib} GiB."
+    || die "Only ${free_gib} GiB is free; ${#groups[@]} workers require at least ${required_free_gib} GiB (${MIN_FREE_DISK_RESERVE_GB} GiB host reserve plus ${MIN_FREE_DISK_GB_PER_MODEL} GiB per model). Use fewer concurrent workers, free disk space, or set CACHE_ROOT to a larger filesystem."
+  printf '  Disk: %s GiB free; required %s GiB (%s GiB host reserve + %s GiB x %s models)\n' \
+    "$free_gib" "$required_free_gib" "$MIN_FREE_DISK_RESERVE_GB" \
+    "$MIN_FREE_DISK_GB_PER_MODEL" "${#groups[@]}"
 
   local index group model port gpu details total free tag pid_file existing_pid selected_gpus=","
   local -a group_gpus
@@ -229,7 +235,7 @@ PY
       VLLM_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" \
       GPU_MEMORY_UTILIZATION="$GPU_MEMORY_UTILIZATION" \
       MIN_FREE_GPU_MEMORY_MIB="$MIN_FREE_GPU_MEMORY_MIB" \
-      MIN_FREE_DISK_GB="$MIN_FREE_DISK_GB_PER_MODEL" \
+      MIN_FREE_DISK_GB="$((MIN_FREE_DISK_RESERVE_GB + MIN_FREE_DISK_GB_PER_MODEL))" \
       KEEP_MODEL_CACHE="$KEEP_MODEL_CACHE" FORCE="$FORCE" \
       CONTINUE_ON_MODEL_ERROR="$CONTINUE_ON_MODEL_ERROR" \
       bash "$RUNNER" >"$log" 2>&1 </dev/null &

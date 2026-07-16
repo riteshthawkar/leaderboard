@@ -47,7 +47,7 @@ The papers' released code uses model-specific Transformers handlers, while this 
 - Linux with a working NVIDIA driver and at least one free 40 GB-class GPU with native BF16 support.
 - At least 32 GB of system RAM.
 - Python 3.10 through 3.14 with `venv` support.
-- `curl` and at least 50 GiB of free disk per concurrently downloaded model.
+- `curl` and at least 96 GiB of free disk for a single-model run. Concurrent launches reserve 64 GiB for the host plus 32 GiB for every model cache.
 - Internet access to Hugging Face. `HF_TOKEN` is recommended to avoid anonymous rate limits.
 
 The script creates one shared pinned environment at `.venv/visual-suite`. It does not require a separately installed CUDA toolkit, but the installed NVIDIA driver must support the PyTorch CUDA runtime selected by `uv`.
@@ -107,6 +107,8 @@ FORCE=1 \
 Run a dry check first by adding `DRY_RUN=1`. `GPU_IDS=0,1` remains supported by the multi-GPU wrapper as legacy shorthand for two independent one-GPU workers; use `GPU_GROUPS` whenever tensor parallel grouping is needed.
 
 Do not start concurrent single-model runners on the same `PORT`. The multi-GPU launcher allocates a distinct port for every worker and verifies that each ready endpoint is serving the expected checkpoint before evaluation begins.
+
+The multi-model launcher also protects 64 GiB of host free space and budgets 32 GiB for each checkpoint being downloaded. If the model cache filesystem is small, run models sequentially or set `CACHE_ROOT` to a larger mounted filesystem. Do not lower these guards merely to bypass a failed preflight.
 
 ## Reliability and audit behavior
 
