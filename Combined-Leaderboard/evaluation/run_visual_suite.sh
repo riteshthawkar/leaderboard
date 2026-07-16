@@ -707,7 +707,8 @@ runner_base_args() {
 
 run_track() {
   local slug="$1" model_id="$2" track="$3"
-  local module questions model_dir output diagnostics smoke_diagnostics attempt seed
+  local module questions model_dir output diagnostics smoke_diagnostics attempt seed smoke_passed
+  local -a smoke_args
   module="$(track_module "$track")"
   questions="$(track_questions "$track")"
   model_dir="$OUTPUT_ROOT/$slug"
@@ -728,13 +729,36 @@ run_track() {
 
   runner_base_args "$slug" "$model_id" "$track" "$BASE_SEED"
   rm -f -- "$smoke_diagnostics"
-  log "Running strict $SMOKE_SAMPLES-sample smoke test for $slug/$track"
-  if ! "$PYTHON_BIN" -m "$module" \
-    "${RUNNER_ARGS[@]}" \
-    --questions "$questions" \
-    --limit "$SMOKE_SAMPLES" \
-    --strict-partial \
-    --diagnostics "$smoke_diagnostics"; then
+  smoke_passed=0
+  for ((attempt = 1; attempt <= MAX_EVAL_ATTEMPTS; attempt++)); do
+    seed=$((BASE_SEED + attempt - 1))
+    runner_base_args "$slug" "$model_id" "$track" "$seed"
+    log "Running strict $SMOKE_SAMPLES-sample smoke test for $slug/$track, pass $attempt/$MAX_EVAL_ATTEMPTS (seed=$seed)"
+    smoke_args=(
+      "${RUNNER_ARGS[@]}"
+      --questions "$questions"
+      --limit "$SMOKE_SAMPLES"
+      --strict-partial
+      --diagnostics "$smoke_diagnostics"
+    )
+    if (( attempt > 1 )); then
+      smoke_args+=(--resume)
+    fi
+    if "$PYTHON_BIN" -m "$module" "${smoke_args[@]}"; then
+      smoke_passed=1
+      break
+    fi
+    if [[ -f "$smoke_diagnostics" ]]; then
+      cp -- "$smoke_diagnostics" "$model_dir/${track}.smoke.attempt-${attempt}.diagnostics.jsonl"
+    fi
+    if (( attempt < MAX_EVAL_ATTEMPTS )); then
+      log "Smoke pass $attempt left failed or unparseable samples; retrying only those samples with seed $((seed + 1))"
+      sleep 15
+    fi
+  done
+  if [[ "$smoke_passed" != "1" ]]; then
+    printf 'Evaluation failed: %s/%s smoke test still has failed or unparseable outputs after %s passes. Raw responses remain in %s. The full evaluation was not started.\n' \
+      "$slug" "$track" "$MAX_EVAL_ATTEMPTS" "$smoke_diagnostics" >&2
     return 1
   fi
   if [[ "$SMOKE_ONLY" == "1" ]]; then
@@ -936,6 +960,7 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     diagnostics = path.parent / f"{track}.diagnostics.jsonl"
     rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line]
     attempt_files = sorted(path.parent.glob(f"{track}.attempt-*.diagnostics.jsonl"))
+    smoke_attempt_files = sorted(path.parent.glob(f"{track}.smoke.attempt-*.diagnostics.jsonl"))
     tracks[track] = {
         "submission_file": output.name,
         "diagnostics_file": diagnostics.name,
@@ -951,6 +976,16 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
                 "sha256": hashlib.sha256(attempt.read_bytes()).hexdigest(),
             }
             for attempt in attempt_files
+        ],
+        "failed_smoke_attempt_diagnostics": [
+            {
+                "file": attempt.name,
+                "seed": run_config["generation"]["base_seed"]
+                + int(attempt.name.split(".attempt-", 1)[1].split(".", 1)[0])
+                - 1,
+                "sha256": hashlib.sha256(attempt.read_bytes()).hexdigest(),
+            }
+            for attempt in smoke_attempt_files
         ],
         "question_bundle_sha256": run_config["source_hashes"]["questions"][track],
         "generation": run_config["generation"][track],

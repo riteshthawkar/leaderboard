@@ -131,6 +131,66 @@ def test_server_identity_check_rejects_another_model_on_the_port():
     assert result.returncode == 0, result.stderr
 
 
+def test_smoke_gate_retries_only_invalid_responses(tmp_path):
+    output_root = tmp_path / "outputs"
+    questions = tmp_path / "questions.jsonl"
+    questions.write_text("{}\n", encoding="utf-8")
+    fake_python = tmp_path / "fake-python"
+    _make_executable(
+        fake_python,
+        """#!/usr/bin/env bash
+set -eu
+count_file="$FAKE_COUNT_FILE"
+count=0
+if [[ -f "$count_file" ]]; then count="$(cat "$count_file")"; fi
+count=$((count + 1))
+printf '%s' "$count" > "$count_file"
+diagnostics=""
+resume=0
+while (( $# )); do
+  case "$1" in
+    --diagnostics) diagnostics="$2"; shift 2 ;;
+    --resume) resume=1; shift ;;
+    *) shift ;;
+  esac
+done
+printf '{"question_id":"q1","output":"1"}\n' > "$diagnostics"
+if (( count == 1 )); then exit 2; fi
+(( resume == 1 )) || exit 9
+""",
+    )
+    count_file = tmp_path / "calls"
+
+    result = _run_sourced(
+        "\n".join(
+            (
+                f"PYTHON_BIN={shlex.quote(str(fake_python))}",
+                f"FAKE_COUNT_FILE={shlex.quote(str(count_file))}",
+                "export FAKE_COUNT_FILE",
+                f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
+                f"track_questions() {{ printf '%s\\n' {shlex.quote(str(questions))}; }}",
+                "track_module() { printf '%s\\n' fake.module; }",
+                "runner_base_args() { RUNNER_ARGS=(--model test/model); }",
+                "MAX_EVAL_ATTEMPTS=3",
+                "SMOKE_SAMPLES=20",
+                "SMOKE_ONLY=1",
+                "FORCE=1",
+                "sleep() { :; }",
+                "run_track test-model test/model do_you_see_me",
+            )
+        )
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert count_file.read_text(encoding="utf-8") == "2"
+    assert "retrying only those samples with seed 1" in result.stdout
+    assert (
+        output_root
+        / "test-model"
+        / "do_you_see_me.smoke.attempt-1.diagnostics.jsonl"
+    ).is_file()
+
+
 def test_force_replaces_stale_artifacts_with_schema_v4_fingerprint(tmp_path):
     output_root = tmp_path / "outputs"
     model_dir = output_root / "test-model"
@@ -216,6 +276,10 @@ def test_manifest_hashes_failed_formatting_attempts(tmp_path):
     attempt.write_text(
         '{"question_id":"q1","output":"unparseable"}\n', encoding="utf-8"
     )
+    smoke_attempt = model_dir / "do_you_see_me.smoke.attempt-1.diagnostics.jsonl"
+    smoke_attempt.write_text(
+        '{"question_id":"q1","output":"unparseable"}\n', encoding="utf-8"
+    )
 
     manifest_result = _run_sourced(
         "\n".join(
@@ -239,6 +303,15 @@ def test_manifest_hashes_failed_formatting_attempts(tmp_path):
             "file": attempt.name,
             "seed": 0,
             "sha256": hashlib.sha256(attempt.read_bytes()).hexdigest(),
+        }
+    ]
+    assert manifest["tracks"]["do_you_see_me"][
+        "failed_smoke_attempt_diagnostics"
+    ] == [
+        {
+            "file": smoke_attempt.name,
+            "seed": 0,
+            "sha256": hashlib.sha256(smoke_attempt.read_bytes()).hexdigest(),
         }
     ]
 
