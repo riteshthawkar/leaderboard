@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 RUNNER="$SCRIPT_DIR/run_visual_suite.sh"
 
+GPU_GROUPS="${GPU_GROUPS:-}"
 GPU_IDS="${GPU_IDS:-}"
 MODEL_LIST="${MODEL_LIST:-qwen35-9b,internvl35-8b,qwen3-vl-8b,minicpm-v46}"
 BASE_PORT="${BASE_PORT:-8011}"
@@ -14,36 +15,40 @@ TRACKS="${TRACKS:-all}"
 VENV_DIR="${VENV_DIR:-$PROJECT_ROOT/.venv/visual-suite}"
 CACHE_ROOT="${CACHE_ROOT:-$PROJECT_ROOT/evaluation/results/.cache}"
 DATASET_DIR="${DATASET_DIR:-$CACHE_ROOT/visual-intelligence-dataset}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-$PROJECT_ROOT/evaluation/results/visual_suite}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-$PROJECT_ROOT/evaluation/results/visual_suite_bf16}"
 LOG_DIR="${LOG_DIR:-$OUTPUT_ROOT/_worker_logs}"
 VLLM_DTYPE="${VLLM_DTYPE:-bfloat16}"
+VLLM_KV_CACHE_DTYPE="${VLLM_KV_CACHE_DTYPE:-bfloat16}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.88}"
 KEEP_MODEL_CACHE="${KEEP_MODEL_CACHE:-0}"
 FORCE="${FORCE:-0}"
 CONTINUE_ON_MODEL_ERROR="${CONTINUE_ON_MODEL_ERROR:-0}"
 STAGGER_SECONDS="${STAGGER_SECONDS:-20}"
-MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-22000}"
-MIN_FREE_DISK_GB_PER_MODEL="${MIN_FREE_DISK_GB_PER_MODEL:-32}"
+MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-38000}"
+MIN_FREE_DISK_GB_PER_MODEL="${MIN_FREE_DISK_GB_PER_MODEL:-50}"
 DRY_RUN="${DRY_RUN:-0}"
 
 usage() {
   cat <<'EOF'
-Launch one visual-suite model on each explicitly selected physical GPU.
+Launch independent unquantized BF16 visual evaluation workers.
 
-Usage:
-  GPU_IDS=1,3,5,7 bash evaluation/run_visual_suite_multi_gpu.sh
+Examples:
+  # Two models, each on one 40 GB GPU.
+  GPU_GROUPS='0;1' \
+  MODEL_LIST=internvl35-8b,minicpm-v46 \
+    bash evaluation/run_visual_suite_multi_gpu.sh
 
-Optional overrides:
-  MODEL_LIST=qwen35-9b,internvl35-8b,qwen3-vl-8b,minicpm-v46
-  BASE_PORT=8011
-  TRACKS=all
-  STAGGER_SECONDS=20
-  MIN_FREE_DISK_GB_PER_MODEL=32
-  KEEP_MODEL_CACHE=0
-  DRY_RUN=1
+  # Two models, each tensor-parallel across two GPUs.
+  GPU_GROUPS='0,1;2,3' \
+  MODEL_LIST=internvl35-8b,minicpm-v46 \
+    bash evaluation/run_visual_suite_multi_gpu.sh
 
-GPU_IDS and MODEL_LIST must contain the same number of comma-separated values.
-The launcher uses one shared Python environment, dataset cache, and output root.
+Compatibility syntax:
+  GPU_IDS=0,1 MODEL_LIST=internvl35-8b,minicpm-v46 ...
+
+`GPU_GROUPS` is semicolon separated. Commas inside a group assign multiple GPUs
+to one model using tensor parallelism. `GPU_IDS` retains the legacy one GPU per
+model meaning and is used only when `GPU_GROUPS` is not supplied.
 EOF
 }
 
@@ -52,8 +57,13 @@ die() {
   exit 2
 }
 
-normalize_csv() {
+normalize() {
   printf '%s' "$1" | tr -d '[:space:]'
+}
+
+validate_flag() {
+  local name="$1" value="$2"
+  [[ "$value" == "0" || "$value" == "1" ]] || die "$name must be 0 or 1."
 }
 
 port_is_available() {
@@ -70,9 +80,17 @@ with socket.socket() as sock:
 PY
 }
 
-validate_flag() {
-  local name="$1" value="$2"
-  [[ "$value" == "0" || "$value" == "1" ]] || die "$name must be 0 or 1."
+legacy_gpu_groups() {
+  local csv="$1" first=1 gpu
+  local -a values
+  IFS=',' read -r -a values <<<"$csv"
+  for gpu in "${values[@]}"; do
+    if (( first == 0 )); then
+      printf ';'
+    fi
+    printf '%s' "$gpu"
+    first=0
+  done
 }
 
 main() {
@@ -83,13 +101,16 @@ main() {
   [[ $# -eq 0 ]] || die "Unknown argument: $1. Use --help for supported configuration."
 
   command -v nvidia-smi >/dev/null || die "nvidia-smi is required."
-  [[ -x "$RUNNER" ]] || die "Single-GPU runner is not executable: $RUNNER"
+  [[ -x "$RUNNER" ]] || die "Visual suite runner is not executable: $RUNNER"
   [[ -x "$VENV_DIR/bin/python" && -x "$VENV_DIR/bin/vllm" ]] \
-    || die "Shared environment is not ready at $VENV_DIR. Complete the common setup first."
-  [[ -n "$GPU_IDS" ]] || die "GPU_IDS is required, for example GPU_IDS=1,3,5,7."
+    || die "Shared environment is not ready at $VENV_DIR. Run the single runner once to create it."
+  [[ "$VLLM_DTYPE" == "bfloat16" ]] \
+    || die "VLLM_DTYPE must remain bfloat16 for the unquantized research profile."
+  [[ "$VLLM_KV_CACHE_DTYPE" == "bfloat16" ]] \
+    || die "VLLM_KV_CACHE_DTYPE must remain bfloat16 for the unquantized research profile."
   [[ "$BASE_PORT" =~ ^[0-9]+$ ]] && (( BASE_PORT > 0 && BASE_PORT < 65536 )) \
     || die "BASE_PORT must be between 1 and 65535."
-  [[ "$STAGGER_SECONDS" =~ ^[0-9]+$ ]] || die "STAGGER_SECONDS must be a non-negative integer."
+  [[ "$STAGGER_SECONDS" =~ ^[0-9]+$ ]] || die "STAGGER_SECONDS must be non-negative."
   [[ "$MIN_FREE_GPU_MEMORY_MIB" =~ ^[0-9]+$ ]] && (( MIN_FREE_GPU_MEMORY_MIB > 0 )) \
     || die "MIN_FREE_GPU_MEMORY_MIB must be positive."
   [[ "$MIN_FREE_DISK_GB_PER_MODEL" =~ ^[0-9]+$ ]] && (( MIN_FREE_DISK_GB_PER_MODEL > 0 )) \
@@ -99,68 +120,74 @@ main() {
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
   validate_flag "DRY_RUN" "$DRY_RUN"
 
-  GPU_IDS="$(normalize_csv "$GPU_IDS")"
-  MODEL_LIST="$(normalize_csv "$MODEL_LIST")"
+  GPU_GROUPS="$(normalize "$GPU_GROUPS")"
+  GPU_IDS="$(normalize "$GPU_IDS")"
+  MODEL_LIST="$(normalize "$MODEL_LIST")"
+  if [[ -z "$GPU_GROUPS" ]]; then
+    [[ -n "$GPU_IDS" ]] || die "Set GPU_GROUPS, for example GPU_GROUPS='0;1'."
+    GPU_GROUPS="$(legacy_gpu_groups "$GPU_IDS")"
+  elif [[ -n "$GPU_IDS" ]]; then
+    die "Set either GPU_GROUPS or GPU_IDS, not both."
+  fi
 
-  local -a gpus models
-  IFS=',' read -r -a gpus <<<"$GPU_IDS"
+  local -a groups models
+  IFS=';' read -r -a groups <<<"$GPU_GROUPS"
   IFS=',' read -r -a models <<<"$MODEL_LIST"
-
-  (( ${#gpus[@]} > 0 )) || die "GPU_IDS did not contain any GPU indices."
-  (( ${#gpus[@]} == ${#models[@]} )) \
-    || die "GPU_IDS contains ${#gpus[@]} values but MODEL_LIST contains ${#models[@]}."
-  (( BASE_PORT + ${#gpus[@]} - 1 < 65536 )) || die "The allocated port range exceeds 65535."
+  (( ${#groups[@]} > 0 )) || die "GPU_GROUPS did not contain any assignments."
+  (( ${#groups[@]} == ${#models[@]} )) \
+    || die "GPU_GROUPS contains ${#groups[@]} groups but MODEL_LIST contains ${#models[@]} models."
+  (( BASE_PORT + ${#groups[@]} - 1 < 65536 )) || die "The allocated port range exceeds 65535."
 
   local free_kib free_gib required_free_gib
   free_kib="$(df -Pk "$PROJECT_ROOT" | awk 'NR == 2 {print $4}')"
-  [[ "$free_kib" =~ ^[0-9]+$ ]] || die "Could not determine free disk space for $PROJECT_ROOT."
+  [[ "$free_kib" =~ ^[0-9]+$ ]] || die "Could not determine free disk space."
   free_gib=$((free_kib / 1024 / 1024))
-  required_free_gib=$((${#gpus[@]} * MIN_FREE_DISK_GB_PER_MODEL))
-  (( free_gib >= required_free_gib )) || die \
-    "Only ${free_gib} GiB is free. ${#gpus[@]} parallel model(s) require at least ${required_free_gib} GiB (${MIN_FREE_DISK_GB_PER_MODEL} GiB per model)."
+  required_free_gib=$((${#groups[@]} * MIN_FREE_DISK_GB_PER_MODEL))
+  (( free_gib >= required_free_gib )) \
+    || die "Only ${free_gib} GiB is free; ${#groups[@]} workers require at least ${required_free_gib} GiB."
 
-  local index gpu model port details total_memory free_memory pid_file existing_pid
-  local -A selected_gpus=()
-  for index in "${!gpus[@]}"; do
-    gpu="${gpus[$index]}"
+  local index group model port gpu details total free tag pid_file existing_pid selected_gpus=","
+  local -a group_gpus
+  for index in "${!groups[@]}"; do
+    group="${groups[$index]}"
     model="${models[$index]}"
     port=$((BASE_PORT + index))
+    [[ -n "$group" ]] || die "GPU_GROUPS contains an empty group."
+    [[ -n "$model" ]] || die "MODEL_LIST contains an empty model."
+    IFS=',' read -r -a group_gpus <<<"$group"
+    (( ${#group_gpus[@]} > 0 )) || die "GPU group $group is empty."
+    for gpu in "${group_gpus[@]}"; do
+      [[ "$gpu" =~ ^[0-9]+$ ]] || die "Invalid GPU index: $gpu"
+      [[ "$selected_gpus" != *",$gpu,"* ]] || die "GPU $gpu appears in more than one worker group."
+      selected_gpus+="$gpu,"
+      details="$(nvidia-smi -i "$gpu" --query-gpu=name,memory.total,memory.free \
+        --format=csv,noheader,nounits 2>/dev/null || true)"
+      [[ -n "$details" ]] || die "GPU $gpu does not exist or cannot be queried."
+      total="$(printf '%s' "$details" | awk -F',' '{gsub(/ /,"",$2); print $2}')"
+      free="$(printf '%s' "$details" | awk -F',' '{gsub(/ /,"",$3); print $3}')"
+      [[ "$total" =~ ^[0-9]+$ && "$free" =~ ^[0-9]+$ ]] \
+        || die "Could not parse memory information for GPU $gpu: $details"
+      (( total >= 39000 && free >= MIN_FREE_GPU_MEMORY_MIB )) \
+        || die "GPU $gpu has ${free}/${total} MiB free; each unquantized worker requires a free 40 GB-class GPU."
+    done
 
-    [[ "$gpu" =~ ^[0-9]+$ ]] || die "Invalid GPU index: $gpu"
-    [[ -z "${selected_gpus[$gpu]:-}" ]] || die "GPU $gpu was selected more than once."
-    selected_gpus[$gpu]=1
-    [[ -n "$model" ]] || die "MODEL_LIST contains an empty model value."
-
-    if ! details="$(nvidia-smi -i "$gpu" \
-      --query-gpu=name,memory.total,memory.free \
-      --format=csv,noheader,nounits 2>/dev/null)"; then
-      die "GPU $gpu does not exist or cannot be queried."
-    fi
-    total_memory="${details#*, }"
-    total_memory="${total_memory%%, *}"
-    free_memory="${details##*, }"
-    [[ "$total_memory" =~ ^[0-9]+$ && "$free_memory" =~ ^[0-9]+$ ]] \
-      || die "Could not parse memory information for GPU $gpu: $details"
-    (( free_memory >= MIN_FREE_GPU_MEMORY_MIB )) \
-      || die "GPU $gpu has only ${free_memory}/${total_memory} MiB free; choose a free GPU."
-    if [[ "$model" == "glm46v-flash" ]]; then
-      (( total_memory >= 39000 && free_memory >= 38000 )) \
-        || die "glm46v-flash requires a free 40 GB-class GPU; GPU $gpu has ${free_memory}/${total_memory} MiB free."
-    fi
-    MODELS="$model" DRY_RUN=1 GPU_ID="$gpu" PORT="$port" \
+    MODELS="$model" DRY_RUN=1 GPU_IDS="$group" \
+      TENSOR_PARALLEL_SIZE="${#group_gpus[@]}" PORT="$port" \
       VENV_DIR="$VENV_DIR" CACHE_ROOT="$CACHE_ROOT" DATASET_DIR="$DATASET_DIR" \
-      OUTPUT_ROOT="$OUTPUT_ROOT" bash "$RUNNER" >/dev/null
-    port_is_available "$port" || die "Port $port is already in use. Set a different BASE_PORT."
+      OUTPUT_ROOT="$OUTPUT_ROOT" VLLM_DTYPE="$VLLM_DTYPE" \
+      VLLM_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" bash "$RUNNER" >/dev/null
+    port_is_available "$port" || die "Port $port is already in use. Set another BASE_PORT."
 
-    pid_file="$LOG_DIR/gpu${gpu}_${model}.pid"
+    tag="$(printf '%s' "$group" | tr ',' '-')"
+    pid_file="$LOG_DIR/gpus${tag}_${model}.pid"
     if [[ -f "$pid_file" ]]; then
       existing_pid="$(<"$pid_file")"
       if [[ "$existing_pid" =~ ^[0-9]+$ ]] && kill -0 "$existing_pid" 2>/dev/null; then
-        die "$model already appears to be running on GPU $gpu as PID $existing_pid."
+        die "$model already appears to be running on GPUs $group as PID $existing_pid."
       fi
     fi
-
-    printf '  GPU %-3s port %-5s model %-22s %s\n' "$gpu" "$port" "$model" "$details"
+    printf '  GPUs %-7s TP=%-2s port %-5s model %-22s unquantized BF16 (BF16 KV)\n' \
+      "$group" "${#group_gpus[@]}" "$port" "$model"
   done
 
   "$VENV_DIR/bin/python" - <<'PY'
@@ -169,6 +196,8 @@ import vllm
 
 if not torch.cuda.is_available():
     raise SystemExit("The shared environment cannot access CUDA.")
+if not torch.cuda.is_bf16_supported():
+    raise SystemExit("The shared environment does not expose native BF16 support.")
 print(
     f"Shared environment ready: vLLM {vllm.__version__}, "
     f"PyTorch {torch.__version__}, CUDA {torch.version.cuda}"
@@ -182,37 +211,33 @@ PY
 
   mkdir -p "$LOG_DIR"
   cd "$PROJECT_ROOT"
-
   local log pid
-  for index in "${!gpus[@]}"; do
-    gpu="${gpus[$index]}"
+  for index in "${!groups[@]}"; do
+    group="${groups[$index]}"
     model="${models[$index]}"
     port=$((BASE_PORT + index))
-    log="$LOG_DIR/gpu${gpu}_${model}.log"
-    pid_file="$LOG_DIR/gpu${gpu}_${model}.pid"
+    IFS=',' read -r -a group_gpus <<<"$group"
+    tag="$(printf '%s' "$group" | tr ',' '-')"
+    log="$LOG_DIR/gpus${tag}_${model}.log"
+    pid_file="$LOG_DIR/gpus${tag}_${model}.pid"
 
     nohup env \
-      VENV_DIR="$VENV_DIR" \
-      CACHE_ROOT="$CACHE_ROOT" \
-      DATASET_DIR="$DATASET_DIR" \
-      OUTPUT_ROOT="$OUTPUT_ROOT" \
-      GPU_ID="$gpu" \
-      PORT="$port" \
-      MODELS="$model" \
-      TRACKS="$TRACKS" \
-      VLLM_DTYPE="$VLLM_DTYPE" \
+      VENV_DIR="$VENV_DIR" CACHE_ROOT="$CACHE_ROOT" DATASET_DIR="$DATASET_DIR" \
+      OUTPUT_ROOT="$OUTPUT_ROOT" GPU_IDS="$group" \
+      TENSOR_PARALLEL_SIZE="${#group_gpus[@]}" PORT="$port" MODELS="$model" \
+      TRACKS="$TRACKS" VLLM_DTYPE="$VLLM_DTYPE" \
+      VLLM_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" \
       GPU_MEMORY_UTILIZATION="$GPU_MEMORY_UTILIZATION" \
+      MIN_FREE_GPU_MEMORY_MIB="$MIN_FREE_GPU_MEMORY_MIB" \
       MIN_FREE_DISK_GB="$MIN_FREE_DISK_GB_PER_MODEL" \
-      KEEP_MODEL_CACHE="$KEEP_MODEL_CACHE" \
-      FORCE="$FORCE" \
+      KEEP_MODEL_CACHE="$KEEP_MODEL_CACHE" FORCE="$FORCE" \
       CONTINUE_ON_MODEL_ERROR="$CONTINUE_ON_MODEL_ERROR" \
       bash "$RUNNER" >"$log" 2>&1 </dev/null &
 
     pid=$!
     printf '%s\n' "$pid" >"$pid_file"
-    printf 'Started %-22s on GPU %s as PID %s; log: %s\n' "$model" "$gpu" "$pid" "$log"
-
-    if (( index + 1 < ${#gpus[@]} && STAGGER_SECONDS > 0 )); then
+    printf 'Started %-22s on GPUs %-7s as PID %s; log: %s\n' "$model" "$group" "$pid" "$log"
+    if (( index + 1 < ${#groups[@]} && STAGGER_SECONDS > 0 )); then
       sleep "$STAGGER_SECONDS"
     fi
   done

@@ -1,1 +1,1 @@
-Inspect the image and its answer choices carefully. Reason step by step inside <think> and </think>. Then return only the uppercase option letter inside <answer> and </answer>.
+Inspect the image and its answer choices carefully. First identify the primitive shapes and relevant visual structure. Next determine how the elements move, rotate, fold, correspond, or combine. Then eliminate options that do not follow that transformation. Put this reasoning inside <think> and </think>, and finish with only the uppercase option letter inside <answer> and </answer>.

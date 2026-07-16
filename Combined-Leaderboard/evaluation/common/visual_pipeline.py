@@ -6,6 +6,7 @@ import base64
 import binascii
 import io
 import json
+import mimetypes
 import os
 import re
 import tempfile
@@ -18,7 +19,6 @@ from urllib.request import Request, urlopen
 
 STANDARD_CONDITION = "standard"
 MAX_REMOTE_IMAGE_BYTES = 50 * 1024 * 1024
-MAX_MODEL_IMAGE_PIXELS = 24_000_000
 SUPPORTED_ANSWER_TYPES = {"integer", "mcq_index_1_4", "mcq_letter", "text"}
 
 
@@ -184,31 +184,17 @@ def resolve_image_source(
     )
 
 
-def _open_capped_image(image) -> Any:
-    width, height = image.size
-    if width * height > MAX_MODEL_IMAGE_PIXELS:
-        scale = (MAX_MODEL_IMAGE_PIXELS / (width * height)) ** 0.5
-        image = image.resize(
-            (max(1, int(width * scale)), max(1, int(height * scale)))
-        )
-    return image.convert("RGB")
-
-
 def image_for_openai(item: dict[str, Any], image_root: Path | None) -> str:
     source_type, source = resolve_image_source(item, image_root)
     if source_type == "remote":
         return str(source)
 
-    from PIL import Image
-
-    Image.MAX_IMAGE_PIXELS = None
-    with Image.open(source) as image:
-        prepared = _open_capped_image(image)
-        buffer = io.BytesIO()
-        prepared.save(buffer, format="PNG")
-        prepared.close()
-    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
-    return f"data:image/png;base64,{encoded}"
+    path = Path(source)
+    media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    if not media_type.startswith("image/"):
+        raise EvaluationPipelineError(f"Unsupported local image type: {path.name}")
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{media_type};base64,{encoded}"
 
 
 def image_for_hf(item: dict[str, Any], image_root: Path | None):
@@ -218,7 +204,8 @@ def image_for_hf(item: dict[str, Any], image_root: Path | None):
     source_type, source = resolve_image_source(item, image_root)
     if source_type == "local":
         with Image.open(source) as image:
-            return _open_capped_image(image)
+            image.load()
+            return image.copy()
 
     url = str(source)
     if url.startswith("data:"):
@@ -251,7 +238,8 @@ def image_for_hf(item: dict[str, Any], image_root: Path | None):
             )
     try:
         with Image.open(io.BytesIO(raw)) as image:
-            return _open_capped_image(image)
+            image.load()
+            return image.copy()
     except OSError as exc:
         raise EvaluationPipelineError("The downloaded image could not be decoded.") from exc
 
@@ -351,6 +339,10 @@ def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
         }
         if item.get("error"):
             row["error"] = str(item["error"])
+        if item.get("finish_reason"):
+            row["finish_reason"] = str(item["finish_reason"])
+        if item.get("completion_tokens") is not None:
+            row["completion_tokens"] = int(item["completion_tokens"])
         rows.append(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
     _atomic_write(path, "\n".join(rows) + ("\n" if rows else ""))
 

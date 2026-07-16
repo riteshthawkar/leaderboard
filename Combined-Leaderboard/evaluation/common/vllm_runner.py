@@ -70,6 +70,10 @@ async def _infer_one(
     system_prompt: str,
     model: str,
     max_tokens: int,
+    temperature: float,
+    top_p: float,
+    presence_penalty: float,
+    frequency_penalty: float,
     seed: int,
     extra_body: dict[str, Any],
 ) -> dict:
@@ -79,7 +83,10 @@ async def _infer_one(
             image = image_for_openai(item, image_root)
             request: dict[str, Any] = {
                 "model": model,
-                "temperature": 0,
+                "temperature": temperature,
+                "top_p": top_p,
+                "presence_penalty": presence_penalty,
+                "frequency_penalty": frequency_penalty,
                 "seed": seed,
                 "max_tokens": max_tokens,
                 "messages": [
@@ -98,7 +105,15 @@ async def _infer_one(
             response = await client.chat.completions.create(
                 **request,
             )
-            result["output"] = _message_text(response.choices[0].message.content)
+            choice = response.choices[0]
+            result["output"] = _message_text(choice.message.content)
+            finish_reason = getattr(choice, "finish_reason", None)
+            if finish_reason:
+                result["finish_reason"] = finish_reason
+            usage = getattr(response, "usage", None)
+            completion_tokens = getattr(usage, "completion_tokens", None)
+            if completion_tokens is not None:
+                result["completion_tokens"] = completion_tokens
             if not result["output"]:
                 result["error"] = "The model returned an empty response."
         except Exception as exc:  # Each failure is retained for a targeted rerun.
@@ -211,6 +226,9 @@ async def _run(
         )
 
     extra_body = dict(args.extra_body)
+    extra_body.setdefault("top_k", args.top_k)
+    extra_body.setdefault("min_p", args.min_p)
+    extra_body.setdefault("repetition_penalty", args.repetition_penalty)
     if args.chat_template_kwargs:
         extra_body["chat_template_kwargs"] = args.chat_template_kwargs
 
@@ -224,6 +242,10 @@ async def _run(
             system_prompt=prompt,
             model=args.model,
             max_tokens=args.max_tokens,
+            temperature=args.temperature,
+            top_p=args.top_p,
+            presence_penalty=args.presence_penalty,
+            frequency_penalty=args.frequency_penalty,
             seed=args.seed,
             extra_body=extra_body,
         )
@@ -280,6 +302,13 @@ def _parser(track: VisualTrackConfig) -> argparse.ArgumentParser:
     )
     parser.add_argument("--prompt-mode", choices=("noncot", "cot"), default="noncot")
     parser.add_argument("--max-tokens", type=int)
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--top-p", type=float, default=1.0)
+    parser.add_argument("--top-k", type=int, default=-1)
+    parser.add_argument("--min-p", type=float, default=0.0)
+    parser.add_argument("--presence-penalty", type=float, default=0.0)
+    parser.add_argument("--frequency-penalty", type=float, default=0.0)
+    parser.add_argument("--repetition-penalty", type=float, default=1.0)
     parser.add_argument("--concurrency", type=int, default=64)
     parser.add_argument("--request-timeout", type=float, default=180.0)
     parser.add_argument("--max-retries", type=int, default=2)
@@ -346,6 +375,23 @@ def main(track: VisualTrackConfig, argv: list[str] | None = None) -> int:
         args.max_tokens = 2048 if args.prompt_mode == "cot" else 256
     if args.max_tokens < 1:
         print("Evaluation failed: --max-tokens must be positive.", file=sys.stderr)
+        return 2
+    if (
+        args.temperature < 0
+        or not 0 < args.top_p <= 1
+        or (args.top_k != -1 and args.top_k < 1)
+        or not 0 <= args.min_p <= 1
+        or not -2 <= args.presence_penalty <= 2
+        or not -2 <= args.frequency_penalty <= 2
+        or args.repetition_penalty <= 0
+    ):
+        print(
+            "Evaluation failed: invalid sampling parameters. Temperature must be non-negative; "
+            "top-p must be in (0, 1]; top-k must be -1 or positive; min-p must be in "
+            "[0, 1]; OpenAI penalties must be in [-2, 2]; and repetition-penalty must "
+            "be positive.",
+            file=sys.stderr,
+        )
         return 2
 
     output_path = args.out or track.default_output_path()

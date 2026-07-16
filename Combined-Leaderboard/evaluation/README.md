@@ -1,110 +1,136 @@
 # Evaluation pipelines
 
-Evaluation tooling is isolated from the production API and frontend. Each benchmark has its own package:
+Evaluation tooling is isolated from the production API and frontend:
 
 - `do_you_see_me/` produces the perception submission JSONL.
 - `minds_eye/` produces the visual cognition submission JSONL.
-- `spatial_reasoning/` runs the six-condition spatial evaluation and produces `spatial_reasoning_submission.zip`.
-- `common/` contains strict shared code used by the two visual runners.
+- `spatial_reasoning/` produces the spatial reasoning proof bundle.
+- `common/` contains strict shared loading, inference, and export code.
 
-The visual pipelines emit raw diagnostic records separately from canonical submission files. Canonical files are written only after complete question coverage, unique identifiers, successful inference, and nonempty final answers have been verified.
+Canonical visual submission files are written only after complete question coverage, unique identifiers, successful inference, and parseable nonempty final answers have been verified. Raw model responses remain in separate diagnostic files.
 
-The backend and frontend do not import these evaluation packages at runtime. The API packages `spatial_reasoning/` only when a user requests the official spatial harness download.
+## Research profile
 
-## One-command visual evaluation suite
+The visual suite uses original checkpoint tensors with BF16 computation. In this documentation, **unquantized BF16** means the checkpoint's original released BF16 precision, not 4-bit or 8-bit weight loading. Converting a BF16 checkpoint to FP32 would not restore information that is absent from the released tensors and would only increase memory use.
 
-`run_visual_suite.sh` provisions an isolated Python environment, downloads the pinned public images and model revisions, starts one model at a time on one NVIDIA GPU, evaluates both visual tracks, validates the outputs, and stops the model before loading the next one.
+The two benchmark protocols are intentionally different:
 
-### GPU host prerequisites
+| Track | Primary prompt | Temperature | Top P | Maximum output tokens | Reference |
+| --- | --- | ---: | ---: | ---: | --- |
+| Do You See Me | Direct answer, non-CoT | 1.0 | 0.95 | 200 | [Paper, Appendix C](https://arxiv.org/abs/2506.02022) |
+| Mind's Eye | Structured CoT | 0.1 | 1.0 | 1,000 | [Paper and released evaluation code](https://arxiv.org/abs/2604.16054) |
 
-- Linux with a working NVIDIA driver and a 24 GB-class GPU. The full-precision GLM-4.6V-Flash entry requires a free 40 GB-class GPU.
-- At least 32 GB of system RAM, with no other memory-heavy model process running.
-- Python 3.10 through 3.14 with the `venv` module.
-- `git`, `curl`, and at least 60 GiB of free disk space.
-- Internet access to Hugging Face. `HF_TOKEN` is optional for these public repositories but recommended to avoid anonymous download rate limits.
+The Do You See Me paper applies the same temperature, nucleus sampling, and token cap to its local and API models. Its main benchmark is direct visual questioning; CoT is a separate ablation. The Mind's Eye main table reports CoT prompting, and its released open-model handlers use roughly 1,000 output tokens and a temperature of 0.1. The Mind's Eye release is not fully uniform about sampling across model-specific handlers, so the leaderboard fixes one documented profile for all models.
 
-The script installs pinned Python dependencies inside `.venv/visual-suite`. It does not require a separately installed CUDA toolkit, but the NVIDIA driver must be compatible with the PyTorch wheel selected by `uv`.
+All models also use neutral shared sampling defaults: `top_k=-1`, `min_p=0`, presence and frequency penalties of `0`, and repetition penalty `1`. Repository-specific generation defaults and model-card sampling recommendations are not silently applied because that would give different decoding policies to different leaderboard entries.
 
-### Clone and run
+Both papers use an expert LLM to extract answers from free-form model output. This suite instead asks for an explicit final-answer format and applies a strict local parser. That avoids a second judge model and ground-truth leakage, but it is a deliberate protocol difference. These results are therefore leaderboard evaluations on the pinned public bundle, not exact reproductions of the papers' historical tables.
+
+For Qwen3.5, thinking is disabled on Do You See Me to implement the direct-answer condition and enabled on Mind's Eye to implement the CoT condition. No model-specific thinking override is applied to other checkpoints.
+
+## What is not changed for speed
+
+- No BitsAndBytes, AWQ, GPTQ, FP8, or other weight quantization. The KV cache is also pinned to BF16 rather than FP8.
+- No benchmark image resize, tiling override, downsampling, or recompression in the runner.
+- No reduced 4,096 or 8,192 token context; every configured model receives a 32,768 token context.
+- No speculative decoding, LoRA adapter, CPU weight offload, synthetic answer, or invalid-answer sentinel.
+- No shorter output budget on retries. Every attempt uses the same track protocol.
+
+The runner supplies the original image bytes without its own resize or recompression step. A checkpoint's native vision processor may still resize, crop, or tile the image as defined by that checkpoint; the suite does not override those model-specific operations.
+
+The performance-only controls are vLLM serving, one active request by default, checkpoint/resume, model cache reuse when requested, and optional tensor parallelism. Tensor parallelism distributes the same unquantized tensors over multiple GPUs. It does not quantize the model, although parallel floating-point reductions can produce very small numerical differences near tied token probabilities.
+
+The papers' released code uses model-specific Transformers handlers, while this suite uses vLLM's supported multimodal path to make the multi-model run operationally consistent. This is not expected to reduce model capability, but it is not bit-for-bit equivalent to the paper handlers and can produce small output differences. Use the original paper repositories when an exact historical reproduction is required.
+
+## Host prerequisites
+
+- Linux with a working NVIDIA driver and at least one free 40 GB-class GPU with native BF16 support.
+- At least 32 GB of system RAM.
+- Python 3.10 through 3.14 with `venv` support.
+- `curl` and at least 50 GiB of free disk per concurrently downloaded model.
+- Internet access to Hugging Face. `HF_TOKEN` is recommended to avoid anonymous rate limits.
+
+The script creates one shared pinned environment at `.venv/visual-suite`. It does not require a separately installed CUDA toolkit, but the installed NVIDIA driver must support the PyTorch CUDA runtime selected by `uv`.
+
+## One model at a time
 
 ```bash
 git clone https://github.com/riteshthawkar/leaderboard.git
 cd leaderboard/Combined-Leaderboard
-export HF_TOKEN="hf_your_token"  # Recommended; omit for anonymous downloads.
-bash evaluation/run_visual_suite.sh
+export HF_TOKEN="hf_your_token"
+
+# Prepare one shared environment and the pinned dataset without loading a model.
+GPU_IDS=0 SETUP_ONLY=1 bash evaluation/run_visual_suite.sh
+
+# Review the exact resolved protocol without starting a model.
+DRY_RUN=1 MODELS=internvl35-8b bash evaluation/run_visual_suite.sh
+
+# Run one unquantized model on one GPU.
+GPU_IDS=0 MODELS=internvl35-8b FORCE=1 \
+  bash evaluation/run_visual_suite.sh
 ```
 
-Run the process inside `tmux`, `screen`, or another persistent terminal because the full suite contains 5,299 samples per model and 37,093 model requests across seven models.
+The available slugs are:
 
-The default sequence is:
+| Slug | Checkpoint | Weight loading | Context |
+| --- | --- | --- | ---: |
+| `qwen35-9b` | `Qwen/Qwen3.5-9B` | Original, unquantized BF16 | 32,768 |
+| `internvl35-8b` | `OpenGVLab/InternVL3_5-8B` | Original, unquantized BF16 | 32,768 |
+| `glm46v-flash` | `zai-org/GLM-4.6V-Flash` | Original, unquantized BF16 | 32,768 |
+| `minicpm-v46` | `openbmb/MiniCPM-V-4.6` | Original, unquantized BF16 | 32,768 |
+| `qwen25-vl-7b` | `Qwen/Qwen2.5-VL-7B-Instruct` | Original, unquantized BF16 | 32,768 |
+| `qwen3-vl-8b` | `Qwen/Qwen3-VL-8B-Instruct` | Original, unquantized BF16 | 32,768 |
+| `phi4-multimodal` | `microsoft/Phi-4-multimodal-instruct` | Original, unquantized BF16 | 32,768 |
 
-| Slug | Model | Loading | Prompt |
-| --- | --- | --- | --- |
-| `qwen35-9b` | `Qwen/Qwen3.5-9B` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT with thinking disabled |
-| `internvl35-8b` | `OpenGVLab/InternVL3_5-8B` | Full precision with a 4,096-token context | Non-CoT |
-| `glm46v-flash` | `zai-org/GLM-4.6V-Flash` | BF16, 32,768-token context | CoT with hybrid thinking enabled |
-| `minicpm-v46` | `openbmb/MiniCPM-V-4.6` | 4-bit BitsAndBytes, 8,192-token context | Non-CoT |
-| `qwen25-vl-7b` | `Qwen/Qwen2.5-VL-7B-Instruct` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT |
-| `qwen3-vl-8b` | `Qwen/Qwen3-VL-8B-Instruct` | 4-bit BitsAndBytes, 32,768-token context | Non-CoT |
-| `phi4-multimodal` | `microsoft/Phi-4-multimodal-instruct` | BF16, or FP16 when BF16 is unavailable | Non-CoT |
+Run inside `tmux` or `screen`. Each complete model receives 5,299 requests across the two tracks.
 
-The pinned Qwen and GLM processors can emit between 12,288 and 16,384 visual tokens for the high-resolution Mind's Eye composites, so they use a 32,768-token context to fit the image, prompt, and response budget without changing the benchmark image. GLM-4.6V-Flash uses its full BF16 checkpoint to avoid quantization effects and therefore requires a free 40 GB-class GPU. InternVL3.5 remains full precision because its vLLM model class does not support the BitsAndBytes loader. Phi-4 multimodal also remains full precision because its built-in vision adapter is incompatible with BitsAndBytes quantization. Both use a 4,096-token context to fit a 24 GB card. Quantized runs must be disclosed as 4-bit inference in the leaderboard method description because quantization can affect scores.
+## Two models on two A100 GPUs
 
-### Reliability behavior
-
-- Every track starts with a strict 20-sample smoke test. A model with empty or unparseable responses does not proceed to the full track.
-- The installed `vllm serve` CLI is checked before dataset or model downloads, so incompatible command options fail once and fail early.
-- Diagnostics are saved atomically every 25 new responses. Re-running the same command keeps valid responses and retries only missing, failed, or unparseable samples.
-- Each full track receives up to three retry passes. One failed model does not prevent later models from running, but the script returns a nonzero exit status if any model remains failed.
-- After all configured retry passes, persistent model responses that cannot be converted to the required answer type are written as `__INVALID_MODEL_RESPONSE__` and score as incorrect. Coverage, API, timeout, and inference errors still fail the run. Raw outputs remain in diagnostics for audit.
-- Exact model and dataset revisions are pinned. A run fingerprint prevents checkpoints from different prompts, revisions, dtypes, or context limits from being mixed.
-- Hugging Face Xet downloads are disabled by default in favor of the standard HTTP path because Xet reconstruction failures can abort large parallel model downloads. Set `HF_HUB_DISABLE_XET=0` to opt back in.
-- MiniCPM-V-4.6 applies a version-checked vLLM 0.25.1 stacked-weight mapping correction. Its identifier and patch-source hash are recorded in the model run configuration and final manifest.
-- Model caches are deleted after each attempted model by default to keep disk use bounded. Set `KEEP_MODEL_CACHE=1` when retaining completed or failed weights is more important than disk use.
-- Canonical submission JSONL is created only after complete question coverage, exact ordering, schema, and nonempty answers have passed validation.
-
-Re-run the same command after a disconnect or model failure. Do not use `FORCE=1` unless the existing checkpoints should be replaced.
-
-### Useful controls
+Use one shared environment and dataset cache, with one independent model per GPU:
 
 ```bash
-# Validate one model and one track with only the strict smoke test.
-MODELS=qwen35-9b TRACKS=minds_eye SMOKE_ONLY=1 \
-  bash evaluation/run_visual_suite.sh
-
-# Run a subset. Values are comma-separated model slugs and track names.
-MODELS=internvl35-8b,qwen3-vl-8b TRACKS=do_you_see_me \
-  bash evaluation/run_visual_suite.sh
-
-# Print the resolved plan without installing or downloading anything.
-DRY_RUN=1 bash evaluation/run_visual_suite.sh
-
-# Keep downloaded weights after successful models.
-KEEP_MODEL_CACHE=1 bash evaluation/run_visual_suite.sh
-```
-
-Use `bash evaluation/run_visual_suite.sh --help` for the complete short reference. The conservative defaults use one active request and 88 percent of GPU memory. Increase concurrency only after proving the selected model has adequate memory headroom.
-
-### Multiple independent GPUs
-
-Use the multi-GPU wrapper to run one model per explicitly selected physical GPU while sharing the same Python environment, dataset cache, and output directory. `GPU_IDS` and `MODEL_LIST` are positional and must contain the same number of values:
-
-```bash
-GPU_IDS=1,3,5,7 \
-MODEL_LIST=qwen35-9b,internvl35-8b,qwen3-vl-8b,minicpm-v46 \
+GPU_GROUPS='0;1' \
+MODEL_LIST=internvl35-8b,minicpm-v46 \
+FORCE=1 \
   bash evaluation/run_visual_suite_multi_gpu.sh
 ```
 
-The wrapper validates every GPU index, requires at least 22,000 MiB of free memory on each selected GPU, allocates a distinct local API port per worker, and refuses duplicate GPUs or active worker PID files. It also reserves 32 GiB of free disk per concurrently selected model before launching any workers. Model caches are removed after each attempt by default; set `KEEP_MODEL_CACHE=1` only when the host has enough disk to retain every concurrent checkpoint. Set `DRY_RUN=1` to validate the mapping without starting model servers.
+To split each model over two GPUs instead, use two comma-separated GPU IDs inside each semicolon-separated worker group:
 
-### Outputs
+```bash
+GPU_GROUPS='0,1;2,3' \
+MODEL_LIST=internvl35-8b,minicpm-v46 \
+FORCE=1 \
+  bash evaluation/run_visual_suite_multi_gpu.sh
+```
 
-Each model writes to `evaluation/results/visual_suite/<model-slug>/`:
+Run a dry check first by adding `DRY_RUN=1`. `GPU_IDS=0,1` remains supported by the multi-GPU wrapper as legacy shorthand for two independent one-GPU workers; use `GPU_GROUPS` whenever tensor parallel grouping is needed.
 
-- `do_you_see_me_submission.jsonl`: upload-ready perception responses.
-- `minds_eye_submission.jsonl`: upload-ready cognition responses.
-- `<track>.diagnostics.jsonl`: raw model responses and per-sample errors for audit and resume.
-- `run_manifest.json`: pinned model revision, inference settings, output row counts, and SHA-256 hashes.
-- `vllm.log`: model download, startup, and server errors.
+## Reliability and audit behavior
 
-The two `*_submission.jsonl` files are the files submitted to their corresponding leaderboard tracks. Diagnostics and manifests should be retained with the experimental record but are not uploaded as visual-track responses.
+- A strict 20-sample smoke test runs before each full track.
+- Diagnostics are saved atomically every 25 new responses.
+- A rerun preserves parseable responses and requests only missing, failed, or unparseable samples.
+- Format recovery uses a deterministic seed sequence beginning at seed 0. It never checks correctness when deciding whether to retry.
+- Every failed formatting pass is archived as `<track>.attempt-N.diagnostics.jsonl`; its hash is included in the final manifest.
+- After the configured attempts, any remaining invalid response fails the track. It is never replaced with a scoreable placeholder.
+- Model, dataset, dependency, prompt, and source revisions are pinned or hashed.
+- A schema-v4 run fingerprint prevents checkpoints from different dtypes, prompts, generation settings, context limits, or tensor-parallel topologies from being mixed.
+- The final manifest records weight loading, BF16 compute and KV-cache dtypes, GPU assignment, tensor parallel size, per-track generation settings, and output hashes.
+- MiniCPM-V-4.6 applies a version-checked vLLM 0.25.1 weight mapping correction. The patch ID and source hash are recorded.
+- Model caches are removed after each attempt by default. Set `KEEP_MODEL_CACHE=1` only when disk capacity is sufficient.
+
+`FORCE=1` is required when replacing earlier 4-bit results. The unquantized runner defaults to `evaluation/results/visual_suite_bf16/`, so old quantized outputs are not silently mixed into the new record.
+
+## Outputs
+
+Each model writes to `evaluation/results/visual_suite_bf16/<model-slug>/`:
+
+- `do_you_see_me_submission.jsonl`: canonical perception responses.
+- `minds_eye_submission.jsonl`: canonical cognition responses.
+- `<track>.diagnostics.jsonl`: raw model responses, finish reasons, token counts, and errors.
+- `.run_config.json`: immutable checkpoint compatibility fingerprint.
+- `run_manifest.json`: final protocol, hardware, provenance, and output hashes.
+- `vllm.log`: model download, startup, and serving diagnostics.
+
+Retain diagnostics and manifests with the experimental record. Only the two submission JSONL files are uploaded as visual benchmark responses.
