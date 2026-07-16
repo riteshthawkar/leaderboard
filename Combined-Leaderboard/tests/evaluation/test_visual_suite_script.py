@@ -115,6 +115,22 @@ def test_visual_suite_rejects_quality_reducing_or_inconsistent_overrides():
     assert "MODELS did not match" in unknown.stderr
 
 
+def test_server_identity_check_rejects_another_model_on_the_port():
+    result = _run_sourced(
+        "\n".join(
+            (
+                'PYTHON_BIN="$(command -v python3)"',
+                'PORT="8011"',
+                'curl() { printf \'%s\' \'{"data":[{"id":"OpenGVLab/InternVL3_5-8B"}]}\'; }',
+                "server_serves_model OpenGVLab/InternVL3_5-8B || exit 7",
+                "if server_serves_model Qwen/Qwen3.5-9B; then exit 8; fi",
+            )
+        )
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
 def test_force_replaces_stale_artifacts_with_schema_v4_fingerprint(tmp_path):
     output_root = tmp_path / "outputs"
     model_dir = output_root / "test-model"

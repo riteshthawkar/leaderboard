@@ -106,6 +106,8 @@ FORCE=1 \
 
 Run a dry check first by adding `DRY_RUN=1`. `GPU_IDS=0,1` remains supported by the multi-GPU wrapper as legacy shorthand for two independent one-GPU workers; use `GPU_GROUPS` whenever tensor parallel grouping is needed.
 
+Do not start concurrent single-model runners on the same `PORT`. The multi-GPU launcher allocates a distinct port for every worker and verifies that each ready endpoint is serving the expected checkpoint before evaluation begins.
+
 ## Reliability and audit behavior
 
 - A strict 20-sample smoke test runs before each full track.

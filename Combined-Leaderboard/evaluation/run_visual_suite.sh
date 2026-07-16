@@ -478,6 +478,40 @@ with socket.socket() as sock:
 PY
 }
 
+server_serves_model() {
+  local expected_model="$1"
+  curl -fsS "http://127.0.0.1:$PORT/v1/models" 2>/dev/null \
+    | "$PYTHON_BIN" -c '
+import json
+import sys
+
+expected = sys.argv[1]
+payload = json.load(sys.stdin)
+model_ids = {
+    str(item.get("id") or "")
+    for item in payload.get("data", [])
+    if isinstance(item, dict)
+}
+raise SystemExit(0 if expected in model_ids else 1)
+' "$expected_model"
+}
+
+server_model_names() {
+  curl -fsS "http://127.0.0.1:$PORT/v1/models" 2>/dev/null \
+    | "$PYTHON_BIN" -c '
+import json
+import sys
+
+payload = json.load(sys.stdin)
+model_ids = [
+    str(item.get("id") or "")
+    for item in payload.get("data", [])
+    if isinstance(item, dict) and item.get("id")
+]
+print(", ".join(model_ids) if model_ids else "<none>")
+'
+}
+
 stop_server() {
   if [[ -z "$SERVER_PID" ]]; then
     return 0
@@ -563,17 +597,29 @@ start_server() {
   fi
   SERVER_PID=$!
 
-  local elapsed=0
+  local elapsed=0 identity_mismatches=0 served_models=""
   while (( elapsed < MODEL_START_TIMEOUT_SECONDS )); do
-    if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
-      log "Model server is ready"
-      return 0
-    fi
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
       printf 'Model server exited during startup. Last log lines:\n' >&2
       tail -n 80 "$SERVER_LOG" >&2 || true
       stop_server
       return 1
+    fi
+    if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+      if server_serves_model "$model_id"; then
+        log "Model server is ready and serves $model_id"
+        return 0
+      fi
+      identity_mismatches=$((identity_mismatches + 1))
+      if (( identity_mismatches >= 3 )); then
+        served_models="$(server_model_names 2>/dev/null || printf '<unavailable>')"
+        printf 'Port %s is healthy but serves [%s], not %s. Another evaluation likely claimed the same PORT. Stop the conflicting runner, assign distinct PORT values, or use evaluation/run_visual_suite_multi_gpu.sh.\n' \
+          "$PORT" "$served_models" "$model_id" >&2
+        stop_server
+        return 1
+      fi
+    else
+      identity_mismatches=0
     fi
     sleep 5
     elapsed=$((elapsed + 5))
