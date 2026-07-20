@@ -1,118 +1,116 @@
-# Spatial Reasoning Harness (Task 3) — VLMEvalKit-backed
+# Track-3 v2 Spatial Reasoning Evaluation
 
-Task 3 of the leaderboard reproduces an **analysis paper** (arXiv:2604.16060)
-that aggregates **13 public spatial-reasoning benchmarks** and probes models with
-four diagnostic conditions. The paper ships **no evaluation code**, so this
-harness reconstructs the framework end to end using
-[VLMEvalKit](https://github.com/open-compass/VLMEvalKit) as the data + inference
-backbone and layering the paper's conditions on top.
+This package evaluates the 13 spatial benchmarks from the Spatial-CoT analysis
+with an OpenAI-compatible vision endpoint and a separate judge endpoint. It
+implements the v2 protocol from `TRACK3-v1-to-v2-changes.md`.
 
-No dataset is redistributed: VLMEvalKit downloads each benchmark from its
-official source on *your* machine.
+## V2 contract
 
-## Install
+- Explicit datasets: `BLINK,CV-Bench-2D,CV-Bench-3D,MMVP,RealWorldQA,VStarBench,MMSIBench_wo_circular,3DSRBench,VSR_MCQ,SpatialBench,MindCube,OmniSpatial,SAT-Real`.
+- Conditions: `main` and No-Image++ (`noimgpp`), each with `noncot` and `cot` prompts.
+- Equal 16,384-token completion budgets for CoT and non-CoT.
+- `answer_type=mcq` uses the paper's Appendix A.3 MCQ judge.
+- `answer_type=vqa` uses the paper's Appendix A.3 VQA judge and runs only in `main`.
+- SpatialBench and SAT-Real use all-rotations-correct circular scoring.
+- No-Image++ runs on every valid MCQ item. There is no frozen probe subset.
 
-```bash
-pip install vlmeval        # data loaders, downloaders, 200+ model wrappers
-```
+## Installed environment
 
-VLMEvalKit pulls in `torch`, `transformers`, `datasets`, `Pillow`, etc. A GPU is
-recommended for open-weight models; API models (GPT-4o, Gemini, …) need only the
-relevant API key in a `.env` file (see VLMEvalKit's Quickstart).
-
-## How it works
-
-```
-VLMEvalKit.build_dataset(name)   ──►  downloads + loads each benchmark
-        │                              (.data DataFrame: question, A/B/C/D, answer, image)
-        ▼
-conditions.build_messages()      ──►  standard / cot / no_image / no_image_plus
-        │
-        ▼
-your model (.generate / adapter) ──►  raw answers
-        │
-        ▼
-spatial_responses.json           ──►  upload to the leaderboard
-```
-
-| File | Role |
-|------|------|
-| `registry.py` | maps our 13 ids → VLMEvalKit registry names; validates against the **installed** registry and skips+warns unknowns |
-| `vlmeval_backend.py` | builds a dataset, normalises rows, extracts options + ground truth, decodes images |
-| `conditions.py` | builds the 4 condition prompts + gray placeholder images |
-| `adapters.py` | resolves `--model` to `example` / a VLMEvalKit model / a custom module |
-| `build_ground_truth.py` | **maintainer-only**: extracts private ground truth + public metadata |
-| `run_harness.py` | **user-facing**: runs your model and writes the submission file |
-
-## Evaluation conditions
-
-| Condition       | Image  | Prompt | Diagnostic |
-|-----------------|--------|--------|------------|
-| `standard`      | real   | question + options + "answer with the option letter" | accuracy |
-| `cot`           | real   | + "think step by step" | CoT‑Δ (does reasoning help/hurt?) |
-| `no_image`      | gray   | same text, image blanked | shortcut score (lower = less blind guessing) |
-| `no_image_plus` | gray   | + "Cannot determine from the image" as the **correct** option | hallucination resistance (higher = better) |
-
-Only `standard` is required; the other three unlock the diagnostics column on the
-Spatial leaderboard.
-
-## Datasets
-
-The 13 benchmarks are declared in `backend/config.py` (`SPATIAL_DATASETS`) and
-mapped to VLMEvalKit names in `registry.py`. VLMEvalKit ships most of them
-(BLINK, MMVP, RealWorldQA, CV-Bench 2D/3D, 3DSRBench, MindCube, MMSI-Bench,
-OmniSpatial, V*Bench). A few (SpatialBench, VSR, SAT) are **not** in the current
-registry — the harness reports and skips those rather than guessing. Update the
-candidate lists in `registry.py` when VLMEvalKit adds them.
-
-## Usage
-
-### Maintainer — build ground truth once
+The dedicated environment on this host is:
 
 ```bash
-# Downloads the resolvable datasets and writes the private ground truth +
-# public metadata the server scores against.
-python build_ground_truth.py
-# subset / smoke test:
-python build_ground_truth.py --datasets blink mmvp --limit 50
+conda activate /share/data/drive_3/conda_envs/track3-v2
 ```
 
-Outputs (paths from `backend/config.py`):
-- `tasks/spatial/ground_truth.json` — private; `{sample_id: {answer, dataset, group, tags}}`
-- `tasks/spatial/questions.json` — public **metadata only** (no questions/images)
-- `tasks/spatial/manifest.json` — refreshed real sample counts
+VLMEvalKit is installed editable from
+`/share/data/drive_3/vendor/VLMEvalKit-7055d301` at commit
+`7055d3010c38ccb5dcae1bc9535ca19c7fe5d79f`. The environment uses CPU PyTorch
+because model and judge generation happen in external endpoints; dataset
+preparation and judging do not need a second CUDA runtime.
 
-### User — evaluate a model
+For a fresh Linux x86-64 environment, use the exact locks:
 
 ```bash
-# A VLMEvalKit-supported model (name from vlmeval.config.supported_VLM):
-python run_harness.py --model Qwen2-VL-7B-Instruct --out spatial_responses.json
-
-# Your own model: a module exposing model_generate(messages) -> str
-python run_harness.py --model my_model
-
-# Validate the whole pipeline offline (no vlmeval, no downloads, stub model):
-python run_harness.py --dry-run --score
+./spatial_harness/install_track3_env.sh
 ```
 
-`messages` is VLMEvalKit's interleaved format:
-`[{"type": "image", "value": "/path.png"}, {"type": "text", "value": "..."}]`.
+`environment-track3-v2.yml` is the small human-readable Conda specification;
+the two lock files record the exact installed Linux package set. The installer
+uses the Conda lock for NumPy and the Python 3.11 build of decord, the pip lock for
+pip-managed packages, and a clean editable VLMEvalKit checkout whose commit is
+verified before installation.
 
-## Output
+## Prepare data
 
-```json
-{
-  "task_id": "spatial",
-  "model_meta": {"name": "Qwen2-VL-7B-Instruct"},
-  "predictions": {
-    "standard":      {"blink:0": "B", "...": "..."},
-    "cot":           {"...": "..."},
-    "no_image":      {"...": "..."},
-    "no_image_plus": {"...": "..."}
-  }
-}
+Accept the SpatialBench terms at
+<https://huggingface.co/datasets/RussRobin/SpatialBench> first. Then run from
+the `Combined-Leaderboard` root:
+
+```bash
+export HF_TOKEN=hf_xxx
+/share/data/drive_3/conda_envs/track3-v2/bin/python \
+  -m spatial_harness.prepare_data \
+  --lmudata /share/data/drive_3/track3-v2/LMUData \
+  --cache /share/data/drive_3/track3-v2/cache
 ```
 
-Upload it on the leaderboard's **Spatial Reasoning** submit card. Sample ids are
-produced by the same backend the maintainer used for the ground truth, so they
-always align. Ground truth stays private server-side.
+Preparation pins custom source revisions, writes SHA-256 provenance to
+`track3_data_manifest.json`, verifies unique indices and answer labels, and
+rejects incorrect v2 counts. The shared bundle contains all 13 datasets under
+`/share/data/drive_3/track3-v2/LMUData` and passes full manifest verification.
+
+| Dataset | Rows | V2 detail |
+| --- | ---: | --- |
+| MMVP | 300 | Official pinned MMVP source; MCQ |
+| RealWorldQA | 765 | 438 MCQ and 327 VQA |
+| 3DSRBench | 5,157 | Flip-augmented source; runner selects 2,625 base questions |
+| MindCube | 1,040 | Paper's 1K MCQ split; path-backed assets pinned separately |
+| SpatialBench | 174 | Mixed MCQ/VQA; parser repairs two malformed positional items |
+| OmniSpatial | 1,533 | 1,304 MCQ and 229 VQA |
+| SAT-Real | 150 | MCQ; multiple images retained |
+
+SpatialBench remains gated for fresh installations. Preparation uses standard
+HTTPS for that source and stops with an actionable error until the Hugging Face
+account associated with `HF_TOKEN` has accepted its terms.
+
+## Run evaluation
+
+The vision server and judge server must expose `/v1/models` and
+`/v1/chat/completions`. Run:
+
+```bash
+./spatial_harness/run_eval.sh \
+  MODEL_NAME \
+  http://127.0.0.1:8000/v1 \
+  http://127.0.0.1:9000/v1 \
+  JUDGE_MODEL_NAME
+```
+
+The fourth argument is optional and defaults to `JUDGE_MODEL`, then to the VLM
+model name. `VLM_ENDPOINTS` may contain comma-separated replicas. Useful
+overrides include `OUT`, `LMUDATA`, `VLM_CONCURRENCY`, `JUDGE_CONCURRENCY`,
+`VLM_API_KEY`, and `JUDGE_API_KEY`.
+
+The runner validates model identity at every endpoint, checkpoints predictions
+atomically, resumes completed rows, and records every input TSV hash. The judge
+also resumes atomically. Final metrics are written to `leaderboard.json` with
+`main_noncot`, `main_cot`, `main_delta`, `npp_noncot`, and `npp_cot` for each
+dataset.
+
+Monitor a running inference directory with:
+
+```bash
+/share/data/drive_3/conda_envs/track3-v2/bin/python \
+  -m spatial_harness.watch_progress \
+  /share/data/drive_3/track3-v2/results/MODEL_SLUG
+```
+
+## Validation
+
+```bash
+/share/data/drive_3/conda_envs/track3-v2/bin/python -m pytest -q tests/spatial
+/share/data/drive_3/conda_envs/track3-v2/bin/python \
+  -m spatial_harness.prepare_data --verify-only \
+  --lmudata /share/data/drive_3/track3-v2/LMUData
+bash -n spatial_harness/run_eval.sh
+```

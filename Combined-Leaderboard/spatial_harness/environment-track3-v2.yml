@@ -1,0 +1,9 @@
+name: track3-v2
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11.15
+  - pip=26.1.2
+  - numpy=2.4.6
+  - decord=0.6.0

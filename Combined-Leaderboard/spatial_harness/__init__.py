@@ -1,0 +1,1 @@
+"""Track-3 spatial reasoning evaluation harness."""
