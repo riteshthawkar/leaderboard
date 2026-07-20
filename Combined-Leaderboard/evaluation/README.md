@@ -237,3 +237,43 @@ The canonical root is `evaluation/results/final/`:
 - `<model-slug>/<track>.diagnostics.jsonl`, retry archives, run configurations, and source manifests: retained audit record.
 
 Retain the canonical diagnostics and manifests with the experimental record. Only the two submission JSONL files are uploaded as benchmark responses. Staging roots and `.cache` are disposable after finalization and after all active runs have stopped.
+
+## Gold-aware malformed-response audit
+
+Post-hoc recovery of a long or malformed response is a response-commitment audit, not a second attempt to solve the image. `extract_canonical_answers.py` therefore requires the complete held-out answer map and gives the verifier the question, answer type, gold answer, and original response. It does not give the verifier an image. The verifier must return a literal quote from the response and classify it as `GOLD_COMMITTED`, `OTHER_COMMITTED`, or `UNRESOLVED`; code independently validates the quote, answer domain, commitment language, and answer-versus-gold verdict.
+
+Ground truth may be supplied as one or more JSON or JSONL files. Their union must cover exactly the 4,500 DYS and 799 Mind's Eye IDs in `tasks/<track>/questions.jsonl`. JSON maps may use either `"question_id": "answer"` or `"question_id": {"answer": "..."}`. JSONL rows use `question_id` and `answer`. The 175-entry files in `tasks/<track>/ground_truth.json` belong to a different private leaderboard subset; the audit rejects them because their IDs do not match the canonical visual set. Keep full answer keys outside Git.
+
+```bash
+python -m evaluation.extract_canonical_answers \
+  --ground-truth /secure/path/dysm-full.json \
+  --ground-truth /secure/path/minds-eye-full.json \
+  --endpoint http://127.0.0.1:8031/v1 \
+  --model Qwen/Qwen3.6-27B \
+  --policy high_risk \
+  --output /share/data/visual-answer-extraction/gold-aware-v6/audit.jsonl
+```
+
+Resume is append-only and requires the same method, full-ground-truth digest, candidate set, and response hashes. Earlier text-only and verifier checkpoints are intentionally incompatible. Once every selected candidate has an audit row, apply it only to a separate canonical copy:
+
+If deterministic evidence rules are refined after a complete audit, reuse the immutable extractor transcript without making new LLM requests. The revalidator requires exact candidate coverage, response hashes, and the same normalized ground-truth digest, then atomically writes a newly versioned audit:
+
+```bash
+python -m evaluation.revalidate_canonical_audit \
+  --ground-truth /secure/path/dysm-full.json \
+  --ground-truth /secure/path/minds-eye-full.json \
+  --source-audit /share/data/visual-answer-extraction/gold-aware-v3/audit.jsonl \
+  --policy high_risk \
+  --output /share/data/visual-answer-extraction/gold-aware-v6/audit.jsonl
+```
+
+```bash
+python -m evaluation.apply_canonical_extractions \
+  --ground-truth /secure/path/dysm-full.json \
+  --ground-truth /secure/path/minds-eye-full.json \
+  --audit /share/data/visual-answer-extraction/gold-aware-v6/audit.jsonl \
+  --policy high_risk \
+  --output-root evaluation/results/final-extracted
+```
+
+Application rechecks full audit coverage, the normalized ground-truth digest, response hashes, literal evidence, and deterministic verdicts before changing an answer. Both explicit correct and explicit incorrect commitments are preserved; unresolved rows remain unchanged. The source `evaluation/results/final/` tree is never modified.

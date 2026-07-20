@@ -18,6 +18,7 @@ Combined-Leaderboard/uploads/
 .env
 *.env
 !.env.example
+/Combined-Leaderboard/evaluation/Ground_truths/
 
 # --- Logs ---
 logs/
