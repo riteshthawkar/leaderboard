@@ -6,10 +6,12 @@ IFS=$'\n\t'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
-VLLM_VERSION="0.25.1"
+VLLM_VERSION="${VLLM_VERSION:-0.25.1}"
 OPENAI_VERSION="2.45.0"
-HUGGINGFACE_HUB_VERSION="1.23.0"
+HUGGINGFACE_HUB_VERSION="${HUGGINGFACE_HUB_VERSION:-1.23.0}"
 PILLOW_VERSION="12.3.0"
+SCIPY_VERSION="1.15.3"
+TIMM_VERSION="1.0.28"
 UV_VERSION="0.11.28"
 DATASET_REPO_ID="amolharsh/visual-intelligence-leaderboard"
 DATASET_REVISION="cc41be90e74679a9d3c9dd295834b2cee9100b9d"
@@ -20,6 +22,7 @@ CACHE_ROOT="${CACHE_ROOT:-$PROJECT_ROOT/evaluation/results/.cache}"
 DATASET_DIR="${DATASET_DIR:-$CACHE_ROOT/visual-intelligence-dataset}"
 GPU_IDS="${GPU_IDS:-${GPU_ID:-0}}"
 TENSOR_PARALLEL_SIZE="${TENSOR_PARALLEL_SIZE:-auto}"
+DATA_PARALLEL_SIZE="${DATA_PARALLEL_SIZE:-1}"
 PORT="${PORT:-8011}"
 MODELS="${MODELS:-all}"
 TRACKS="${TRACKS:-all}"
@@ -34,51 +37,82 @@ MAX_EVAL_ATTEMPTS="${MAX_EVAL_ATTEMPTS:-3}"
 CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-25}"
 REQUEST_TIMEOUT_SECONDS="${REQUEST_TIMEOUT_SECONDS:-600}"
 MODEL_START_TIMEOUT_SECONDS="${MODEL_START_TIMEOUT_SECONDS:-7200}"
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.88}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.84}"
+DISABLE_CUSTOM_ALL_REDUCE="${DISABLE_CUSTOM_ALL_REDUCE:-0}"
+SERVING_REPLICA_MODE="${SERVING_REPLICA_MODE:-builtin}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-auto}"
 CONCURRENCY="${CONCURRENCY:-1}"
+MAX_NUM_SEQS_PER_REPLICA="${MAX_NUM_SEQS_PER_REPLICA:-auto}"
+PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 MIN_FREE_DISK_GB="${MIN_FREE_DISK_GB:-96}"
 MIN_SYSTEM_RAM_GB="${MIN_SYSTEM_RAM_GB:-28}"
 MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-38000}"
 VLLM_DTYPE="${VLLM_DTYPE:-bfloat16}"
 VLLM_KV_CACHE_DTYPE="${VLLM_KV_CACHE_DTYPE:-bfloat16}"
 HF_HUB_DISABLE_XET="${HF_HUB_DISABLE_XET:-1}"
+HF_HUB_ENABLE_HF_TRANSFER="0"
 HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
 BASE_SEED="${BASE_SEED:-0}"
+ANSWER_EXTRACTOR_SEED="${ANSWER_EXTRACTOR_SEED:-$BASE_SEED}"
+ANSWER_EXTRACTOR_MAX_TOKENS="${ANSWER_EXTRACTOR_MAX_TOKENS:-200}"
+EXTRACT_UNPARSEABLE_ONLY="${EXTRACT_UNPARSEABLE_ONLY:-0}"
+ALLOW_SMOKE_RAW_OUTPUT_FALLBACK="${ALLOW_SMOKE_RAW_OUTPUT_FALLBACK:-0}"
 SAMPLING_TOP_K="${SAMPLING_TOP_K:--1}"
 SAMPLING_MIN_P="${SAMPLING_MIN_P:-0.0}"
 PRESENCE_PENALTY="${PRESENCE_PENALTY:-0.0}"
 FREQUENCY_PENALTY="${FREQUENCY_PENALTY:-0.0}"
 REPETITION_PENALTY="${REPETITION_PENALTY:-1.0}"
+PHI_OFFICIAL_SNAPSHOT_PATH="${PHI_OFFICIAL_SNAPSHOT_PATH:-}"
+
+PHI_OFFICIAL_SNAPSHOT_REPO_ID="microsoft/Phi-4-multimodal-instruct"
+PHI_OFFICIAL_SNAPSHOT_COMMIT="7641bf905e6965ee54166808d275266371e28343"
+PHI_MODEL_SHARD_1_SHA256="c46bb03332d82f6a3eaf85bd20af388dd4d4d68b198c2203c965c7381a466094"
+PHI_MODEL_SHARD_2_SHA256="b3e812c0c8acef4e7f5e34d6c9f77a7640ee4a2b93ea351921365ac62f19918d"
+PHI_MODEL_SHARD_3_SHA256="7be96b7339303752634b202d3f377bcf312a03046586eca6cea23347ace1e65a"
+PHI_VISION_ADAPTER_SHA256="1620b16722edf701038bf66e3cd46412c7cc5458e58df89e9f92cedb71fcbde8"
 
 # Primary benchmark profiles reconstructed from the papers and released code.
 DYS_PROMPT_MODE="${DYS_PROMPT_MODE:-noncot}"
-DYS_MAX_TOKENS="${DYS_MAX_TOKENS:-200}"
 DYS_TEMPERATURE="${DYS_TEMPERATURE:-1.0}"
 DYS_TOP_P="${DYS_TOP_P:-0.95}"
 MINDS_EYE_PROMPT_MODE="${MINDS_EYE_PROMPT_MODE:-cot}"
-MINDS_EYE_MAX_TOKENS="${MINDS_EYE_MAX_TOKENS:-1000}"
 MINDS_EYE_TEMPERATURE="${MINDS_EYE_TEMPERATURE:-0.1}"
 MINDS_EYE_TOP_P="${MINDS_EYE_TOP_P:-1.0}"
+FINAL_ANSWER_MAX_TOKENS="${FINAL_ANSWER_MAX_TOKENS:-200}"
+INTERNVL35_MAX_TOKENS="${INTERNVL35_MAX_TOKENS:-8192}"
+QWEN36_MAX_TOKENS="${QWEN36_MAX_TOKENS:-8192}"
 
 VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
-UNPARSEABLE_ANSWER_POLICY_ID="retry-with-deterministic-seed-sequence-then-fail-v1"
-PIPELINE_REVISION_ID="unquantized-bf16-paper-aligned-protocol-v2"
+VLLM_PHI4MM_MASK_SUM_PATCH_ID="vllm-0.25.1-phi4mm-fp32-mask-sum-v1"
+VLLM_DEEPSEEK_VL2_CONFIG_OVERRIDE_ID="vllm-0.25.1-deepseek-vl2-config-defaults-v1"
+ANSWER_EXTRACTION_METHOD_ID="same-served-model-text-only-v1"
+UNPARSEABLE_ANSWER_POLICY_ID="deterministic-retries-text-extraction-then-exact-raw-output-v5"
+PIPELINE_REVISION_ID="unquantized-bf16-smoke-and-full-text-extraction-v10"
 
 # slug|repository|revision|weight loading|max context
 MODEL_SPECS=(
   'qwen35-9b|Qwen/Qwen3.5-9B|c202236235762e1c871ad0ccb60c8ee5ba337b9a|unquantized|32768'
+  'qwen36-27b|Qwen/Qwen3.6-27B|6a9e13bd6fc8f0983b9b99948120bc37f49c13e9|unquantized|32768'
   'internvl35-8b|OpenGVLab/InternVL3_5-8B|9bb6a56ad9cc69db95e2d4eeb15a52bbcac4ef79|unquantized|32768'
   'glm46v-flash|zai-org/GLM-4.6V-Flash|411bb4d77144a3f03accbf4b780f5acb8b7cde4e|unquantized|32768'
   'minicpm-v46|openbmb/MiniCPM-V-4.6|8169864629825dc1d755a5aa1cd8b5935dcbc83f|unquantized|32768'
   'qwen25-vl-7b|Qwen/Qwen2.5-VL-7B-Instruct|cc594898137f460bfe9f0759e9844b3ce807cfb5|unquantized|32768'
   'qwen3-vl-8b|Qwen/Qwen3-VL-8B-Instruct|0c351dd01ed87e9c1b53cbc748cba10e6187ff3b|unquantized|32768'
   'phi4-multimodal|microsoft/Phi-4-multimodal-instruct|93f923e1a7727d1c4f446756212d9d3e8fcc5d81|unquantized|32768'
+  'gemma3-12b-it|google/gemma-3-12b-it|96b6f1eccf38110c56df3a15bffe176da04bfd80|unquantized|32768'
+  'gemma3-27b-it|google/gemma-3-27b-it|005ad3404e59d6023443cb575daa05336842228a|unquantized|32768'
+  'kimi-vl-a3b-instruct|moonshotai/Kimi-VL-A3B-Instruct|398eede0903cd983a2bfa0cc634e9ac1d843f375|unquantized|32768'
+  'deepseek-vl2|deepseek-ai/deepseek-vl2|f363772d1c47f4239dd844015b4bd53beb87951b|unquantized|4096'
+  'llama32-11b-vision-instruct|meta-llama/Llama-3.2-11B-Vision-Instruct|9eb2daaa8597bf192a8b0e73f848f3a102794df5|unquantized|32768'
 )
 
 SERVER_PID=""
 SERVER_OWNS_PROCESS_GROUP=0
 SERVER_LOG=""
+SERVER_ENDPOINTS=""
+INDEPENDENT_SERVER_PIDS=()
+INDEPENDENT_SERVER_PORTS=()
+INDEPENDENT_SERVER_LOGS=()
 PYTHON_BIN=""
 VLLM_BIN=""
 UV_BIN=""
@@ -89,6 +123,7 @@ SUCCESS_MODELS=()
 FAILED_MODELS=()
 SKIPPED_MODELS=()
 RUNNER_ARGS=()
+ACTIVE_RUN_MARKER=""
 
 usage() {
   cat <<'EOF'
@@ -102,22 +137,66 @@ Common overrides:
   TRACKS=do_you_see_me,minds_eye     Run selected benchmark tracks only
   GPU_IDS=0                          Run a model on one physical GPU
   GPU_IDS=0,1                        Split one model over two physical GPUs
-  TENSOR_PARALLEL_SIZE=2             Must match the number of assigned GPUs
+  TENSOR_PARALLEL_SIZE=2             Tensor-parallel GPUs per replica
+  DATA_PARALLEL_SIZE=4               Run four independent serving replicas
+  CONCURRENCY=4                      Keep four data-parallel replicas busy
   SMOKE_ONLY=1                       Run strict compatibility checks only
   SETUP_ONLY=1                       Prepare the shared environment and dataset, then exit
   FORCE=1                            Replace outputs from an older run contract
   KEEP_MODEL_CACHE=1                 Retain downloaded model weights
   DRY_RUN=1                          Validate and print the resolved plan
+  INTERNVL35_MAX_TOKENS=8192         Bound InternVL3.5, GLM-4.6V, MiniCPM-V, Qwen2.5-VL, and Qwen3-VL completions
+  QWEN36_MAX_TOKENS=8192             Bound Qwen3.6 completions
+  EXTRACT_UNPARSEABLE_ONLY=1         Judge only existing unparseable diagnostics
 
 The runner uses the original checkpoint tensors with BF16 compute. It never
 loads 4-bit or 8-bit weights, resizes benchmark images, or creates a synthetic
-answer. Failed or unparseable responses remain in diagnostics and make the run
-fail after the configured retry sequence.
+answer. After deterministic visual retries, the same served model may extract
+an answer from raw response text only. If strict recovery is exhausted, a
+complete nonempty model output is copied exactly into the submission answer;
+missing, empty, or inference-error records still fail.
 EOF
 }
 
 log() {
   printf '[%s] %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$*"
+}
+
+write_active_run_marker() {
+  ACTIVE_RUN_MARKER="$OUTPUT_ROOT/.active-run.json"
+  ACTIVE_RUN_MARKER="$ACTIVE_RUN_MARKER" ACTIVE_RUN_PID="$$" \
+  ACTIVE_RUN_MODELS="$MODELS" ACTIVE_RUN_TRACKS="$TRACKS" \
+  "$PYTHON_BIN" - <<'PY'
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+path = Path(os.environ["ACTIVE_RUN_MARKER"])
+temporary = path.with_suffix(".json.tmp")
+temporary.write_text(
+    json.dumps(
+        {
+            "pid": int(os.environ["ACTIVE_RUN_PID"]),
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "models": os.environ["ACTIVE_RUN_MODELS"],
+            "tracks": os.environ["ACTIVE_RUN_TRACKS"],
+        },
+        indent=2,
+        sort_keys=True,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+os.replace(temporary, path)
+PY
+}
+
+cleanup_runner() {
+  stop_server
+  if [[ -n "$ACTIVE_RUN_MARKER" ]]; then
+    rm -f -- "$ACTIVE_RUN_MARKER"
+  fi
 }
 
 die() {
@@ -155,10 +234,54 @@ track_prompt_mode() {
   esac
 }
 
-track_max_tokens() {
+model_reasoning_profile() {
   case "$1" in
-    do_you_see_me) printf '%s\n' "$DYS_MAX_TOKENS" ;;
-    minds_eye) printf '%s\n' "$MINDS_EYE_MAX_TOKENS" ;;
+    qwen35-9b|internvl35-8b) printf '%s\n' 'thinking' ;;
+    qwen36-27b) printf '%s\n' 'nonthinking' ;;
+    *) printf '%s\n' 'nonthinking' ;;
+  esac
+}
+
+model_max_tokens() {
+  case "$1" in
+    qwen36-27b) printf '%s\n' "$QWEN36_MAX_TOKENS" ;;
+    internvl35-8b|glm46v-flash|minicpm-v46|qwen25-vl-7b|qwen3-vl-8b) printf '%s\n' "$INTERNVL35_MAX_TOKENS" ;;
+    qwen35-9b) printf '\n' ;;
+    *) printf '%s\n' "$FINAL_ANSWER_MAX_TOKENS" ;;
+  esac
+}
+
+model_max_tokens_policy() {
+  case "$1" in
+    qwen36-27b) printf '%s\n' 'explicit-model-completion-cap' ;;
+    internvl35-8b|glm46v-flash|minicpm-v46|qwen25-vl-7b|qwen3-vl-8b) printf '%s\n' 'explicit-model-completion-cap' ;;
+    qwen35-9b) printf '%s\n' 'remaining-model-context' ;;
+    *) printf '%s\n' 'explicit-total-completion-cap' ;;
+  esac
+}
+
+track_max_tokens() {
+  local slug="$1" track="$2"
+  if [[ ( "$slug" == gemma3-*-it || "$slug" == "kimi-vl-a3b-instruct" || "$slug" == "llama32-11b-vision-instruct" ) && "$track" == "minds_eye" ]]; then
+    printf '%s\n' "$INTERNVL35_MAX_TOKENS"
+  else
+    model_max_tokens "$slug"
+  fi
+}
+
+track_max_tokens_policy() {
+  local slug="$1" track="$2"
+  if [[ ( "$slug" == gemma3-*-it || "$slug" == "kimi-vl-a3b-instruct" || "$slug" == "llama32-11b-vision-instruct" ) && "$track" == "minds_eye" ]]; then
+    printf '%s\n' 'explicit-model-completion-cap'
+  else
+    model_max_tokens_policy "$slug"
+  fi
+}
+
+track_stop_sequence() {
+  case "$(track_prompt_mode "$1")" in
+    cot) printf '%s\n' '</answer>' ;;
+    noncot) printf '\n' ;;
     *) return 1 ;;
   esac
 }
@@ -180,16 +303,71 @@ track_top_p() {
 }
 
 track_chat_kwargs() {
-  local slug="$1" track="$2"
-  if [[ "$slug" == "qwen35-9b" ]]; then
-    if [[ "$track" == "do_you_see_me" ]]; then
-      printf '%s\n' '{"enable_thinking":false}'
-    else
-      printf '%s\n' '{"enable_thinking":true}'
-    fi
-    return 0
+  local slug="$1"
+  case "$slug" in
+    glm46v-flash|qwen36-27b) printf '%s\n' '{"enable_thinking":false}' ;;
+    qwen35-9b) printf '%s\n' '{"enable_thinking":true}' ;;
+    *) printf '%s\n' '{}' ;;
+  esac
+}
+
+model_request_name() {
+  local slug="$1" model_id="$2"
+  if [[ "$slug" == "phi4-multimodal" ]]; then
+    printf '%s\n' 'vision'
+  else
+    printf '%s\n' "$model_id"
   fi
-  printf '%s\n' '{}'
+}
+
+model_adapter_name() {
+  if [[ "$1" == "phi4-multimodal" ]]; then
+    printf '%s\n' 'vision'
+  fi
+}
+
+model_adapter_source() {
+  if [[ "$1" == "phi4-multimodal" ]]; then
+    printf '%s\n' 'vision-lora'
+  fi
+}
+
+model_source_provider() {
+  local slug="$1"
+  if [[ "$slug" == "phi4-multimodal" && -n "$PHI_OFFICIAL_SNAPSHOT_PATH" ]]; then
+    printf '%s\n' 'modelscope-official-git'
+  else
+    printf '%s\n' 'huggingface'
+  fi
+}
+
+model_source_repo_id() {
+  local slug="$1" model_id="$2"
+  if [[ "$slug" == "phi4-multimodal" && -n "$PHI_OFFICIAL_SNAPSHOT_PATH" ]]; then
+    printf '%s\n' "$PHI_OFFICIAL_SNAPSHOT_REPO_ID"
+  else
+    printf '%s\n' "$model_id"
+  fi
+}
+
+model_source_revision() {
+  local slug="$1" revision="$2"
+  if [[ "$slug" == "phi4-multimodal" && -n "$PHI_OFFICIAL_SNAPSHOT_PATH" ]]; then
+    printf '%s\n' "$PHI_OFFICIAL_SNAPSHOT_COMMIT"
+  else
+    printf '%s\n' "$revision"
+  fi
+}
+
+model_source_objects() {
+  local slug="$1"
+  if [[ "$slug" == "phi4-multimodal" && -n "$PHI_OFFICIAL_SNAPSHOT_PATH" ]]; then
+    printf '{"model-00001-of-00003.safetensors":"%s","model-00002-of-00003.safetensors":"%s","model-00003-of-00003.safetensors":"%s","vision-lora/adapter_model.safetensors":"%s"}\n' \
+      "$PHI_MODEL_SHARD_1_SHA256" "$PHI_MODEL_SHARD_2_SHA256" \
+      "$PHI_MODEL_SHARD_3_SHA256" "$PHI_VISION_ADAPTER_SHA256"
+  else
+    printf '%s\n' '{}'
+  fi
 }
 
 selected_tracks() {
@@ -244,12 +422,24 @@ initialize_gpu_topology() {
   done
 
   if [[ "$TENSOR_PARALLEL_SIZE" == "auto" ]]; then
-    TENSOR_PARALLEL_SIZE="$GPU_COUNT"
+    [[ "$DATA_PARALLEL_SIZE" =~ ^[0-9]+$ ]] && (( DATA_PARALLEL_SIZE > 0 )) \
+      || die "DATA_PARALLEL_SIZE must be a positive integer."
+    (( GPU_COUNT % DATA_PARALLEL_SIZE == 0 )) \
+      || die "$GPU_COUNT GPU_IDS entries cannot be divided into DATA_PARALLEL_SIZE=$DATA_PARALLEL_SIZE replicas."
+    TENSOR_PARALLEL_SIZE=$((GPU_COUNT / DATA_PARALLEL_SIZE))
   fi
   [[ "$TENSOR_PARALLEL_SIZE" =~ ^[0-9]+$ ]] && (( TENSOR_PARALLEL_SIZE > 0 )) \
     || die "TENSOR_PARALLEL_SIZE must be auto or a positive integer."
-  (( TENSOR_PARALLEL_SIZE == GPU_COUNT )) \
-    || die "TENSOR_PARALLEL_SIZE=$TENSOR_PARALLEL_SIZE must match the $GPU_COUNT GPU_IDS entries."
+  [[ "$DATA_PARALLEL_SIZE" =~ ^[0-9]+$ ]] && (( DATA_PARALLEL_SIZE > 0 )) \
+    || die "DATA_PARALLEL_SIZE must be a positive integer."
+  (( TENSOR_PARALLEL_SIZE * DATA_PARALLEL_SIZE == GPU_COUNT )) \
+    || die "TENSOR_PARALLEL_SIZE=$TENSOR_PARALLEL_SIZE x DATA_PARALLEL_SIZE=$DATA_PARALLEL_SIZE must match the $GPU_COUNT GPU_IDS entries."
+}
+
+resolve_max_num_seqs_per_replica() {
+  if [[ "$MAX_NUM_SEQS_PER_REPLICA" == "auto" ]]; then
+    MAX_NUM_SEQS_PER_REPLICA=$(((CONCURRENCY + DATA_PARALLEL_SIZE - 1) / DATA_PARALLEL_SIZE))
+  fi
 }
 
 validate_settings() {
@@ -262,11 +452,27 @@ validate_settings() {
   validate_positive_integer "MAX_EVAL_ATTEMPTS" "$MAX_EVAL_ATTEMPTS"
   validate_positive_integer "CHECKPOINT_EVERY" "$CHECKPOINT_EVERY"
   validate_positive_integer "CONCURRENCY" "$CONCURRENCY"
+  resolve_max_num_seqs_per_replica
+  if [[ "$MAX_NUM_SEQS_PER_REPLICA" != "auto" ]]; then
+    validate_positive_integer "MAX_NUM_SEQS_PER_REPLICA" "$MAX_NUM_SEQS_PER_REPLICA"
+  fi
   validate_positive_integer "MODEL_START_TIMEOUT_SECONDS" "$MODEL_START_TIMEOUT_SECONDS"
   validate_positive_integer "MIN_FREE_DISK_GB" "$MIN_FREE_DISK_GB"
   validate_positive_integer "MIN_SYSTEM_RAM_GB" "$MIN_SYSTEM_RAM_GB"
   validate_positive_integer "MIN_FREE_GPU_MEMORY_MIB" "$MIN_FREE_GPU_MEMORY_MIB"
   validate_positive_integer "HF_HUB_DOWNLOAD_TIMEOUT" "$HF_HUB_DOWNLOAD_TIMEOUT"
+  validate_flag "DISABLE_CUSTOM_ALL_REDUCE" "$DISABLE_CUSTOM_ALL_REDUCE"
+  validate_flag "ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" "$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK"
+  [[ "$SERVING_REPLICA_MODE" == "builtin" || "$SERVING_REPLICA_MODE" == "independent" ]] \
+    || die "SERVING_REPLICA_MODE must be builtin or independent."
+  if [[ "$SERVING_REPLICA_MODE" == "independent" ]]; then
+    (( TENSOR_PARALLEL_SIZE == 1 )) \
+      || die "Independent replica serving requires TENSOR_PARALLEL_SIZE=1."
+    (( DATA_PARALLEL_SIZE == GPU_COUNT )) \
+      || die "Independent replica serving requires one DATA_PARALLEL_SIZE replica per GPU."
+    (( PORT + DATA_PARALLEL_SIZE - 1 < 65536 )) \
+      || die "Independent replica ports exceed 65535. Choose a lower PORT."
+  fi
   [[ "$REQUEST_TIMEOUT_SECONDS" =~ ^[0-9]+([.][0-9]+)?$ ]] \
     && awk -v value="$REQUEST_TIMEOUT_SECONDS" 'BEGIN { exit !(value > 0) }' \
     || die "REQUEST_TIMEOUT_SECONDS must be positive."
@@ -286,13 +492,19 @@ validate_settings() {
     || die "DYS_PROMPT_MODE must be noncot or cot."
   [[ "$MINDS_EYE_PROMPT_MODE" == "noncot" || "$MINDS_EYE_PROMPT_MODE" == "cot" ]] \
     || die "MINDS_EYE_PROMPT_MODE must be noncot or cot."
-  validate_positive_integer "DYS_MAX_TOKENS" "$DYS_MAX_TOKENS"
-  validate_positive_integer "MINDS_EYE_MAX_TOKENS" "$MINDS_EYE_MAX_TOKENS"
+  [[ -z "${COT_MAX_TOKENS:-}" && -z "${THINKING_MAX_TOKENS:-}" ]] \
+    || die "COT_MAX_TOKENS and THINKING_MAX_TOKENS must be unset; completion caps are configured per model."
+  validate_positive_integer "FINAL_ANSWER_MAX_TOKENS" "$FINAL_ANSWER_MAX_TOKENS"
+  validate_positive_integer "INTERNVL35_MAX_TOKENS" "$INTERNVL35_MAX_TOKENS"
+  validate_positive_integer "QWEN36_MAX_TOKENS" "$QWEN36_MAX_TOKENS"
+  validate_positive_integer "ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_MAX_TOKENS"
   [[ "$DYS_TEMPERATURE" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "DYS_TEMPERATURE must be non-negative."
   [[ "$MINDS_EYE_TEMPERATURE" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "MINDS_EYE_TEMPERATURE must be non-negative."
   validate_probability "DYS_TOP_P" "$DYS_TOP_P"
   validate_probability "MINDS_EYE_TOP_P" "$MINDS_EYE_TOP_P"
   [[ "$BASE_SEED" =~ ^[0-9]+$ ]] || die "BASE_SEED must be a non-negative integer."
+  [[ "$ANSWER_EXTRACTOR_SEED" =~ ^[0-9]+$ ]] \
+    || die "ANSWER_EXTRACTOR_SEED must be a non-negative integer."
   [[ "$SAMPLING_TOP_K" == "-1" || "$SAMPLING_TOP_K" =~ ^[1-9][0-9]*$ ]] \
     || die "SAMPLING_TOP_K must be -1 or a positive integer."
   [[ "$SAMPLING_MIN_P" =~ ^[0-9]+([.][0-9]+)?$ ]] \
@@ -314,23 +526,50 @@ validate_settings() {
   validate_flag "KEEP_MODEL_CACHE" "$KEEP_MODEL_CACHE"
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
   validate_flag "HF_HUB_DISABLE_XET" "$HF_HUB_DISABLE_XET"
+  validate_flag "EXTRACT_UNPARSEABLE_ONLY" "$EXTRACT_UNPARSEABLE_ONLY"
+  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
+    [[ "$FORCE" != "1" ]] || die "EXTRACT_UNPARSEABLE_ONLY cannot be combined with FORCE=1."
+    [[ "$SMOKE_ONLY" != "1" ]] || die "EXTRACT_UNPARSEABLE_ONLY cannot be combined with SMOKE_ONLY=1."
+  fi
   [[ -n "$(selected_tracks)" ]] || die "TRACKS must select do_you_see_me, minds_eye, or all."
   (( $(selected_model_count) > 0 )) || die "MODELS did not match any configured model slug."
+  if [[ -n "$PHI_OFFICIAL_SNAPSHOT_PATH" ]]; then
+    is_enabled "$MODELS" "phi4-multimodal" \
+      || die "PHI_OFFICIAL_SNAPSHOT_PATH is set but phi4-multimodal is not selected."
+  fi
 }
 
 print_plan() {
-  local track spec slug model_id revision loading model_max_len effective_model_len
+  local track max_tokens dys_max_tokens me_max_tokens stop_sequence spec slug model_id revision loading model_max_len effective_model_len adapter_name reasoning_profile
   log "Evaluation plan"
-  printf '  GPUs: %s (tensor parallel size %s)\n' "$GPU_IDS" "$TENSOR_PARALLEL_SIZE"
+  printf '  GPUs: %s (tensor parallel size %s, data parallel size %s, request concurrency %s)\n' \
+    "$GPU_IDS" "$TENSOR_PARALLEL_SIZE" "$DATA_PARALLEL_SIZE" "$CONCURRENCY"
+  printf '  Serving replica mode: %s\n' "$SERVING_REPLICA_MODE"
+  printf '  Serving admission: at most %s active sequence(s) per data-parallel replica\n' \
+    "$MAX_NUM_SEQS_PER_REPLICA"
+  printf '  GPU allocation: utilization=%s; PYTORCH_CUDA_ALLOC_CONF=%s\n' \
+    "$GPU_MEMORY_UTILIZATION" "$PYTORCH_CUDA_ALLOC_CONF"
   printf '  Weights: original checkpoint tensors, unquantized; compute: %s; KV cache: %s\n' \
     "$VLLM_DTYPE" "$VLLM_KV_CACHE_DTYPE"
+  printf '  Serving engine: vLLM %s\n' "$VLLM_VERSION"
   printf '  Image preprocessing: original image bytes, no runner resize or recompression\n'
+  printf '  Answer recovery: same served model, text only, temperature=0, max_tokens=%s, seed=%s\n' \
+    "$ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_SEED"
+  printf '  Exhausted recovery: preserve exact nonempty diagnostics.output in submission\n'
+  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
+    printf '  Mode: extract existing unparseable diagnostics; no visual requests\n'
+  fi
   printf '  Shared sampling: top_k=%s, min_p=%s, presence=%s, frequency=%s, repetition=%s\n' \
     "$SAMPLING_TOP_K" "$SAMPLING_MIN_P" "$PRESENCE_PENALTY" "$FREQUENCY_PENALTY" "$REPETITION_PENALTY"
   while IFS= read -r track; do
-    printf '  Track %-14s prompt=%s, temperature=%s, top_p=%s, max_tokens=%s\n' \
+    stop_sequence="$(track_stop_sequence "$track")"
+    printf '  Track %-14s prompt=%s, temperature=%s, top_p=%s' \
       "$track" "$(track_prompt_mode "$track")" "$(track_temperature "$track")" \
-      "$(track_top_p "$track")" "$(track_max_tokens "$track")"
+      "$(track_top_p "$track")"
+    if [[ -n "$stop_sequence" ]]; then
+      printf ', retained_stop=%s' "$stop_sequence"
+    fi
+    printf '\n'
   done < <(selected_tracks)
   for spec in "${MODEL_SPECS[@]}"; do
     IFS='|' read -r slug model_id revision loading model_max_len <<<"$spec"
@@ -339,8 +578,27 @@ print_plan() {
       if [[ "$MAX_MODEL_LEN" != "auto" ]]; then
         effective_model_len="$MAX_MODEL_LEN"
       fi
+      reasoning_profile="$(model_reasoning_profile "$slug")"
+      dys_max_tokens="$(track_max_tokens "$slug" do_you_see_me)"
+      me_max_tokens="$(track_max_tokens "$slug" minds_eye)"
+      [[ -n "$dys_max_tokens" ]] || dys_max_tokens="uncapped ($(track_max_tokens_policy "$slug" do_you_see_me))"
+      [[ -n "$me_max_tokens" ]] || me_max_tokens="uncapped ($(track_max_tokens_policy "$slug" minds_eye))"
       printf '  %-22s %-45s %s, context=%s\n' \
         "$slug" "$model_id" "$loading" "$effective_model_len"
+      if [[ "$dys_max_tokens" == "$me_max_tokens" ]]; then
+        max_tokens="$dys_max_tokens"
+      else
+        max_tokens="do_you_see_me=$dys_max_tokens, minds_eye=$me_max_tokens"
+      fi
+      printf '    Reasoning profile: %s; API max_tokens=%s; final_answer_max_tokens=%s\n' \
+        "$reasoning_profile" "$max_tokens" "$FINAL_ANSWER_MAX_TOKENS"
+      printf '    Engine mode: %s; server KV cache argument: %s\n' \
+        "$(model_vllm_engine_mode "$slug")" "$(model_server_kv_cache_dtype "$slug")"
+      adapter_name="$(model_adapter_name "$slug")"
+      if [[ -n "$adapter_name" ]]; then
+        printf '    Request model: %s; bundled adapter: %s\n' \
+          "$(model_request_name "$slug" "$model_id")" "$(model_adapter_source "$slug")"
+      fi
     fi
   done
 }
@@ -379,7 +637,7 @@ preflight_host() {
   GPU_NAME="$(IFS=';'; printf '%s' "${gpu_names[*]}")"
 
   local free_kib free_gib ram_kib ram_gib
-  free_kib="$(df -Pk "$PROJECT_ROOT" | awk 'NR == 2 {print $4}')"
+  free_kib="$(df -Pk "$CACHE_ROOT" | awk 'NR == 2 {print $4}')"
   free_gib=$((free_kib / 1024 / 1024))
   (( free_gib >= MIN_FREE_DISK_GB )) \
     || die "Only ${free_gib} GiB is free; at least ${MIN_FREE_DISK_GB} GiB is required."
@@ -388,11 +646,11 @@ preflight_host() {
   ram_gib=$((ram_kib / 1024 / 1024))
   (( ram_gib >= MIN_SYSTEM_RAM_GB )) \
     || die "The host has ${ram_gib} GiB RAM; at least ${MIN_SYSTEM_RAM_GB} GiB is required."
-  log "Host preflight passed: $GPU_NAME; ${ram_gib} GiB RAM; ${free_gib} GiB disk free"
+  log "Host preflight passed: $GPU_NAME; ${ram_gib} GiB RAM; ${free_gib} GiB cache disk free"
 }
 
 setup_environment() {
-  local marker="$VENV_DIR/.ms-vista-vllm-${VLLM_VERSION}-unquantized-bf16-uv-${UV_VERSION}"
+  local marker="$VENV_DIR/.ms-vista-vllm-${VLLM_VERSION}-scipy-${SCIPY_VERSION}-timm-${TIMM_VERSION}-unquantized-bf16-uv-${UV_VERSION}"
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
     log "Creating evaluation environment at $VENV_DIR"
     python3 -m venv "$VENV_DIR" \
@@ -410,11 +668,23 @@ setup_environment() {
       "vllm==$VLLM_VERSION" \
       "openai==$OPENAI_VERSION" \
       "huggingface-hub==$HUGGINGFACE_HUB_VERSION" \
-      "pillow==$PILLOW_VERSION"
-    : >"$marker"
+      "pillow==$PILLOW_VERSION" \
+      "scipy==$SCIPY_VERSION" \
+      "timm==$TIMM_VERSION"
+  fi
+
+  if [[ -z "${HF_TOKEN:-}" ]]; then
+    HF_TOKEN="$("$PYTHON_BIN" - <<'PY'
+from huggingface_hub import get_token
+
+print(get_token() or "")
+PY
+)"
   fi
 
   "$PYTHON_BIN" - <<'PY'
+from scipy.optimize import linear_sum_assignment
+import timm
 import torch
 import vllm
 
@@ -422,14 +692,23 @@ if not torch.cuda.is_available():
     raise SystemExit("PyTorch cannot access CUDA. Check the NVIDIA driver and vLLM wheel.")
 if not torch.cuda.is_bf16_supported():
     raise SystemExit("The selected CUDA runtime does not expose native BF16 support.")
-print(f"Environment ready: vLLM {vllm.__version__}, PyTorch {torch.__version__}, CUDA {torch.version.cuda}")
+print(
+    f"Environment ready: vLLM {vllm.__version__}, timm {timm.__version__}, "
+    f"PyTorch {torch.__version__}, CUDA {torch.version.cuda}"
+)
 PY
+  : >"$marker"
 }
 
 verify_vllm_cli() {
   local help_text option
-  help_text="$("$VLLM_BIN" serve --help=all 2>&1)" \
-    || die "Could not inspect the installed vLLM serve command."
+  if [[ "$VLLM_VERSION" == 0.10.* ]]; then
+    help_text="$("$VLLM_BIN" serve --help 2>&1)" \
+      || die "Could not inspect the installed vLLM serve command."
+  else
+    help_text="$("$VLLM_BIN" serve --help=all 2>&1)" \
+      || die "Could not inspect the installed vLLM serve command."
+  fi
   for option in \
     --host --port --served-model-name --revision --dtype --gpu-memory-utilization \
     --max-model-len --max-num-seqs --limit-mm-per-prompt --generation-config --kv-cache-dtype \
@@ -437,6 +716,12 @@ verify_vllm_cli() {
     [[ "$help_text" == *"$option"* ]] \
       || die "Installed vLLM $VLLM_VERSION does not expose required option $option."
   done
+  if is_enabled "$MODELS" "phi4-multimodal"; then
+    for option in --enable-lora --max-lora-rank --max-loras --lora-modules; do
+      [[ "$help_text" == *"$option"* ]] \
+        || die "Installed vLLM $VLLM_VERSION does not expose Phi-4 requirement $option."
+    done
+  fi
   log "vLLM serve CLI compatibility preflight passed"
 }
 
@@ -445,6 +730,7 @@ prepare_dataset() {
   HF_TOKEN="${HF_TOKEN:-}" \
     HF_HUB_DISABLE_TELEMETRY=1 \
     HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+    HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
     HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" \
     "$PYTHON_BIN" -m evaluation.prepare_visual_data \
       --output "$DATASET_DIR" \
@@ -457,16 +743,154 @@ apply_model_compatibility_patches() {
     log "Applying audited MiniCPM vLLM compatibility patch"
     "$PYTHON_BIN" -m evaluation.common.patch_vllm_weights_mapper
   fi
-}
-
-model_compatibility_patch() {
-  if [[ "$1" == "minicpm-v46" ]]; then
-    printf '%s\n' "$VLLM_STACKED_WEIGHT_PATCH_ID"
+  if is_enabled "$MODELS" "phi4-multimodal"; then
+    log "Applying audited Phi-4 vLLM mask-sum precision patch"
+    "$PYTHON_BIN" -m evaluation.common.patch_vllm_phi4mm
   fi
 }
 
+model_compatibility_patch() {
+  case "$1" in
+    minicpm-v46) printf '%s\n' "$VLLM_STACKED_WEIGHT_PATCH_ID" ;;
+    phi4-multimodal) printf '%s\n' "$VLLM_PHI4MM_MASK_SUM_PATCH_ID" ;;
+    deepseek-vl2) printf '%s\n' "$VLLM_DEEPSEEK_VL2_CONFIG_OVERRIDE_ID" ;;
+  esac
+}
+
+model_compatibility_patch_source() {
+  case "$1" in
+    minicpm-v46) printf '%s\n' 'evaluation/common/patch_vllm_weights_mapper.py' ;;
+    phi4-multimodal) printf '%s\n' 'evaluation/common/patch_vllm_phi4mm.py' ;;
+    deepseek-vl2) printf '%s\n' 'evaluation/run_visual_suite.sh' ;;
+  esac
+}
+
+model_hf_overrides() {
+  case "$1" in
+    deepseek-vl2) printf '%s\n' '{"text_config":{"kv_lora_rank":512,"num_hidden_layers":30}}' ;;
+  esac
+}
+
+model_vllm_engine_mode() {
+  case "$1" in
+    llama32-11b-vision-instruct) printf '%s\n' 'legacy-v0' ;;
+    *) printf '%s\n' 'v1' ;;
+  esac
+}
+
+model_server_kv_cache_dtype() {
+  case "$1" in
+    llama32-11b-vision-instruct) printf '%s\n' 'auto' ;;
+    *) printf '%s\n' "$VLLM_KV_CACHE_DTYPE" ;;
+  esac
+}
+
+prefetch_model_snapshot() {
+  local model_id="$1" revision="$2" model_cache="$3"
+  log "Prefetching the pinned $model_id snapshot once before launching $DATA_PARALLEL_SIZE data-parallel workers"
+  HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+    HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+    HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
+    HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+    HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
+    HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" \
+    "$PYTHON_BIN" - "$model_id" "$revision" <<'PY'
+import sys
+
+from huggingface_hub import snapshot_download
+
+if sys.argv[1] == "meta-llama/Llama-3.2-11B-Vision-Instruct":
+  snapshot_download(
+    repo_id=sys.argv[1],
+    revision=sys.argv[2],
+    ignore_patterns=["*consolidated.pth"],
+  )
+else:
+  snapshot_download(repo_id=sys.argv[1], revision=sys.argv[2])
+PY
+}
+
+download_phi_vision_adapter() {
+  local model_id="$1" revision="$2" model_cache="$3"
+  HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+    HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+    HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
+    HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+    HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
+    HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" \
+    "$PYTHON_BIN" - "$model_id" "$revision" <<'PY'
+import sys
+from pathlib import Path
+
+from huggingface_hub import snapshot_download
+
+snapshot = Path(
+    snapshot_download(
+        repo_id=sys.argv[1],
+        revision=sys.argv[2],
+        allow_patterns=["vision-lora/*"],
+    )
+)
+adapter = snapshot / "vision-lora"
+required = (adapter / "adapter_config.json", adapter / "adapter_model.safetensors")
+missing = [path.name for path in required if not path.is_file()]
+if missing:
+    raise SystemExit("Pinned Phi vision adapter is incomplete: " + ", ".join(missing))
+print(adapter)
+PY
+}
+
+verify_phi_official_snapshot() {
+  local snapshot="$PHI_OFFICIAL_SNAPSHOT_PATH" commit
+  [[ -n "$snapshot" ]] || die "PHI_OFFICIAL_SNAPSHOT_PATH is not set."
+  [[ -d "$snapshot/.git" ]] \
+    || die "Phi official snapshot is not a Git checkout: $snapshot"
+  command -v git >/dev/null || die "git is required to verify the Phi official snapshot."
+  commit="$(git -C "$snapshot" rev-parse HEAD 2>/dev/null || true)"
+  [[ "$commit" == "$PHI_OFFICIAL_SNAPSHOT_COMMIT" ]] \
+    || die "Phi official snapshot must be commit $PHI_OFFICIAL_SNAPSHOT_COMMIT, found ${commit:-<unreadable>}."
+
+  PHI_SNAPSHOT_PATH="$snapshot" \
+  PHI_SHARD_1_SHA256="$PHI_MODEL_SHARD_1_SHA256" \
+  PHI_SHARD_2_SHA256="$PHI_MODEL_SHARD_2_SHA256" \
+  PHI_SHARD_3_SHA256="$PHI_MODEL_SHARD_3_SHA256" \
+  PHI_ADAPTER_SHA256="$PHI_VISION_ADAPTER_SHA256" \
+    "$PYTHON_BIN" - <<'PY'
+import hashlib
+import os
+from pathlib import Path
+
+root = Path(os.environ["PHI_SNAPSHOT_PATH"]).expanduser().resolve()
+
+def sha256(file_path: Path) -> str:
+  digest = hashlib.sha256()
+  with file_path.open("rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+      digest.update(chunk)
+  return digest.hexdigest()
+
+expected = {
+    "model-00001-of-00003.safetensors": os.environ["PHI_SHARD_1_SHA256"],
+    "model-00002-of-00003.safetensors": os.environ["PHI_SHARD_2_SHA256"],
+    "model-00003-of-00003.safetensors": os.environ["PHI_SHARD_3_SHA256"],
+    "vision-lora/adapter_model.safetensors": os.environ["PHI_ADAPTER_SHA256"],
+}
+for relative, digest in expected.items():
+    path = root / relative
+    if not path.is_file():
+        raise SystemExit(f"Phi official snapshot is missing {relative}")
+    actual = sha256(path)
+    if actual != digest:
+        raise SystemExit(
+            f"Phi official snapshot hash mismatch for {relative}: {actual} != {digest}"
+        )
+print(root)
+PY
+}
+
 port_is_available() {
-  "$PYTHON_BIN" - "$PORT" <<'PY'
+  local port="${1:-$PORT}"
+  "$PYTHON_BIN" - "$port" <<'PY'
 import socket
 import sys
 
@@ -478,9 +902,18 @@ with socket.socket() as sock:
 PY
 }
 
+wait_for_port_release() {
+  local timeout_seconds="$1" port="${2:-$PORT}" waited=0
+  while ! port_is_available "$port"; do
+    (( waited >= timeout_seconds )) && return 1
+    sleep 1
+    waited=$((waited + 1))
+  done
+}
+
 server_serves_model() {
-  local expected_model="$1"
-  curl -fsS "http://127.0.0.1:$PORT/v1/models" 2>/dev/null \
+  local expected_model="$1" port="${2:-$PORT}"
+  curl -fsS "http://127.0.0.1:$port/v1/models" 2>/dev/null \
     | "$PYTHON_BIN" -c '
 import json
 import sys
@@ -497,7 +930,8 @@ raise SystemExit(0 if expected in model_ids else 1)
 }
 
 server_model_names() {
-  curl -fsS "http://127.0.0.1:$PORT/v1/models" 2>/dev/null \
+  local port="${1:-$PORT}"
+  curl -fsS "http://127.0.0.1:$port/v1/models" 2>/dev/null \
     | "$PYTHON_BIN" -c '
 import json
 import sys
@@ -513,31 +947,78 @@ print(", ".join(model_ids) if model_ids else "<none>")
 }
 
 stop_server() {
+  if (( ${#INDEPENDENT_SERVER_PIDS[@]} > 0 )); then
+    local pid port waited=0 alive
+    log "Stopping ${#INDEPENDENT_SERVER_PIDS[@]} independent model servers"
+    for pid in "${INDEPENDENT_SERVER_PIDS[@]}"; do
+      kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+    done
+    while (( waited < 60 )); do
+      alive=0
+      for pid in "${INDEPENDENT_SERVER_PIDS[@]}"; do
+        kill -0 "$pid" 2>/dev/null && alive=1
+      done
+      (( alive == 0 )) && break
+      sleep 2
+      waited=$((waited + 2))
+    done
+    for pid in "${INDEPENDENT_SERVER_PIDS[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+      fi
+      wait "$pid" 2>/dev/null || true
+    done
+    for port in "${INDEPENDENT_SERVER_PORTS[@]}"; do
+      wait_for_port_release 30 "$port" \
+        || printf 'Independent server port %s was not released.\n' "$port" >&2
+    done
+    INDEPENDENT_SERVER_PIDS=()
+    INDEPENDENT_SERVER_PORTS=()
+    INDEPENDENT_SERVER_LOGS=()
+    SERVER_ENDPOINTS=""
+    SERVER_PID=""
+    SERVER_OWNS_PROCESS_GROUP=0
+    return 0
+  fi
   if [[ -z "$SERVER_PID" ]]; then
     return 0
   fi
-  log "Stopping model server PID $SERVER_PID"
-  if [[ "$SERVER_OWNS_PROCESS_GROUP" == "1" ]]; then
-    kill -TERM -- "-$SERVER_PID" 2>/dev/null || true
+  local server_pid="$SERVER_PID" owns_process_group="$SERVER_OWNS_PROCESS_GROUP"
+  log "Stopping model server PID $server_pid"
+  if [[ "$owns_process_group" == "1" ]]; then
+    kill -TERM -- "-$server_pid" 2>/dev/null || true
   else
-    kill -TERM "$SERVER_PID" 2>/dev/null || true
+    kill -TERM "$server_pid" 2>/dev/null || true
   fi
   local waited=0
-  while kill -0 "$SERVER_PID" 2>/dev/null && (( waited < 60 )); do
+  while kill -0 "$server_pid" 2>/dev/null && (( waited < 60 )); do
     sleep 2
     waited=$((waited + 2))
   done
-  if kill -0 "$SERVER_PID" 2>/dev/null; then
-    if [[ "$SERVER_OWNS_PROCESS_GROUP" == "1" ]]; then
-      kill -KILL -- "-$SERVER_PID" 2>/dev/null || true
+  if kill -0 "$server_pid" 2>/dev/null; then
+    if [[ "$owns_process_group" == "1" ]]; then
+      kill -KILL -- "-$server_pid" 2>/dev/null || true
     else
-      kill -KILL "$SERVER_PID" 2>/dev/null || true
+      kill -KILL "$server_pid" 2>/dev/null || true
     fi
   fi
-  wait "$SERVER_PID" 2>/dev/null || true
+  wait "$server_pid" 2>/dev/null || true
+  if ! wait_for_port_release 60; then
+    log "Port $PORT is still held after graceful model-server shutdown; forcing process-group cleanup"
+    if [[ "$owns_process_group" == "1" ]]; then
+      kill -KILL -- "-$server_pid" 2>/dev/null || true
+    else
+      kill -KILL "$server_pid" 2>/dev/null || true
+    fi
+    if ! wait_for_port_release 10; then
+      printf 'Model server stopped, but port %s was not released after 70 seconds.\n' "$PORT" >&2
+      SERVER_PID=""
+      SERVER_OWNS_PROCESS_GROUP=0
+      return 1
+    fi
+  fi
   SERVER_PID=""
   SERVER_OWNS_PROCESS_GROUP=0
-  sleep 5
 }
 
 report_startup_progress() {
@@ -565,45 +1046,195 @@ report_startup_failure() {
 
 start_server() {
   local slug="$1" model_id="$2" revision="$3" loading="$4" model_cache="$5" model_max_len="$6"
+  local request_model adapter_path="" model_source="$model_id" source_revision="$revision" hf_overrides
+  local vllm_engine_mode server_kv_cache_dtype
+  local -a server_environment=()
   [[ "$loading" == "unquantized" ]] || die "Refusing unsupported weight loading mode: $loading"
+  request_model="$(model_request_name "$slug" "$model_id")"
+  hf_overrides="$(model_hf_overrides "$slug")"
+  vllm_engine_mode="$(model_vllm_engine_mode "$slug")"
+  server_kv_cache_dtype="$(model_server_kv_cache_dtype "$slug")"
+  if [[ "$vllm_engine_mode" == "legacy-v0" ]]; then
+    server_environment+=(VLLM_USE_V1=0)
+  fi
   SERVER_LOG="$OUTPUT_ROOT/$slug/vllm.log"
   mkdir -p "$(dirname "$SERVER_LOG")" "$model_cache"
   : >"$SERVER_LOG"
   port_is_available || die "Port $PORT is already in use. Set PORT to an unused local port."
 
+  if [[ "$slug" == "phi4-multimodal" && -n "$PHI_OFFICIAL_SNAPSHOT_PATH" ]]; then
+    log "Verifying the immutable official Microsoft Phi snapshot"
+    verify_phi_official_snapshot >/dev/null
+    model_source="$(cd "$PHI_OFFICIAL_SNAPSHOT_PATH" && pwd -P)"
+    source_revision="$PHI_OFFICIAL_SNAPSHOT_COMMIT"
+    adapter_path="$model_source/vision-lora"
+  fi
+
+  if (( DATA_PARALLEL_SIZE > 1 )) && [[ "$model_source" == "$model_id" ]]; then
+    if ! prefetch_model_snapshot "$model_id" "$revision" "$model_cache"; then
+      printf 'Could not prefetch %s at pinned revision %s before data-parallel startup.\n' \
+        "$model_id" "$revision" >&2
+      return 1
+    fi
+  fi
+
+  if [[ "$SERVING_REPLICA_MODE" == "independent" ]]; then
+    [[ "$model_source" == "$model_id" ]] \
+      || die "Independent replica serving currently supports Hugging Face model sources only."
+    local replica replica_port replica_log replica_pid gpu endpoint
+    local -a replica_command
+    SERVER_LOG="$OUTPUT_ROOT/$slug/vllm.replica-0.log"
+    SERVER_ENDPOINTS=""
+    for replica in "${!GPU_ID_LIST[@]}"; do
+      gpu="${GPU_ID_LIST[$replica]}"
+      replica_port=$((PORT + replica))
+      replica_log="$OUTPUT_ROOT/$slug/vllm.replica-$replica.log"
+      port_is_available "$replica_port" \
+        || die "Independent replica port $replica_port is already in use."
+      : >"$replica_log"
+      replica_command=(
+        "$VLLM_BIN" serve "$model_source"
+        --host 127.0.0.1
+        --port "$replica_port"
+        --served-model-name "$model_id"
+        --dtype "$VLLM_DTYPE"
+        --kv-cache-dtype "$server_kv_cache_dtype"
+        --tensor-parallel-size 1
+        --data-parallel-size 1
+        --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
+        --max-model-len "$model_max_len"
+        --max-num-seqs "$MAX_NUM_SEQS_PER_REPLICA"
+        --limit-mm-per-prompt '{"image":1}'
+        --generation-config vllm
+        --trust-remote-code
+        --revision "$revision"
+      )
+      if [[ -n "$hf_overrides" ]]; then
+        replica_command+=(--hf-overrides "$hf_overrides")
+      fi
+      setsid env \
+        HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+        HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+        HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
+        HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+        HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
+        HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" TOKENIZERS_PARALLELISM=false \
+        CUDA_VISIBLE_DEVICES="$gpu" PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+        PYTHONUNBUFFERED=1 \
+        "${server_environment[@]}" \
+        "${replica_command[@]}" >"$replica_log" 2>&1 &
+      replica_pid=$!
+      INDEPENDENT_SERVER_PIDS+=("$replica_pid")
+      INDEPENDENT_SERVER_PORTS+=("$replica_port")
+      INDEPENDENT_SERVER_LOGS+=("$replica_log")
+      endpoint="http://127.0.0.1:$replica_port/v1"
+      SERVER_ENDPOINTS+="${SERVER_ENDPOINTS:+,}$endpoint"
+      log "Started independent replica $replica on GPU $gpu, port $replica_port, PID $replica_pid"
+    done
+
+    local elapsed=0 ready_count latest
+    while (( elapsed < MODEL_START_TIMEOUT_SECONDS )); do
+      ready_count=0
+      for replica in "${!INDEPENDENT_SERVER_PIDS[@]}"; do
+        replica_pid="${INDEPENDENT_SERVER_PIDS[$replica]}"
+        replica_port="${INDEPENDENT_SERVER_PORTS[$replica]}"
+        replica_log="${INDEPENDENT_SERVER_LOGS[$replica]}"
+        if ! kill -0 "$replica_pid" 2>/dev/null; then
+          printf 'Independent replica %s exited during startup. Last log lines:\n' "$replica" >&2
+          tail -n 80 "$replica_log" >&2 || true
+          stop_server
+          return 1
+        fi
+        if curl -fsS "http://127.0.0.1:$replica_port/health" >/dev/null 2>&1 \
+          && server_serves_model "$request_model" "$replica_port"; then
+          ready_count=$((ready_count + 1))
+        fi
+      done
+      if (( ready_count == DATA_PARALLEL_SIZE )); then
+        log "All $ready_count independent replicas are ready and serve request model $request_model"
+        return 0
+      fi
+      sleep 5
+      elapsed=$((elapsed + 5))
+      if (( elapsed % 60 == 0 )); then
+        latest="$(tail -c 16384 "${INDEPENDENT_SERVER_LOGS[0]}" 2>/dev/null | tr '\r' '\n' | awk 'NF { line = $0 } END { print line }')" || true
+        log "Waiting for independent replicas ($ready_count/$DATA_PARALLEL_SIZE ready, ${elapsed}s elapsed)"
+        [[ -n "$latest" ]] && printf '  Latest replica-0 log: %.300s\n' "$latest"
+      fi
+    done
+    printf 'Independent replicas did not become ready within %s seconds.\n' "$MODEL_START_TIMEOUT_SECONDS" >&2
+    stop_server
+    return 1
+  fi
+
   local -a command=(
-    "$VLLM_BIN" serve "$model_id"
+    "$VLLM_BIN" serve "$model_source"
     --host 127.0.0.1
     --port "$PORT"
     --served-model-name "$model_id"
-    --revision "$revision"
     --dtype "$VLLM_DTYPE"
-    --kv-cache-dtype "$VLLM_KV_CACHE_DTYPE"
+    --kv-cache-dtype "$server_kv_cache_dtype"
     --tensor-parallel-size "$TENSOR_PARALLEL_SIZE"
+    --data-parallel-size "$DATA_PARALLEL_SIZE"
     --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION"
     --max-model-len "$model_max_len"
-    --max-num-seqs "$CONCURRENCY"
+    --max-num-seqs "$MAX_NUM_SEQS_PER_REPLICA"
     --limit-mm-per-prompt '{"image":1}'
     --generation-config vllm
     --trust-remote-code
   )
+  if [[ "$DISABLE_CUSTOM_ALL_REDUCE" == "1" ]]; then
+    command+=(--disable-custom-all-reduce)
+  fi
+  if [[ -n "$hf_overrides" ]]; then
+    command+=(--hf-overrides "$hf_overrides")
+  fi
+  if [[ "$model_source" == "$model_id" ]]; then
+    command+=(--revision "$revision")
+  fi
 
-  log "Starting $model_id at revision ${revision:0:12} (unquantized $VLLM_DTYPE, TP=$TENSOR_PARALLEL_SIZE)"
+  if [[ "$slug" == "phi4-multimodal" ]]; then
+    if [[ -z "$adapter_path" ]]; then
+      log "Resolving the pinned Phi-4 vision adapter"
+      if ! adapter_path="$(download_phi_vision_adapter "$model_id" "$revision" "$model_cache")"; then
+        printf 'Could not download the required Phi-4 vision adapter at revision %s.\n' "$revision" >&2
+        return 1
+      fi
+    fi
+    command+=(
+      --enable-lora
+      --max-lora-rank 320
+      --max-loras 1
+      --lora-modules "vision=$adapter_path"
+    )
+  fi
+
+  log "Starting $model_id from $(model_source_provider "$slug") revision ${source_revision:0:12} (unquantized $VLLM_DTYPE, TP=$TENSOR_PARALLEL_SIZE, DP=$DATA_PARALLEL_SIZE, concurrency=$CONCURRENCY, max sequences/replica=$MAX_NUM_SEQS_PER_REPLICA)"
   log "Model startup log: $SERVER_LOG"
   if command -v setsid >/dev/null; then
     setsid env \
-      HF_HOME="$model_cache" HF_TOKEN="${HF_TOKEN:-}" \
+      HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+      HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+      HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
       HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
       HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" TOKENIZERS_PARALLELISM=false \
-      CUDA_VISIBLE_DEVICES="$GPU_IDS" PYTHONUNBUFFERED=1 \
+      CUDA_VISIBLE_DEVICES="$GPU_IDS" PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+      PYTHONUNBUFFERED=1 \
+      "${server_environment[@]}" \
       "${command[@]}" >"$SERVER_LOG" 2>&1 &
     SERVER_OWNS_PROCESS_GROUP=1
   else
     env \
-      HF_HOME="$model_cache" HF_TOKEN="${HF_TOKEN:-}" \
+      HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+      HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+      HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
       HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
       HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" TOKENIZERS_PARALLELISM=false \
-      CUDA_VISIBLE_DEVICES="$GPU_IDS" PYTHONUNBUFFERED=1 \
+      CUDA_VISIBLE_DEVICES="$GPU_IDS" PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+      PYTHONUNBUFFERED=1 \
+      "${server_environment[@]}" \
       "${command[@]}" >"$SERVER_LOG" 2>&1 &
     SERVER_OWNS_PROCESS_GROUP=0
   fi
@@ -617,15 +1248,15 @@ start_server() {
       return 1
     fi
     if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
-      if server_serves_model "$model_id"; then
-        log "Model server is ready and serves $model_id"
+      if server_serves_model "$request_model"; then
+        log "Model server is ready and serves request model $request_model"
         return 0
       fi
       identity_mismatches=$((identity_mismatches + 1))
       if (( identity_mismatches >= 3 )); then
         served_models="$(server_model_names 2>/dev/null || printf '<unavailable>')"
-        printf 'Port %s is healthy but serves [%s], not %s. Another evaluation likely claimed the same PORT. Stop the conflicting runner, assign distinct PORT values, or use evaluation/run_visual_suite_multi_gpu.sh.\n' \
-          "$PORT" "$served_models" "$model_id" >&2
+        printf 'Port %s is healthy but serves [%s], not request model %s. Another evaluation likely claimed the same PORT or a required adapter failed to register. Stop the conflicting runner, assign distinct PORT values, or use evaluation/run_visual_suite_multi_gpu.sh.\n' \
+          "$PORT" "$served_models" "$request_model" >&2
         stop_server
         return 1
       fi
@@ -685,19 +1316,19 @@ PY
 
 runner_base_args() {
   local slug="$1" model_id="$2" track="$3" seed="$4"
-  local prompt_mode max_tokens temperature top_p chat_kwargs
+  local prompt_mode max_tokens stop_sequence temperature top_p chat_kwargs
   prompt_mode="$(track_prompt_mode "$track")"
-  max_tokens="$(track_max_tokens "$track")"
+  max_tokens="$(track_max_tokens "$slug" "$track")"
+  stop_sequence="$(track_stop_sequence "$track")"
   temperature="$(track_temperature "$track")"
   top_p="$(track_top_p "$track")"
   chat_kwargs="$(track_chat_kwargs "$slug" "$track")"
   RUNNER_ARGS=(
     --model "$model_id"
-    --endpoints "http://127.0.0.1:$PORT/v1"
+    --endpoints "${SERVER_ENDPOINTS:-http://127.0.0.1:$PORT/v1}"
     --api-key EMPTY
     --image-root "$DATASET_DIR"
     --prompt-mode "$prompt_mode"
-    --max-tokens "$max_tokens"
     --temperature "$temperature"
     --top-p "$top_p"
     --top-k "$SAMPLING_TOP_K"
@@ -710,10 +1341,116 @@ runner_base_args() {
     --max-retries 3
     --seed "$seed"
     --checkpoint-every "$CHECKPOINT_EVERY"
+    --max-final-answer-tokens "$FINAL_ANSWER_MAX_TOKENS"
   )
+  if [[ -n "$max_tokens" ]]; then
+    RUNNER_ARGS+=(--max-tokens "$max_tokens")
+  fi
+  if [[ -n "$stop_sequence" ]]; then
+    RUNNER_ARGS+=(--stop "$stop_sequence" --include-stop-str-in-output)
+  fi
   if [[ "$chat_kwargs" != "{}" ]]; then
     RUNNER_ARGS+=(--chat-template-kwargs "$chat_kwargs")
   fi
+}
+
+run_answer_extraction() {
+  local slug="$1" model_id="$2" track="$3" questions="$4" output="$5" diagnostics="$6"
+  local module source
+  local -a source_args=()
+  module="$(track_module "$track")"
+  [[ -f "$diagnostics" ]] || {
+    printf 'Evaluation failed: %s/%s has no diagnostics to extract from: %s\n' \
+      "$slug" "$track" "$diagnostics" >&2
+    return 1
+  }
+  for source in "${diagnostics%/*}/${track}.attempt-"*.diagnostics.jsonl; do
+    if [[ -f "$source" ]]; then
+      source_args+=(--extraction-source-diagnostics "$source")
+    fi
+  done
+  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
+  log "Extracting existing unparseable $slug/$track answers with the same served model (text only, seed=$ANSWER_EXTRACTOR_SEED)"
+  "$PYTHON_BIN" -m "$module" \
+    "${RUNNER_ARGS[@]}" \
+    --questions "$questions" \
+    --resume \
+    --extract-unparseable-only \
+    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
+    "${source_args[@]}" \
+    --out "$output" \
+    --diagnostics "$diagnostics" \
+    && validate_submission "$output" "$questions"
+}
+
+finalize_raw_outputs() {
+  local slug="$1" model_id="$2" track="$3" questions="$4" output="$5" diagnostics="$6"
+  local module
+  module="$(track_module "$track")"
+  [[ -f "$diagnostics" ]] || return 1
+  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
+  log "Finalizing $slug/$track with exact faulty model outputs after strict recovery was exhausted"
+  "$PYTHON_BIN" -m "$module" \
+    "${RUNNER_ARGS[@]}" \
+    --questions "$questions" \
+    --finalize-existing-diagnostics \
+    --raw-output-fallback \
+    --out "$output" \
+    --diagnostics "$diagnostics" \
+    && validate_submission "$output" "$questions"
+}
+
+run_smoke_answer_extraction() {
+  local slug="$1" model_id="$2" track="$3" questions="$4" diagnostics="$5"
+  local module source
+  local -a source_args=()
+  module="$(track_module "$track")"
+  [[ -f "$diagnostics" ]] || return 1
+  for source in "${diagnostics%/*}/${track}.smoke.attempt-"*.diagnostics.jsonl; do
+    if [[ -f "$source" ]]; then
+      source_args+=(--extraction-source-diagnostics "$source")
+    fi
+  done
+  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
+  log "Extracting unparseable $slug/$track smoke answers with the same served model (text only, seed=$ANSWER_EXTRACTOR_SEED)"
+  "$PYTHON_BIN" -m "$module" \
+    "${RUNNER_ARGS[@]}" \
+    --questions "$questions" \
+    --limit "$SMOKE_SAMPLES" \
+    --strict-partial \
+    --resume \
+    --extract-unparseable-only \
+    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
+    "${source_args[@]}" \
+    --diagnostics "$diagnostics"
+}
+
+smoke_outputs_are_complete() {
+  local questions="$1" diagnostics="$2"
+  "$PYTHON_BIN" - "$questions" "$diagnostics" "$SMOKE_SAMPLES" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+questions_path = Path(sys.argv[1])
+diagnostics_path = Path(sys.argv[2])
+limit = int(sys.argv[3])
+expected = [
+    str(json.loads(line)["question_id"])
+    for line in questions_path.read_text(encoding="utf-8").splitlines()
+    if line.strip()
+][:limit]
+rows = [
+    json.loads(line)
+    for line in diagnostics_path.read_text(encoding="utf-8").splitlines()
+    if line.strip()
+]
+ids = [str(row.get("question_id") or "") for row in rows]
+if ids != expected or len(ids) != len(set(ids)):
+    raise SystemExit(1)
+if any(row.get("error") or not str(row.get("output") or "").strip() for row in rows):
+    raise SystemExit(1)
+PY
 }
 
 run_track() {
@@ -737,36 +1474,58 @@ run_track() {
   elif [[ -f "$output" ]]; then
     mv -- "$output" "$output.invalid.$(date -u '+%Y%m%dT%H%M%SZ')"
   fi
+  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
+    run_answer_extraction "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"
+    return
+  fi
 
   runner_base_args "$slug" "$model_id" "$track" "$BASE_SEED"
-  rm -f -- "$smoke_diagnostics"
   smoke_passed=0
-  for ((attempt = 1; attempt <= MAX_EVAL_ATTEMPTS; attempt++)); do
-    seed=$((BASE_SEED + attempt - 1))
-    runner_base_args "$slug" "$model_id" "$track" "$seed"
-    log "Running strict $SMOKE_SAMPLES-sample smoke test for $slug/$track, pass $attempt/$MAX_EVAL_ATTEMPTS (seed=$seed)"
-    smoke_args=(
-      "${RUNNER_ARGS[@]}"
-      --questions "$questions"
-      --limit "$SMOKE_SAMPLES"
-      --strict-partial
-      --diagnostics "$smoke_diagnostics"
-    )
-    if (( attempt > 1 )); then
-      smoke_args+=(--resume)
-    fi
-    if "$PYTHON_BIN" -m "$module" "${smoke_args[@]}"; then
+  if [[ "$FORCE" != "1" && -f "$smoke_diagnostics" ]]; then
+    log "Resuming the saved $slug/$track smoke checkpoint with text-only answer extraction"
+    if run_smoke_answer_extraction \
+      "$slug" "$model_id" "$track" "$questions" "$smoke_diagnostics"; then
       smoke_passed=1
-      break
     fi
-    if [[ -f "$smoke_diagnostics" ]]; then
-      cp -- "$smoke_diagnostics" "$model_dir/${track}.smoke.attempt-${attempt}.diagnostics.jsonl"
-    fi
-    if (( attempt < MAX_EVAL_ATTEMPTS )); then
-      log "Smoke pass $attempt left failed or unparseable samples; retrying only those samples with seed $((seed + 1))"
-      sleep 15
-    fi
-  done
+  fi
+  if [[ "$smoke_passed" != "1" ]]; then
+    rm -f -- "$smoke_diagnostics"
+    for ((attempt = 1; attempt <= MAX_EVAL_ATTEMPTS; attempt++)); do
+      seed=$((BASE_SEED + attempt - 1))
+      runner_base_args "$slug" "$model_id" "$track" "$seed"
+      log "Running strict $SMOKE_SAMPLES-sample smoke test for $slug/$track, pass $attempt/$MAX_EVAL_ATTEMPTS (seed=$seed)"
+      smoke_args=(
+        "${RUNNER_ARGS[@]}"
+        --questions "$questions"
+        --limit "$SMOKE_SAMPLES"
+        --strict-partial
+        --diagnostics "$smoke_diagnostics"
+      )
+      if (( attempt > 1 )); then
+        smoke_args+=(--resume)
+      fi
+      if "$PYTHON_BIN" -m "$module" "${smoke_args[@]}"; then
+        smoke_passed=1
+        break
+      fi
+      if [[ -f "$smoke_diagnostics" ]]; then
+        cp -- "$smoke_diagnostics" "$model_dir/${track}.smoke.attempt-${attempt}.diagnostics.jsonl"
+      fi
+      if (( attempt < MAX_EVAL_ATTEMPTS )); then
+        log "Smoke pass $attempt left failed or unparseable samples; retrying only those samples with seed $((seed + 1))"
+        sleep 15
+      fi
+    done
+  fi
+  if [[ "$smoke_passed" != "1" ]] && run_smoke_answer_extraction \
+    "$slug" "$model_id" "$track" "$questions" "$smoke_diagnostics"; then
+    smoke_passed=1
+  fi
+  if [[ "$smoke_passed" != "1" && "$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" == "1" ]] \
+    && smoke_outputs_are_complete "$questions" "$smoke_diagnostics"; then
+    log "Accepting $slug/$track smoke with complete nonempty raw outputs after strict recovery was exhausted"
+    smoke_passed=1
+  fi
   if [[ "$smoke_passed" != "1" ]]; then
     printf 'Evaluation failed: %s/%s smoke test still has failed or unparseable outputs after %s passes. Raw responses remain in %s. The full evaluation was not started.\n' \
       "$slug" "$track" "$MAX_EVAL_ATTEMPTS" "$smoke_diagnostics" >&2
@@ -799,7 +1558,17 @@ run_track() {
     fi
   done
 
-  printf 'Evaluation failed: %s/%s still has missing, failed, or unparseable outputs after %s passes. Raw responses remain in %s. No submission file was finalized.\n' \
+  if run_answer_extraction "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"; then
+    rm -f -- "$smoke_diagnostics"
+    return 0
+  fi
+
+  if finalize_raw_outputs "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"; then
+    rm -f -- "$smoke_diagnostics"
+    return 0
+  fi
+
+  printf 'Evaluation failed: %s/%s still has missing, failed, or empty outputs after %s visual passes, same-model text extraction, and exact raw-output finalization. Raw responses remain in %s. No submission file was finalized.\n' \
     "$slug" "$track" "$MAX_EVAL_ATTEMPTS" "$diagnostics" >&2
   return 1
 }
@@ -817,25 +1586,52 @@ completed_tracks() {
 
 ensure_run_config() {
   local slug="$1" model_id="$2" revision="$3" loading="$4" model_max_len="$5"
+  resolve_max_num_seqs_per_replica
   mkdir -p "$OUTPUT_ROOT/$slug"
   RUN_CONFIG_PATH="$OUTPUT_ROOT/$slug/.run_config.json" \
   RUN_CONFIG_MODEL_ID="$model_id" RUN_CONFIG_REVISION="$revision" \
   RUN_CONFIG_LOADING="$loading" RUN_CONFIG_MODEL_MAX_LEN="$model_max_len" \
   RUN_CONFIG_DTYPE="$VLLM_DTYPE" RUN_CONFIG_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" \
-  RUN_CONFIG_TP_SIZE="$TENSOR_PARALLEL_SIZE" \
+  RUN_CONFIG_TP_SIZE="$TENSOR_PARALLEL_SIZE" RUN_CONFIG_DP_SIZE="$DATA_PARALLEL_SIZE" \
+  RUN_CONFIG_CONCURRENCY="$CONCURRENCY" RUN_CONFIG_MAX_NUM_SEQS="$MAX_NUM_SEQS_PER_REPLICA" \
+  RUN_CONFIG_GPU_MEMORY_UTILIZATION="$GPU_MEMORY_UTILIZATION" \
+  RUN_CONFIG_DISABLE_CUSTOM_ALL_REDUCE="$DISABLE_CUSTOM_ALL_REDUCE" \
+  RUN_CONFIG_SERVING_REPLICA_MODE="$SERVING_REPLICA_MODE" \
+  RUN_CONFIG_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+  RUN_CONFIG_REASONING_PROFILE="$(model_reasoning_profile "$slug")" \
+  RUN_CONFIG_FINAL_ANSWER_MAX_TOKENS="$FINAL_ANSWER_MAX_TOKENS" \
+  RUN_CONFIG_ANSWER_EXTRACTION_METHOD="$ANSWER_EXTRACTION_METHOD_ID" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS="$ANSWER_EXTRACTOR_MAX_TOKENS" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_SEED="$ANSWER_EXTRACTOR_SEED" \
+  RUN_CONFIG_REQUEST_MODEL="$(model_request_name "$slug" "$model_id")" \
+  RUN_CONFIG_SOURCE_PROVIDER="$(model_source_provider "$slug")" \
+  RUN_CONFIG_SOURCE_REPO_ID="$(model_source_repo_id "$slug" "$model_id")" \
+  RUN_CONFIG_SOURCE_REVISION="$(model_source_revision "$slug" "$revision")" \
+  RUN_CONFIG_SOURCE_OBJECTS="$(model_source_objects "$slug")" \
+  RUN_CONFIG_ADAPTER_NAME="$(model_adapter_name "$slug")" \
+  RUN_CONFIG_ADAPTER_SOURCE="$(model_adapter_source "$slug")" \
+  RUN_CONFIG_ADAPTER_REVISION="$(model_source_revision "$slug" "$revision")" \
   RUN_CONFIG_PROJECT_ROOT="$PROJECT_ROOT" RUN_CONFIG_DATASET_REPO_ID="$DATASET_REPO_ID" \
   RUN_CONFIG_DATASET_REVISION="$DATASET_REVISION" RUN_CONFIG_VLLM_VERSION="$VLLM_VERSION" \
+  RUN_CONFIG_VLLM_ENGINE_MODE="$(model_vllm_engine_mode "$slug")" \
+  RUN_CONFIG_SERVER_KV_CACHE_DTYPE="$(model_server_kv_cache_dtype "$slug")" \
   RUN_CONFIG_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
+  RUN_CONFIG_HF_OVERRIDES="$(model_hf_overrides "$slug")" \
   RUN_CONFIG_UNPARSEABLE_POLICY="$UNPARSEABLE_ANSWER_POLICY_ID" \
+  RUN_CONFIG_ALLOW_SMOKE_RAW_OUTPUT_FALLBACK="$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" \
   RUN_CONFIG_PIPELINE_REVISION="$PIPELINE_REVISION_ID" RUN_CONFIG_MAX_ATTEMPTS="$MAX_EVAL_ATTEMPTS" \
   RUN_CONFIG_BASE_SEED="$BASE_SEED" RUN_CONFIG_FORCE="$FORCE" \
   RUN_CONFIG_TOP_K="$SAMPLING_TOP_K" RUN_CONFIG_MIN_P="$SAMPLING_MIN_P" \
   RUN_CONFIG_PRESENCE_PENALTY="$PRESENCE_PENALTY" RUN_CONFIG_FREQUENCY_PENALTY="$FREQUENCY_PENALTY" \
   RUN_CONFIG_REPETITION_PENALTY="$REPETITION_PENALTY" \
-  RUN_CONFIG_DYS_PROMPT_MODE="$DYS_PROMPT_MODE" RUN_CONFIG_DYS_MAX_TOKENS="$DYS_MAX_TOKENS" \
+  RUN_CONFIG_DYS_PROMPT_MODE="$DYS_PROMPT_MODE" RUN_CONFIG_DYS_MAX_TOKENS="$(track_max_tokens "$slug" do_you_see_me)" \
+  RUN_CONFIG_DYS_MAX_TOKENS_POLICY="$(track_max_tokens_policy "$slug" do_you_see_me)" \
+  RUN_CONFIG_DYS_STOP_SEQUENCE="$(track_stop_sequence do_you_see_me)" \
   RUN_CONFIG_DYS_TEMPERATURE="$DYS_TEMPERATURE" RUN_CONFIG_DYS_TOP_P="$DYS_TOP_P" \
   RUN_CONFIG_DYS_CHAT_KWARGS="$(track_chat_kwargs "$slug" do_you_see_me)" \
-  RUN_CONFIG_ME_PROMPT_MODE="$MINDS_EYE_PROMPT_MODE" RUN_CONFIG_ME_MAX_TOKENS="$MINDS_EYE_MAX_TOKENS" \
+  RUN_CONFIG_ME_PROMPT_MODE="$MINDS_EYE_PROMPT_MODE" RUN_CONFIG_ME_MAX_TOKENS="$(track_max_tokens "$slug" minds_eye)" \
+  RUN_CONFIG_ME_MAX_TOKENS_POLICY="$(track_max_tokens_policy "$slug" minds_eye)" \
+  RUN_CONFIG_ME_STOP_SEQUENCE="$(track_stop_sequence minds_eye)" \
   RUN_CONFIG_ME_TEMPERATURE="$MINDS_EYE_TEMPERATURE" RUN_CONFIG_ME_TOP_P="$MINDS_EYE_TOP_P" \
   RUN_CONFIG_ME_CHAT_KWARGS="$(track_chat_kwargs "$slug" minds_eye)" \
   "$PYTHON_BIN" - <<'PY'
@@ -848,12 +1644,32 @@ path = Path(os.environ["RUN_CONFIG_PATH"])
 root = Path(os.environ["RUN_CONFIG_PROJECT_ROOT"])
 
 def sha256(file_path: Path) -> str:
-    return hashlib.sha256(file_path.read_bytes()).hexdigest()
+  digest = hashlib.sha256()
+  with file_path.open("rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+      digest.update(chunk)
+  return digest.hexdigest()
 
 def protocol(prefix: str, track: str) -> dict:
+    raw_max_tokens = os.environ[f"RUN_CONFIG_{prefix}_MAX_TOKENS"]
+    max_tokens = int(raw_max_tokens) if raw_max_tokens else None
+    final_answer_max_tokens = int(os.environ["RUN_CONFIG_FINAL_ANSWER_MAX_TOKENS"])
+    needs_separate_answer_check = (
+        max_tokens is None or max_tokens > final_answer_max_tokens
+    )
+    stop_sequence = os.environ[f"RUN_CONFIG_{prefix}_STOP_SEQUENCE"]
     return {
         "prompt_mode": os.environ[f"RUN_CONFIG_{prefix}_PROMPT_MODE"],
-        "max_tokens": int(os.environ[f"RUN_CONFIG_{prefix}_MAX_TOKENS"]),
+        "max_tokens": max_tokens,
+        "max_tokens_policy": os.environ[f"RUN_CONFIG_{prefix}_MAX_TOKENS_POLICY"],
+          "final_answer_max_tokens": final_answer_max_tokens,
+          "final_answer_token_enforcement": (
+            "post-extraction-served-model-tokenizer"
+            if needs_separate_answer_check
+            else "total-completion-cap"
+          ),
+        "stop_sequences": [stop_sequence] if stop_sequence else [],
+        "include_stop_str_in_output": bool(stop_sequence),
         "temperature": float(os.environ[f"RUN_CONFIG_{prefix}_TEMPERATURE"]),
         "top_p": float(os.environ[f"RUN_CONFIG_{prefix}_TOP_P"]),
         "top_k": int(os.environ["RUN_CONFIG_TOP_K"]),
@@ -869,14 +1685,49 @@ def protocol(prefix: str, track: str) -> dict:
     }
 
 desired = {
-    "schema_version": 4,
+  "schema_version": 10,
     "model_id": os.environ["RUN_CONFIG_MODEL_ID"],
     "model_revision": os.environ["RUN_CONFIG_REVISION"],
-    "serving_engine": {"name": "vllm", "version": os.environ["RUN_CONFIG_VLLM_VERSION"]},
+    "reasoning_profile": os.environ["RUN_CONFIG_REASONING_PROFILE"],
+  "checkpoint_source": {
+    "provider": os.environ["RUN_CONFIG_SOURCE_PROVIDER"],
+    "repo_id": os.environ["RUN_CONFIG_SOURCE_REPO_ID"],
+    "revision": os.environ["RUN_CONFIG_SOURCE_REVISION"],
+    "object_sha256": json.loads(os.environ["RUN_CONFIG_SOURCE_OBJECTS"]),
+  },
+    "serving_engine": {
+        "name": "vllm",
+        "version": os.environ["RUN_CONFIG_VLLM_VERSION"],
+        "engine_mode": os.environ["RUN_CONFIG_VLLM_ENGINE_MODE"],
+        "request_model": os.environ["RUN_CONFIG_REQUEST_MODEL"],
+      "kv_cache_cli_value": os.environ["RUN_CONFIG_SERVER_KV_CACHE_DTYPE"],
+      "max_num_seqs_per_replica": int(os.environ["RUN_CONFIG_MAX_NUM_SEQS"]),
+      "gpu_memory_utilization": float(
+        os.environ["RUN_CONFIG_GPU_MEMORY_UTILIZATION"]
+      ),
+      "cuda_allocator_config": os.environ["RUN_CONFIG_CUDA_ALLOC_CONF"],
+      **(
+        {"disable_custom_all_reduce": True}
+        if os.environ["RUN_CONFIG_DISABLE_CUSTOM_ALL_REDUCE"] == "1"
+        else {}
+      ),
+      **(
+        {"replica_mode": "independent-processes"}
+        if os.environ["RUN_CONFIG_SERVING_REPLICA_MODE"] == "independent"
+        else {}
+      ),
+      **(
+        {"hf_overrides": json.loads(os.environ["RUN_CONFIG_HF_OVERRIDES"])}
+        if os.environ["RUN_CONFIG_HF_OVERRIDES"]
+        else {}
+      ),
+    },
     "weight_loading": os.environ["RUN_CONFIG_LOADING"],
     "compute_dtype": os.environ["RUN_CONFIG_DTYPE"],
     "kv_cache_dtype": os.environ["RUN_CONFIG_KV_CACHE_DTYPE"],
     "tensor_parallel_size": int(os.environ["RUN_CONFIG_TP_SIZE"]),
+    "data_parallel_size": int(os.environ["RUN_CONFIG_DP_SIZE"]),
+    "request_concurrency": int(os.environ["RUN_CONFIG_CONCURRENCY"]),
     "max_model_len": int(os.environ["RUN_CONFIG_MODEL_MAX_LEN"]),
     "dataset": {
         "repo_id": os.environ["RUN_CONFIG_DATASET_REPO_ID"],
@@ -889,8 +1740,48 @@ desired = {
         "format_retry_attempts": int(os.environ["RUN_CONFIG_MAX_ATTEMPTS"]),
     },
     "image_preprocessing": "original-bytes-no-runner-resize-or-recompression",
-    "answer_extraction": "strict-local-final-answer-parser",
-    "unparseable_answers": {"policy": os.environ["RUN_CONFIG_UNPARSEABLE_POLICY"]},
+    "answer_extraction": {
+      "local_parser": "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
+      "fallback": {
+        "method": os.environ["RUN_CONFIG_ANSWER_EXTRACTION_METHOD"],
+        "model": os.environ["RUN_CONFIG_REQUEST_MODEL"],
+        "input_fields": ["question", "answer_type", "candidate_response"],
+        "image_supplied": False,
+        "ground_truth_supplied": False,
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "seed": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_SEED"]),
+        "max_tokens": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS"]),
+        "stop_sequences": ["</answer>"],
+        "include_stop_str_in_output": True,
+        "support_validation": "answer-must-be-stated-in-candidate-response",
+        "source_order": "current-then-archived-attempts-in-ascending-attempt-number",
+        "source_deduplication": "candidate-response-utf8-sha256",
+        "source_provenance": ["diagnostics_filename", "candidate-response-utf8-sha256"],
+        "judge_attempt_history": "preserved",
+        "applies_after": ["smoke_visual_retries", "full_visual_retries"],
+      },
+    },
+    "unparseable_answers": {
+      "policy": os.environ["RUN_CONFIG_UNPARSEABLE_POLICY"],
+      "final_fallback": {
+        "applies_after": ["full_visual_retries", "same_model_text_extraction"],
+        "eligible_records": "complete-nonerror-nonempty-output",
+        "source_field": "diagnostics.output",
+        "transformation": "none",
+      },
+      **(
+        {
+          "smoke_admission": {
+            "applies_after": ["smoke_visual_retries", "same_model_text_extraction"],
+            "eligible_records": "complete-nonerror-nonempty-output",
+            "canonical_output_effect": "none",
+          }
+        }
+        if os.environ["RUN_CONFIG_ALLOW_SMOKE_RAW_OUTPUT_FALLBACK"] == "1"
+        else {}
+      ),
+    },
     "pipeline_revision": os.environ["RUN_CONFIG_PIPELINE_REVISION"],
     "source_hashes": {
         "questions": {
@@ -903,9 +1794,746 @@ desired = {
         },
     },
 }
+adapter_name = os.environ["RUN_CONFIG_ADAPTER_NAME"]
+if adapter_name:
+    desired["adapter"] = {
+        "name": adapter_name,
+        "source": os.environ["RUN_CONFIG_ADAPTER_SOURCE"],
+        "revision": os.environ["RUN_CONFIG_ADAPTER_REVISION"],
+    }
 patch = os.environ["RUN_CONFIG_COMPATIBILITY_PATCH"]
 if patch:
     desired["compatibility_patches"] = [patch]
+
+def extraction_upgrade_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  for key in (
+    "schema_version",
+    "answer_extraction",
+    "unparseable_answers",
+    "pipeline_revision",
+    "artifact_migrations",
+  ):
+    invariant.pop(key, None)
+  invariant.get("source_hashes", {}).pop("runner", None)
+  serving_engine = invariant.get("serving_engine", {})
+  serving_engine.pop("max_num_seqs_per_replica", None)
+  serving_engine.pop("gpu_memory_utilization", None)
+  serving_engine.pop("cuda_allocator_config", None)
+  return invariant
+
+def is_supported_extraction_upgrade(existing: dict) -> bool:
+  return (
+    (
+      (existing.get("schema_version"), existing.get("pipeline_revision"))
+      in {
+        (7, "unquantized-bf16-model-generation-final-answer-caps-v7"),
+        (8, "unquantized-bf16-same-model-text-extraction-v8"),
+        (9, "unquantized-bf16-archived-text-extraction-v9"),
+      }
+    )
+    and desired.get("schema_version") == 10
+    and desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and extraction_upgrade_invariants(existing)
+    == extraction_upgrade_invariants(desired)
+  )
+
+def serving_resource_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  serving_engine = invariant.get("serving_engine", {})
+  serving_engine.pop("max_num_seqs_per_replica", None)
+  serving_engine.pop("gpu_memory_utilization", None)
+  serving_engine.pop("cuda_allocator_config", None)
+  return invariant
+
+def is_supported_serving_resource_upgrade(existing: dict) -> bool:
+  serving_engine = existing.get("serving_engine", {})
+  return (
+    existing.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and not {
+      "max_num_seqs_per_replica",
+      "gpu_memory_utilization",
+      "cuda_allocator_config",
+    }.intersection(serving_engine)
+    and serving_resource_invariants(existing)
+    == serving_resource_invariants(desired)
+  )
+
+def local_parser_upgrade_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  invariant.get("answer_extraction", {}).pop("local_parser", None)
+  invariant.get("source_hashes", {}).get("runner", {}).pop(
+    "visual_pipeline", None
+  )
+  return invariant
+
+def is_supported_local_parser_upgrade(existing: dict) -> bool:
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("answer_extraction", {}).get("local_parser")
+    in {
+      "strict-local-final-answer-parser-v2-number-words-zero-through-twenty",
+      "strict-local-final-answer-parser-v3-number-words-and-explicit-odd-figure",
+      "strict-local-final-answer-parser-v4-innermost-glm-box",
+    }
+    and desired.get("answer_extraction", {}).get("local_parser")
+    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    and local_parser_upgrade_invariants(existing)
+    == local_parser_upgrade_invariants(desired)
+  )
+
+def raw_output_finalization_upgrade_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  invariant.pop("unparseable_answers", None)
+  invariant.get("answer_extraction", {}).pop("local_parser", None)
+  invariant.get("source_hashes", {}).pop("runner", None)
+  return invariant
+
+def is_supported_raw_output_finalization_upgrade(existing: dict) -> bool:
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("unparseable_answers", {}).get("policy")
+    == "deterministic-smoke-and-full-visual-retries-then-text-extraction-v4"
+    and desired.get("unparseable_answers", {}).get("policy")
+    == "deterministic-retries-text-extraction-then-exact-raw-output-v5"
+    and existing.get("answer_extraction", {}).get("local_parser")
+    in {
+      "strict-local-final-answer-parser-v3-number-words-and-explicit-odd-figure",
+      "strict-local-final-answer-parser-v4-innermost-glm-box",
+      "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
+    }
+    and desired.get("answer_extraction", {}).get("local_parser")
+    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    and raw_output_finalization_upgrade_invariants(existing)
+    == raw_output_finalization_upgrade_invariants(desired)
+  )
+
+def smoke_admission_upgrade_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  invariant.get("unparseable_answers", {}).pop("smoke_admission", None)
+  return invariant
+
+def is_supported_smoke_admission_upgrade(existing: dict) -> bool:
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision") == desired.get("pipeline_revision")
+    and existing.get("model_id")
+    == desired.get("model_id")
+    == "moonshotai/Kimi-VL-A3B-Instruct"
+    and "smoke_admission" not in existing.get("unparseable_answers", {})
+    and desired.get("unparseable_answers", {}).get("smoke_admission")
+    == {
+      "applies_after": ["smoke_visual_retries", "same_model_text_extraction"],
+      "eligible_records": "complete-nonerror-nonempty-output",
+      "canonical_output_effect": "none",
+    }
+    and smoke_admission_upgrade_invariants(existing)
+    == smoke_admission_upgrade_invariants(desired)
+  )
+
+def glm_extended_retry_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  invariant.get("generation", {}).pop("format_retry_attempts", None)
+  invariant.get("answer_extraction", {}).pop("local_parser", None)
+  invariant.get("source_hashes", {}).get("runner", {}).pop(
+    "visual_pipeline", None
+  )
+  return invariant
+
+def is_supported_glm_extended_retry(existing: dict) -> bool:
+  model_dir = path.parent
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("model_id")
+    == desired.get("model_id")
+    == "zai-org/GLM-4.6V-Flash"
+    and (model_dir / "minds_eye.diagnostics.jsonl").is_file()
+    and not list(model_dir.glob("*_submission.jsonl"))
+    and existing.get("generation", {}).get("format_retry_attempts") == 3
+    and desired.get("generation", {}).get("format_retry_attempts") == 6
+    and existing.get("answer_extraction", {}).get("local_parser")
+    in {
+      "strict-local-final-answer-parser-v3-number-words-and-explicit-odd-figure",
+      "strict-local-final-answer-parser-v4-innermost-glm-box",
+      "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
+    }
+    and desired.get("answer_extraction", {}).get("local_parser")
+    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    and glm_extended_retry_invariants(existing)
+    == glm_extended_retry_invariants(desired)
+  )
+
+def completion_cap_recovery_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  for key in (
+    "tensor_parallel_size",
+    "data_parallel_size",
+    "request_concurrency",
+  ):
+    invariant.pop(key, None)
+  serving_engine = invariant.get("serving_engine", {})
+  for key in (
+    "max_num_seqs_per_replica",
+    "gpu_memory_utilization",
+    "cuda_allocator_config",
+  ):
+    serving_engine.pop(key, None)
+  for track in ("do_you_see_me", "minds_eye"):
+    generation = invariant.get("generation", {}).get(track, {})
+    for key in (
+      "max_tokens",
+      "max_tokens_policy",
+      "final_answer_token_enforcement",
+    ):
+      generation.pop(key, None)
+  return invariant
+
+def glm_completion_recovery_invariants(config: dict) -> dict:
+  invariant = completion_cap_recovery_invariants(config)
+  invariant.get("generation", {}).pop("base_seed", None)
+  return invariant
+
+def completion_protocol_matches(
+  config: dict,
+  *,
+  max_tokens: int,
+  policy: str,
+  enforcement: str,
+) -> bool:
+  return all(
+    config.get("generation", {}).get(track, {}).get("max_tokens") == max_tokens
+    and config["generation"][track].get("max_tokens_policy") == policy
+    and config["generation"][track].get("final_answer_max_tokens") == 200
+    and config["generation"][track].get("final_answer_token_enforcement")
+    == enforcement
+    for track in ("do_you_see_me", "minds_eye")
+  )
+
+def is_supported_completion_cap_recovery(existing: dict) -> bool:
+  model_dir = path.parent
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("model_id")
+    == desired.get("model_id")
+    == "Qwen/Qwen2.5-VL-7B-Instruct"
+    and (model_dir / "minds_eye.diagnostics.jsonl").is_file()
+    and not list(model_dir.glob("*_submission.jsonl"))
+    and not (model_dir / "do_you_see_me.diagnostics.jsonl").exists()
+    and completion_protocol_matches(
+      existing,
+      max_tokens=200,
+      policy="explicit-total-completion-cap",
+      enforcement="total-completion-cap",
+    )
+    and completion_protocol_matches(
+      desired,
+      max_tokens=8192,
+      policy="explicit-model-completion-cap",
+      enforcement="post-extraction-served-model-tokenizer",
+    )
+    and completion_cap_recovery_invariants(existing)
+    == completion_cap_recovery_invariants(desired)
+  )
+
+def gemma_completion_cap_recovery_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  generation = invariant.get("generation", {}).get("minds_eye", {})
+  for key in (
+    "max_tokens",
+    "max_tokens_policy",
+    "final_answer_token_enforcement",
+  ):
+    generation.pop(key, None)
+  return invariant
+
+def is_supported_gemma_completion_cap_recovery(existing: dict) -> bool:
+  model_dir = path.parent
+  dys_diagnostics = model_dir / "do_you_see_me.diagnostics.jsonl"
+  dys_submission = model_dir / "do_you_see_me_submission.jsonl"
+  smoke_files = list(model_dir.glob("minds_eye.smoke*.diagnostics.jsonl"))
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("model_id")
+    == desired.get("model_id")
+    == "google/gemma-3-12b-it"
+    and dys_diagnostics.is_file()
+    and dys_submission.is_file()
+    and smoke_files
+    and not (model_dir / "minds_eye.diagnostics.jsonl").exists()
+    and not (model_dir / "minds_eye_submission.jsonl").exists()
+    and existing.get("generation", {}).get("do_you_see_me")
+    == desired.get("generation", {}).get("do_you_see_me")
+    and existing.get("generation", {}).get("minds_eye", {}).get("max_tokens")
+    == 200
+    and existing["generation"]["minds_eye"].get("max_tokens_policy")
+    == "explicit-total-completion-cap"
+    and existing["generation"]["minds_eye"].get(
+      "final_answer_token_enforcement"
+    ) == "total-completion-cap"
+    and desired.get("generation", {}).get("minds_eye", {}).get("max_tokens")
+    == 8192
+    and desired["generation"]["minds_eye"].get("max_tokens_policy")
+    == "explicit-model-completion-cap"
+    and desired["generation"]["minds_eye"].get(
+      "final_answer_token_enforcement"
+    ) == "post-extraction-served-model-tokenizer"
+    and gemma_completion_cap_recovery_invariants(existing)
+    == gemma_completion_cap_recovery_invariants(desired)
+  )
+
+def is_supported_glm_completion_recovery(existing: dict) -> bool:
+  model_dir = path.parent
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("model_id")
+    == desired.get("model_id")
+    == "zai-org/GLM-4.6V-Flash"
+    and (model_dir / "do_you_see_me.diagnostics.jsonl").is_file()
+    and not list(model_dir.glob("*_submission.jsonl"))
+    and not (model_dir / "minds_eye.diagnostics.jsonl").exists()
+    and existing.get("generation", {}).get("base_seed") == 0
+    and desired.get("generation", {}).get("base_seed") == 3
+    and completion_protocol_matches(
+      existing,
+      max_tokens=200,
+      policy="explicit-total-completion-cap",
+      enforcement="total-completion-cap",
+    )
+    and completion_protocol_matches(
+      desired,
+      max_tokens=8192,
+      policy="explicit-model-completion-cap",
+      enforcement="post-extraction-served-model-tokenizer",
+    )
+    and glm_completion_recovery_invariants(existing)
+    == glm_completion_recovery_invariants(desired)
+  )
+
+def serving_topology_resume_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  invariant.pop("artifact_migrations", None)
+  invariant.pop("data_parallel_size", None)
+  invariant.pop("request_concurrency", None)
+  return invariant
+
+def is_supported_serving_topology_resume(existing: dict) -> bool:
+  model_dir = path.parent
+  has_checkpoint = any(
+    (model_dir / f"{track}.diagnostics.jsonl").is_file()
+    for track in ("do_you_see_me", "minds_eye")
+  )
+  topology_changed = (
+    existing.get("data_parallel_size") != desired.get("data_parallel_size")
+    or existing.get("request_concurrency") != desired.get("request_concurrency")
+  )
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and has_checkpoint
+    and topology_changed
+    and not list(model_dir.glob("*_submission.jsonl"))
+    and serving_topology_resume_invariants(existing)
+    == serving_topology_resume_invariants(desired)
+  )
+
+def serving_protocol(config: dict) -> dict:
+  return {
+    "tensor_parallel_size": config["tensor_parallel_size"],
+    "data_parallel_size": config["data_parallel_size"],
+    "request_concurrency": config["request_concurrency"],
+    "max_num_seqs_per_replica": config["serving_engine"][
+      "max_num_seqs_per_replica"
+    ],
+    "gpu_memory_utilization": config["serving_engine"][
+      "gpu_memory_utilization"
+    ],
+    "cuda_allocator_config": config["serving_engine"][
+      "cuda_allocator_config"
+    ],
+  }
+
+def archive_completion_cap_recovery(existing: dict) -> dict:
+  model_dir = path.parent
+  diagnostics = model_dir / "minds_eye.diagnostics.jsonl"
+  diagnostics_archive = (
+    model_dir / "minds_eye.pre-completion-cap-recovery.diagnostics.jsonl"
+  )
+  diagnostics_bytes = diagnostics.read_bytes()
+  diagnostics_digest = hashlib.sha256(diagnostics_bytes).hexdigest()
+  if diagnostics_archive.exists():
+    if sha256(diagnostics_archive) != diagnostics_digest:
+      raise SystemExit(
+        f"Recovery archive differs from {diagnostics.name}: "
+        f"{diagnostics_archive.name}. Refusing to overwrite it."
+      )
+  else:
+    diagnostics_archive.write_bytes(diagnostics_bytes)
+
+  rows = [
+    json.loads(line)
+    for line in diagnostics_bytes.decode("utf-8").splitlines()
+    if line.strip()
+  ]
+  archived_attempts = []
+  for pattern in (
+    "minds_eye.attempt-*.diagnostics.jsonl",
+    "minds_eye.smoke.attempt-*.diagnostics.jsonl",
+  ):
+    for source in sorted(model_dir.glob(pattern)):
+      archived = model_dir / source.name.replace(
+        "minds_eye.", "minds_eye.pre-completion-cap-recovery.", 1
+      )
+      source_digest = sha256(source)
+      if archived.exists():
+        if sha256(archived) != source_digest:
+          raise SystemExit(
+            f"Recovery archive differs from {source.name}: "
+            f"{archived.name}. Refusing to overwrite it."
+          )
+        source.unlink()
+      else:
+        os.replace(source, archived)
+      archived_attempts.append(
+        {
+          "original_file": source.name,
+          "archived_file": archived.name,
+          "sha256": source_digest,
+        }
+      )
+
+  return {
+    "reason": "provenance-preserving-completion-cap-recovery",
+    "scope": "resume-valid-records-and-regenerate-only-unresolved",
+    "baseline_diagnostics": {
+      "file": diagnostics_archive.name,
+      "sha256": diagnostics_digest,
+      "row_count": len(rows),
+      "extractor_error_count": sum(bool(row.get("extractor_error")) for row in rows),
+    },
+    "archived_attempt_diagnostics": archived_attempts,
+    "previous_generation": existing["generation"]["minds_eye"],
+    "current_generation": desired["generation"]["minds_eye"],
+    "previous_serving": serving_protocol(existing),
+    "current_serving": serving_protocol(desired),
+  }
+
+def archive_gemma_completion_cap_recovery(existing: dict) -> dict:
+  model_dir = path.parent
+  completed_artifacts = {}
+  for filename in (
+    "do_you_see_me.diagnostics.jsonl",
+    "do_you_see_me_submission.jsonl",
+  ):
+    artifact = model_dir / filename
+    rows = [
+      json.loads(line)
+      for line in artifact.read_text(encoding="utf-8").splitlines()
+      if line.strip()
+    ]
+    if len(rows) != 4500:
+      raise SystemExit(
+        f"Completed Gemma DYS artifact has {len(rows)} rows instead of 4500: "
+        f"{artifact.name}"
+      )
+    completed_artifacts[filename] = {
+      "row_count": len(rows),
+      "sha256": sha256(artifact),
+    }
+
+  archived_smoke = []
+  for source in sorted(model_dir.glob("minds_eye.smoke*.diagnostics.jsonl")):
+    archived = model_dir / source.name.replace(
+      "minds_eye.", "minds_eye.pre-completion-cap-recovery.", 1
+    )
+    source_digest = sha256(source)
+    if archived.exists():
+      if sha256(archived) != source_digest:
+        raise SystemExit(
+          f"Recovery archive differs from {source.name}: {archived.name}. "
+          "Refusing to overwrite it."
+        )
+      source.unlink()
+    else:
+      os.replace(source, archived)
+    archived_smoke.append(
+      {
+        "original_file": source.name,
+        "archived_file": archived.name,
+        "sha256": source_digest,
+      }
+    )
+
+  return {
+    "reason": "provenance-preserving-gemma-minds-eye-completion-cap-recovery",
+    "scope": "preserve-completed-dys-and-rerun-minds-eye-smoke",
+    "completed_do_you_see_me_artifacts": completed_artifacts,
+    "archived_smoke_diagnostics": archived_smoke,
+    "previous_generation": existing["generation"]["minds_eye"],
+    "current_generation": desired["generation"]["minds_eye"],
+  }
+
+def archive_glm_completion_recovery(existing: dict) -> dict:
+  model_dir = path.parent
+  diagnostics = model_dir / "do_you_see_me.diagnostics.jsonl"
+  diagnostics_archive = (
+    model_dir / "do_you_see_me.pre-completion-cap-recovery.diagnostics.jsonl"
+  )
+  diagnostics_bytes = diagnostics.read_bytes()
+  diagnostics_digest = hashlib.sha256(diagnostics_bytes).hexdigest()
+  if diagnostics_archive.exists():
+    if sha256(diagnostics_archive) != diagnostics_digest:
+      raise SystemExit(
+        f"Recovery archive differs from {diagnostics.name}: "
+        f"{diagnostics_archive.name}. Refusing to overwrite it."
+      )
+  else:
+    diagnostics_archive.write_bytes(diagnostics_bytes)
+
+  rows = [
+    json.loads(line)
+    for line in diagnostics_bytes.decode("utf-8").splitlines()
+    if line.strip()
+  ]
+  archived_diagnostics = []
+  sources = [
+    *sorted(model_dir.glob("do_you_see_me.attempt-*.diagnostics.jsonl")),
+    *sorted(model_dir.glob("do_you_see_me.smoke.attempt-*.diagnostics.jsonl")),
+  ]
+  smoke = model_dir / "do_you_see_me.smoke.diagnostics.jsonl"
+  if smoke.is_file():
+    sources.append(smoke)
+  for source in sources:
+    archived = model_dir / source.name.replace(
+      "do_you_see_me.", "do_you_see_me.pre-completion-cap-recovery.", 1
+    )
+    source_digest = sha256(source)
+    if archived.exists():
+      if sha256(archived) != source_digest:
+        raise SystemExit(
+          f"Recovery archive differs from {source.name}: "
+          f"{archived.name}. Refusing to overwrite it."
+        )
+      source.unlink()
+    else:
+      os.replace(source, archived)
+    archived_diagnostics.append(
+      {
+        "original_file": source.name,
+        "archived_file": archived.name,
+        "sha256": source_digest,
+      }
+    )
+
+  return {
+    "reason": "provenance-preserving-completion-and-seed-recovery",
+    "scope": "resume-valid-records-and-regenerate-only-unresolved",
+    "baseline_diagnostics": {
+      "file": diagnostics_archive.name,
+      "sha256": diagnostics_digest,
+      "row_count": len(rows),
+      "extractor_error_count": sum(bool(row.get("extractor_error")) for row in rows),
+    },
+    "archived_diagnostics": archived_diagnostics,
+    "previous_generation": existing["generation"]["do_you_see_me"],
+    "current_generation": desired["generation"]["do_you_see_me"],
+    "previous_base_seed": existing["generation"]["base_seed"],
+    "current_base_seed": desired["generation"]["base_seed"],
+    "previous_serving": serving_protocol(existing),
+    "current_serving": serving_protocol(desired),
+  }
+
+def archive_glm_extended_retry(existing: dict) -> dict:
+  model_dir = path.parent
+  diagnostics = model_dir / "minds_eye.diagnostics.jsonl"
+  diagnostics_archive = (
+    model_dir / "minds_eye.pre-extended-format-retry.diagnostics.jsonl"
+  )
+  diagnostics_bytes = diagnostics.read_bytes()
+  diagnostics_digest = hashlib.sha256(diagnostics_bytes).hexdigest()
+  if diagnostics_archive.exists():
+    if sha256(diagnostics_archive) != diagnostics_digest:
+      raise SystemExit(
+        f"Retry archive differs from {diagnostics.name}: "
+        f"{diagnostics_archive.name}. Refusing to overwrite it."
+      )
+  else:
+    diagnostics_archive.write_bytes(diagnostics_bytes)
+
+  rows = [
+    json.loads(line)
+    for line in diagnostics_bytes.decode("utf-8").splitlines()
+    if line.strip()
+  ]
+  for source in sorted(model_dir.glob("minds_eye.attempt-*.diagnostics.jsonl")):
+    archived = model_dir / source.name.replace(
+      "minds_eye.", "minds_eye.pre-extended-format-retry.", 1
+    )
+    source_digest = sha256(source)
+    if archived.exists():
+      if sha256(archived) != source_digest:
+        raise SystemExit(
+          f"Retry archive differs from {source.name}: "
+          f"{archived.name}. Refusing to overwrite it."
+        )
+      source.unlink()
+    else:
+      os.replace(source, archived)
+
+  archived_attempts = []
+  for archived in sorted(
+    model_dir.glob(
+      "minds_eye.pre-extended-format-retry.attempt-*.diagnostics.jsonl"
+    )
+  ):
+    archived_attempts.append(
+      {
+        "original_file": archived.name.replace(
+          "minds_eye.pre-extended-format-retry.", "minds_eye.", 1
+        ),
+        "archived_file": archived.name,
+        "sha256": sha256(archived),
+      }
+    )
+
+  smoke = model_dir / "minds_eye.smoke.diagnostics.jsonl"
+  smoke_archive = (
+    model_dir / "minds_eye.pre-extended-format-retry.smoke.diagnostics.jsonl"
+  )
+  archived_smoke = None
+  if smoke.is_file():
+    smoke_digest = sha256(smoke)
+    if smoke_archive.exists():
+      if sha256(smoke_archive) != smoke_digest:
+        raise SystemExit(
+          f"Retry archive differs from {smoke.name}: "
+          f"{smoke_archive.name}. Refusing to overwrite it."
+        )
+    else:
+      smoke_archive.write_bytes(smoke.read_bytes())
+    archived_smoke = {
+      "file": smoke_archive.name,
+      "sha256": smoke_digest,
+    }
+
+  return {
+    "reason": "provenance-preserving-glm-extended-format-retry",
+    "scope": "resume-valid-records-and-regenerate-only-unresolved",
+    "baseline_diagnostics": {
+      "file": diagnostics_archive.name,
+      "sha256": diagnostics_digest,
+      "row_count": len(rows),
+      "extractor_error_count": sum(bool(row.get("extractor_error")) for row in rows),
+    },
+    "archived_attempt_diagnostics": archived_attempts,
+    **({"archived_smoke_diagnostics": archived_smoke} if archived_smoke else {}),
+    "previous_format_retry_attempts": existing["generation"][
+      "format_retry_attempts"
+    ],
+    "current_format_retry_attempts": desired["generation"][
+      "format_retry_attempts"
+    ],
+    "previous_local_parser": existing["answer_extraction"]["local_parser"],
+    "current_local_parser": desired["answer_extraction"]["local_parser"],
+    "previous_visual_pipeline_sha256": existing["source_hashes"]["runner"][
+      "visual_pipeline"
+    ],
+    "current_visual_pipeline_sha256": desired["source_hashes"]["runner"][
+      "visual_pipeline"
+    ],
+  }
+
+def archive_serving_topology_resume(existing: dict) -> dict:
+  model_dir = path.parent
+  baselines = {}
+  archived_attempts = []
+  for track in ("do_you_see_me", "minds_eye"):
+    diagnostics = model_dir / f"{track}.diagnostics.jsonl"
+    if diagnostics.is_file():
+      diagnostics_archive = (
+        model_dir / f"{track}.pre-serving-topology-resume.diagnostics.jsonl"
+      )
+      diagnostics_bytes = diagnostics.read_bytes()
+      diagnostics_digest = hashlib.sha256(diagnostics_bytes).hexdigest()
+      if diagnostics_archive.exists():
+        if sha256(diagnostics_archive) != diagnostics_digest:
+          raise SystemExit(
+            f"Topology archive differs from {diagnostics.name}: "
+            f"{diagnostics_archive.name}. Refusing to overwrite it."
+          )
+      else:
+        diagnostics_archive.write_bytes(diagnostics_bytes)
+      baselines[track] = {
+        "file": diagnostics_archive.name,
+        "sha256": diagnostics_digest,
+        "row_count": sum(
+          bool(line.strip())
+          for line in diagnostics_bytes.decode("utf-8").splitlines()
+        ),
+      }
+
+    for pattern in (
+      f"{track}.attempt-*.diagnostics.jsonl",
+      f"{track}.smoke.attempt-*.diagnostics.jsonl",
+    ):
+      for source in sorted(model_dir.glob(pattern)):
+        archived = model_dir / source.name.replace(
+          f"{track}.", f"{track}.pre-serving-topology-resume.", 1
+        )
+        source_digest = sha256(source)
+        if archived.exists():
+          if sha256(archived) != source_digest:
+            raise SystemExit(
+              f"Topology archive differs from {source.name}: "
+              f"{archived.name}. Refusing to overwrite it."
+            )
+          source.unlink()
+        else:
+          os.replace(source, archived)
+        archived_attempts.append(
+          {
+            "original_file": source.name,
+            "archived_file": archived.name,
+            "sha256": source_digest,
+          }
+        )
+
+  return {
+    "reason": "provenance-preserving-serving-topology-resume",
+    "baseline_diagnostics": baselines,
+    "archived_attempt_diagnostics": archived_attempts,
+    "previous_serving": serving_protocol(existing),
+    "current_serving": serving_protocol(desired),
+  }
 
 force = os.environ["RUN_CONFIG_FORCE"] == "1"
 artifacts = (
@@ -925,11 +2553,173 @@ elif path.is_file():
             f"Run fingerprint is unreadable for {path.parent.name}: {exc}. "
             "Set FORCE=1 to replace its artifacts safely."
         ) from exc
+    if existing.get("artifact_migrations"):
+        desired["artifact_migrations"] = existing["artifact_migrations"]
     if existing != desired and artifacts:
-        raise SystemExit(
+        if is_supported_extraction_upgrade(existing):
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "provenance-preserving-answer-extraction-upgrade",
+              "from_schema_version": existing["schema_version"],
+              "from_pipeline_revision": existing["pipeline_revision"],
+              "previous_answer_extraction": existing.get("answer_extraction"),
+              "previous_unparseable_answers": existing.get("unparseable_answers"),
+              "previous_runner_source_hashes": existing.get("source_hashes", {}).get(
+                "runner", {}
+              ),
+              "to_schema_version": desired["schema_version"],
+              "to_pipeline_revision": desired["pipeline_revision"],
+            },
+          ]
+          print(
+            f"Migrated {path.parent.name} run fingerprint from schema "
+            f"{existing['schema_version']} to {desired['schema_version']}; "
+            "existing diagnostics were preserved."
+          )
+        elif is_supported_serving_resource_upgrade(existing):
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "provenance-preserving-serving-resource-upgrade",
+              "schema_version": existing["schema_version"],
+              "previous": {
+                "max_num_seqs_per_replica": existing["request_concurrency"],
+                "gpu_memory_utilization": 0.88,
+                "cuda_allocator_config": "default",
+              },
+              "current": {
+                "max_num_seqs_per_replica": desired["serving_engine"][
+                  "max_num_seqs_per_replica"
+                ],
+                "gpu_memory_utilization": desired["serving_engine"][
+                  "gpu_memory_utilization"
+                ],
+                "cuda_allocator_config": desired["serving_engine"][
+                  "cuda_allocator_config"
+                ],
+              },
+            },
+          ]
+          print(
+            f"Recorded bounded serving resources for {path.parent.name}; "
+            "existing diagnostics were preserved."
+          )
+        elif is_supported_local_parser_upgrade(existing):
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "provenance-preserving-local-parser-upgrade",
+              "schema_version": existing["schema_version"],
+              "pipeline_revision": existing["pipeline_revision"],
+              "previous_local_parser": existing["answer_extraction"][
+                "local_parser"
+              ],
+              "current_local_parser": desired["answer_extraction"][
+                "local_parser"
+              ],
+              "previous_visual_pipeline_sha256": existing["source_hashes"][
+                "runner"
+              ]["visual_pipeline"],
+              "current_visual_pipeline_sha256": desired["source_hashes"][
+                "runner"
+              ]["visual_pipeline"],
+            },
+          ]
+          print(
+            f"Recorded strict local-parser upgrade for {path.parent.name}; "
+            "existing diagnostics were preserved."
+          )
+        elif is_supported_raw_output_finalization_upgrade(existing):
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "provenance-preserving-exact-raw-output-finalization-upgrade",
+              "schema_version": existing["schema_version"],
+              "previous_unparseable_answers": existing["unparseable_answers"],
+              "current_unparseable_answers": desired["unparseable_answers"],
+              "previous_local_parser": existing["answer_extraction"]["local_parser"],
+              "current_local_parser": desired["answer_extraction"]["local_parser"],
+              "previous_runner_source_hashes": existing["source_hashes"]["runner"],
+              "current_runner_source_hashes": desired["source_hashes"]["runner"],
+            },
+          ]
+          print(
+            f"Recorded exact raw-output finalization policy for {path.parent.name}; "
+            "existing diagnostics were preserved."
+          )
+        elif is_supported_smoke_admission_upgrade(existing):
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "provenance-preserving-smoke-raw-output-admission",
+              "schema_version": existing["schema_version"],
+              "smoke_admission": desired["unparseable_answers"]["smoke_admission"],
+            },
+          ]
+          print(
+            f"Recorded complete raw-output smoke admission for {path.parent.name}; "
+            "existing diagnostics were preserved."
+          )
+        elif is_supported_glm_extended_retry(existing):
+          migration = archive_glm_extended_retry(existing)
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            migration,
+          ]
+          print(
+            f"Recorded extended GLM formatting recovery for {path.parent.name}; "
+            f"{migration['baseline_diagnostics']['row_count']} diagnostics were "
+            "preserved and only unresolved records will be regenerated."
+          )
+        elif is_supported_completion_cap_recovery(existing):
+          migration = archive_completion_cap_recovery(existing)
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            migration,
+          ]
+          print(
+            f"Recorded Qwen2.5 completion-cap recovery for {path.parent.name}; "
+            f"{migration['baseline_diagnostics']['row_count']} diagnostics were "
+            "preserved and only unresolved records will be regenerated."
+          )
+        elif is_supported_gemma_completion_cap_recovery(existing):
+          migration = archive_gemma_completion_cap_recovery(existing)
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            migration,
+          ]
+          print(
+            f"Recorded Gemma Mind's Eye completion-cap recovery for "
+            f"{path.parent.name}; completed DYS artifacts were preserved and "
+            "the obsolete smoke attempts were archived."
+          )
+        elif is_supported_glm_completion_recovery(existing):
+          migration = archive_glm_completion_recovery(existing)
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            migration,
+          ]
+          print(
+            f"Recorded GLM completion and seed recovery for {path.parent.name}; "
+            f"{migration['baseline_diagnostics']['row_count']} diagnostics were "
+            "preserved and only unresolved records will be regenerated."
+          )
+        elif is_supported_serving_topology_resume(existing):
+          migration = archive_serving_topology_resume(existing)
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            migration,
+          ]
+          print(
+            f"Recorded serving-topology resume for {path.parent.name}; "
+            "existing checkpoints were preserved."
+          )
+        else:
+          raise SystemExit(
             f"Run configuration changed for {path.parent.name}. Set FORCE=1 to start "
             "a clean run instead of mixing checkpoints from different configurations."
-        )
+          )
 elif artifacts:
     raise SystemExit(
         f"Existing evaluation artifacts for {path.parent.name} have no run fingerprint. "
@@ -952,8 +2742,10 @@ write_manifest() {
   MANIFEST_MODEL_MAX_LEN="$model_max_len" MANIFEST_DTYPE="$VLLM_DTYPE" \
   MANIFEST_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" \
   MANIFEST_GPU="$GPU_NAME" MANIFEST_GPU_IDS="$GPU_IDS" MANIFEST_TP_SIZE="$TENSOR_PARALLEL_SIZE" \
+  MANIFEST_DP_SIZE="$DATA_PARALLEL_SIZE" MANIFEST_CONCURRENCY="$CONCURRENCY" \
   MANIFEST_TRACKS="$manifest_tracks" MANIFEST_VLLM_VERSION="$VLLM_VERSION" \
   MANIFEST_OPENAI_VERSION="$OPENAI_VERSION" MANIFEST_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
+  MANIFEST_COMPATIBILITY_PATCH_SOURCE="$(model_compatibility_patch_source "$slug")" \
   MANIFEST_PIPELINE_REVISION="$PIPELINE_REVISION_ID" \
   "$PYTHON_BIN" - <<'PY'
 import hashlib
@@ -962,29 +2754,60 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from evaluation.common.visual_pipeline import record_answer
+
 path = Path(os.environ["MANIFEST_PATH"])
 root = Path(os.environ["MANIFEST_PROJECT_ROOT"])
 run_config = json.loads((path.parent / ".run_config.json").read_text(encoding="utf-8"))
+
+def sha256(file_path: Path) -> str:
+  digest = hashlib.sha256()
+  with file_path.open("rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+      digest.update(chunk)
+  return digest.hexdigest()
+
 tracks = {}
 for track in os.environ["MANIFEST_TRACKS"].split(","):
     output = path.parent / f"{track}_submission.jsonl"
     diagnostics = path.parent / f"{track}.diagnostics.jsonl"
     rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line]
+    diagnostic_rows = [
+      json.loads(line)
+      for line in diagnostics.read_text(encoding="utf-8").splitlines()
+      if line
+    ]
+    diagnostics_by_id = {
+      str(row["question_id"]): row for row in diagnostic_rows
+    }
+    exact_raw_output_fallback_question_ids = []
+    for row in rows:
+      question_id = str(row["question_id"])
+      diagnostic = diagnostics_by_id[question_id]
+      answer_type = str(diagnostic.get("answer_type") or "text")
+      if (
+        not record_answer(diagnostic, answer_type)
+        and row["answer"] == diagnostic.get("output")
+      ):
+        exact_raw_output_fallback_question_ids.append(question_id)
     attempt_files = sorted(path.parent.glob(f"{track}.attempt-*.diagnostics.jsonl"))
     smoke_attempt_files = sorted(path.parent.glob(f"{track}.smoke.attempt-*.diagnostics.jsonl"))
     tracks[track] = {
         "submission_file": output.name,
         "diagnostics_file": diagnostics.name,
         "row_count": len(rows),
-        "submission_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
-        "diagnostics_sha256": hashlib.sha256(diagnostics.read_bytes()).hexdigest(),
+        "submission_sha256": sha256(output),
+        "diagnostics_sha256": sha256(diagnostics),
+        "exact_raw_output_fallback_question_ids": (
+          exact_raw_output_fallback_question_ids
+        ),
         "failed_attempt_diagnostics": [
             {
                 "file": attempt.name,
                 "seed": run_config["generation"]["base_seed"]
                 + int(attempt.name.split(".attempt-", 1)[1].split(".", 1)[0])
                 - 1,
-                "sha256": hashlib.sha256(attempt.read_bytes()).hexdigest(),
+                "sha256": sha256(attempt),
             }
             for attempt in attempt_files
         ],
@@ -994,7 +2817,7 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
                 "seed": run_config["generation"]["base_seed"]
                 + int(attempt.name.split(".attempt-", 1)[1].split(".", 1)[0])
                 - 1,
-                "sha256": hashlib.sha256(attempt.read_bytes()).hexdigest(),
+                "sha256": sha256(attempt),
             }
             for attempt in smoke_attempt_files
         ],
@@ -1003,11 +2826,13 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     }
 
 manifest = {
-    "schema_version": 4,
+  "schema_version": 10,
     "created_at": datetime.now(timezone.utc).isoformat(),
     "model_id": os.environ["MANIFEST_MODEL_ID"],
     "model_revision": os.environ["MANIFEST_REVISION"],
-    "serving_engine": {"name": "vllm", "version": os.environ["MANIFEST_VLLM_VERSION"]},
+    "reasoning_profile": run_config["reasoning_profile"],
+    "checkpoint_source": run_config["checkpoint_source"],
+    "serving_engine": run_config["serving_engine"],
     "weight_loading": os.environ["MANIFEST_LOADING"],
     "compute_dtype": os.environ["MANIFEST_DTYPE"],
     "kv_cache_dtype": os.environ["MANIFEST_KV_CACHE_DTYPE"],
@@ -1016,7 +2841,9 @@ manifest = {
         "assigned_gpu_ids": os.environ["MANIFEST_GPU_IDS"].split(","),
         "description": os.environ["MANIFEST_GPU"],
         "tensor_parallel_size": int(os.environ["MANIFEST_TP_SIZE"]),
+        "data_parallel_size": int(os.environ["MANIFEST_DP_SIZE"]),
     },
+      "request_concurrency": int(os.environ["MANIFEST_CONCURRENCY"]),
     "dataset": run_config["dataset"],
     "image_preprocessing": run_config["image_preprocessing"],
     "answer_extraction": run_config["answer_extraction"],
@@ -1025,12 +2852,16 @@ manifest = {
     "dependencies": {"openai": os.environ["MANIFEST_OPENAI_VERSION"]},
     "tracks": tracks,
 }
+if "artifact_migrations" in run_config:
+    manifest["artifact_migrations"] = run_config["artifact_migrations"]
+if "adapter" in run_config:
+    manifest["adapter"] = run_config["adapter"]
 patch = os.environ["MANIFEST_COMPATIBILITY_PATCH"]
 if patch:
-    patch_source = root / "evaluation" / "common" / "patch_vllm_weights_mapper.py"
+    patch_source = root / os.environ["MANIFEST_COMPATIBILITY_PATCH_SOURCE"]
     manifest["compatibility_patches"] = [{
         "id": patch,
-        "source_sha256": hashlib.sha256(patch_source.read_bytes()).hexdigest(),
+        "source_sha256": sha256(patch_source),
     }]
 temporary = path.with_suffix(".json.tmp")
 temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -1071,7 +2902,7 @@ model_was_skipped() {
 
 run_model() {
   local slug="$1" model_id="$2" revision="$3" loading="$4" model_max_len="$5"
-  local model_cache="$CACHE_ROOT/models/$slug" track
+  local model_cache="$CACHE_ROOT/models/$slug" request_model track track_failed=0
   if [[ "$MAX_MODEL_LEN" != "auto" ]]; then
     model_max_len="$MAX_MODEL_LEN"
   fi
@@ -1089,14 +2920,18 @@ run_model() {
     delete_model_cache "$model_cache"
     return 1
   fi
+  request_model="$(model_request_name "$slug" "$model_id")"
   while IFS= read -r track; do
-    if ! run_track "$slug" "$model_id" "$track"; then
-      stop_server
-      delete_model_cache "$model_cache"
-      return 1
+    if ! run_track "$slug" "$request_model" "$track"; then
+      track_failed=1
+      log "$slug/$track failed; continuing with remaining selected tracks"
     fi
   done < <(selected_tracks)
   stop_server
+  if [[ "$track_failed" == "1" ]]; then
+    delete_model_cache "$model_cache"
+    return 1
+  fi
 
   if [[ "$SMOKE_ONLY" != "1" ]]; then
     write_manifest "$slug" "$model_id" "$revision" "$loading" "$model_max_len"
@@ -1117,8 +2952,8 @@ main() {
     return 0
   fi
 
-  preflight_host
   mkdir -p "$OUTPUT_ROOT" "$CACHE_ROOT/models"
+  preflight_host
   setup_environment
   apply_model_compatibility_patches
   verify_vllm_cli
@@ -1127,6 +2962,7 @@ main() {
     log "Shared environment and pinned dataset are ready; no model worker was started"
     return 0
   fi
+  write_active_run_marker
 
   local selected_count=0 spec slug model_id revision loading model_max_len
   for spec in "${MODEL_SPECS[@]}"; do
@@ -1161,7 +2997,7 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  trap stop_server EXIT
+  trap cleanup_runner EXIT
   trap 'exit 130' INT TERM
   main "$@"
 fi

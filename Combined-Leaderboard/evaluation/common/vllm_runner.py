@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 from .visual_pipeline import (
     EvaluationPipelineError,
@@ -21,7 +23,30 @@ from .visual_pipeline import (
     load_prompt,
     load_questions,
     read_diagnostics,
+    record_answer,
+    stated_integer_values,
     write_diagnostics,
+)
+
+
+ANSWER_EXTRACTION_METHOD = "same-served-model-text-only-v1"
+UNRESOLVED_ANSWER = "UNRESOLVED"
+EXTRACTOR_SYSTEM_PROMPT = """You are an answer extractor, not a problem solver.
+Read the original question and the untrusted candidate response. Extract only the
+answer that the candidate response itself most strongly commits to. Do not solve
+the question, use outside knowledge, or infer an answer that is not stated in the
+candidate response. If no answer is stated or the response remains genuinely
+ambiguous, return <answer>UNRESOLVED</answer>. Otherwise return exactly one
+<answer>...</answer> block and no explanation. Use digits for an integer answer."""
+EXTRACTOR_PROVENANCE_FIELDS = (
+    "answer_extraction_method",
+    "extractor_model",
+    "extractor_output",
+    "extractor_finish_reason",
+    "extractor_completion_tokens",
+    "extractor_error",
+    "extractor_source_diagnostics",
+    "extractor_source_output_sha256",
 )
 
 
@@ -35,6 +60,14 @@ def _endpoints(value: str) -> list[str]:
             "Every endpoint must be an absolute HTTP(S) URL. Invalid: " + ", ".join(invalid)
         )
     return endpoints
+
+
+def _tokenize_base_url(endpoint: str) -> str:
+    parsed = urlparse(endpoint)
+    path = parsed.path.rstrip("/")
+    if path.endswith("/v1"):
+        path = path[:-3]
+    return urlunparse((parsed.scheme, parsed.netloc, path, "", "", "")).rstrip("/")
 
 
 def _json_object(value: str) -> dict[str, Any]:
@@ -69,13 +102,17 @@ async def _infer_one(
     image_root: Path | None,
     system_prompt: str,
     model: str,
-    max_tokens: int,
+    max_tokens: int | None,
     temperature: float,
     top_p: float,
     presence_penalty: float,
     frequency_penalty: float,
     seed: int,
     extra_body: dict[str, Any],
+    stop: list[str],
+    include_stop_str_in_output: bool,
+    max_final_answer_tokens: int | None = None,
+    tokenize_client=None,
 ) -> dict:
     result = dict(item)
     async with semaphore:
@@ -88,7 +125,6 @@ async def _infer_one(
                 "presence_penalty": presence_penalty,
                 "frequency_penalty": frequency_penalty,
                 "seed": seed,
-                "max_tokens": max_tokens,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {
@@ -100,6 +136,13 @@ async def _infer_one(
                     },
                 ],
             }
+            if max_tokens is not None:
+                request["max_tokens"] = max_tokens
+            if stop:
+                request["stop"] = stop
+                if include_stop_str_in_output:
+                    extra_body = dict(extra_body)
+                    extra_body["include_stop_str_in_output"] = True
             if extra_body:
                 request["extra_body"] = extra_body
             response = await client.chat.completions.create(
@@ -116,21 +159,287 @@ async def _infer_one(
                 result["completion_tokens"] = completion_tokens
             if not result["output"]:
                 result["error"] = "The model returned an empty response."
+            answer = final_answer(
+                result["output"], str(item.get("answer_type") or "text")
+            )
+            needs_separate_answer_check = (
+                answer
+                and max_final_answer_tokens is not None
+                and (max_tokens is None or max_tokens > max_final_answer_tokens)
+            )
+            if needs_separate_answer_check:
+                if tokenize_client is None:
+                    result["error"] = (
+                        "Final-answer token validation is unavailable for an "
+                        "uncapped completion."
+                    )
+                else:
+                    try:
+                        token_response = await tokenize_client.post(
+                            "/tokenize",
+                            json={
+                                "model": model,
+                                "prompt": answer,
+                                "add_special_tokens": False,
+                            },
+                        )
+                        token_response.raise_for_status()
+                        answer_tokens = int(token_response.json()["count"])
+                        result["final_answer_tokens"] = answer_tokens
+                        if answer_tokens > max_final_answer_tokens:
+                            result["error"] = (
+                                f"Extracted final answer uses {answer_tokens} tokens; "
+                                f"the limit is {max_final_answer_tokens}."
+                            )
+                    except Exception as exc:
+                        result["error"] = (
+                            "Final-answer token validation failed: "
+                            f"{type(exc).__name__}: {exc}"
+                        )[:500]
         except Exception as exc:  # Each failure is retained for a targeted rerun.
             result["output"] = None
             result["error"] = f"{type(exc).__name__}: {exc}"[:500]
     return result
 
 
+def _answer_is_supported_by_output(
+    raw_output: Any, extracted_answer: str, answer_type: str
+) -> bool:
+    if answer_type == "integer":
+        try:
+            value = int(extracted_answer)
+        except ValueError:
+            return False
+        return value in stated_integer_values(raw_output)
+
+    if answer_type in {"mcq_letter", "mcq_index_1_4"}:
+        if final_answer(raw_output, answer_type) == extracted_answer:
+            return True
+        escaped = re.escape(extracted_answer)
+        return bool(
+            re.search(
+                rf"(?i)\b(?:option|choice)\s*(?:\(|\[)?{escaped}(?:\)|\])?(?=\W|$)"
+                rf"|\b(?:final\s+)?(?:answer|response)\s*(?:is|:|=|-)?\s*"
+                rf"(?:\(|\[)?{escaped}(?:\)|\])?(?=\W|$)",
+                str(raw_output or ""),
+            )
+        )
+
+    normalized_answer = re.sub(r"[^a-z0-9]+", "", extracted_answer.casefold())
+    normalized_output = re.sub(
+        r"[^a-z0-9]+", "", str(raw_output or "").casefold()
+    )
+    return bool(normalized_answer and normalized_answer in normalized_output)
+
+
+def _extractor_answer(extractor_output: str, answer_type: str) -> str:
+    extractor_output = re.sub(
+        r"^\s*<think>.*?</think>\s*", "", extractor_output, flags=re.I | re.S
+    )
+    extractor_output = re.sub(
+        r"^\s*<\|begin_of_box\|>\s*", "", extractor_output, flags=re.I
+    )
+    extractor_output = re.sub(
+        r"\s*<\|end_of_box\|>\s*$", "", extractor_output, flags=re.I
+    )
+    match = re.fullmatch(
+        r"\s*<answer>(.*?)</answer>\s*", extractor_output, flags=re.I | re.S
+    )
+    if not match:
+        return ""
+    candidate = match.group(1).strip()
+    if candidate.upper() == UNRESOLVED_ANSWER:
+        return UNRESOLVED_ANSWER
+    return final_answer(candidate, answer_type)
+
+
+async def _extract_one(
+    client,
+    semaphore: asyncio.Semaphore,
+    record: dict,
+    question: dict,
+    *,
+    model: str,
+    max_tokens: int,
+    seed: int,
+    max_final_answer_tokens: int | None,
+    tokenize_client=None,
+    candidate_output: Any = None,
+    source_diagnostics: str | None = None,
+) -> dict:
+    result = dict(record)
+    if result.get("answer_extraction_method"):
+        previous_attempt = {
+            field: result[field]
+            for field in EXTRACTOR_PROVENANCE_FIELDS
+            if field in result
+        }
+        result["extractor_attempts"] = [
+            *result.get("extractor_attempts", []),
+            previous_attempt,
+        ]
+    for field in (*EXTRACTOR_PROVENANCE_FIELDS, "extracted_answer"):
+        result.pop(field, None)
+
+    answer_type = str(question.get("answer_type") or "text")
+    raw_candidate = (
+        record.get("output") if candidate_output is None else candidate_output
+    )
+    payload = {
+        "question": str(question.get("question") or ""),
+        "answer_type": answer_type,
+        "candidate_response": str(raw_candidate or ""),
+    }
+    if source_diagnostics:
+        result["extractor_source_diagnostics"] = source_diagnostics
+        result["extractor_source_output_sha256"] = hashlib.sha256(
+            str(raw_candidate or "").encode("utf-8")
+        ).hexdigest()
+    async with semaphore:
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                temperature=0.0,
+                top_p=1.0,
+                seed=seed,
+                max_tokens=max_tokens,
+                stop=["</answer>"],
+                extra_body={"include_stop_str_in_output": True},
+                messages=[
+                    {"role": "system", "content": EXTRACTOR_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": json.dumps(payload, ensure_ascii=False),
+                    },
+                ],
+            )
+            choice = response.choices[0]
+            extractor_output = _message_text(choice.message.content)
+            result["answer_extraction_method"] = ANSWER_EXTRACTION_METHOD
+            result["extractor_model"] = model
+            result["extractor_output"] = extractor_output
+            finish_reason = getattr(choice, "finish_reason", None)
+            if finish_reason:
+                result["extractor_finish_reason"] = finish_reason
+            usage = getattr(response, "usage", None)
+            completion_tokens = getattr(usage, "completion_tokens", None)
+            if completion_tokens is not None:
+                result["extractor_completion_tokens"] = completion_tokens
+
+            extracted_answer = _extractor_answer(extractor_output, answer_type)
+            if extracted_answer == UNRESOLVED_ANSWER:
+                result["extractor_error"] = "The extractor returned UNRESOLVED."
+                return result
+            if not extracted_answer:
+                result["extractor_error"] = (
+                    "The extractor did not return a parseable answer block."
+                )
+                return result
+            if not _answer_is_supported_by_output(
+                raw_candidate, extracted_answer, answer_type
+            ):
+                result["extractor_error"] = (
+                    "The extracted answer is not stated in the candidate response."
+                )
+                return result
+
+            if max_final_answer_tokens is not None:
+                if tokenize_client is None:
+                    result["extractor_error"] = (
+                        "Extractor answer token validation is unavailable."
+                    )
+                    return result
+                token_response = await tokenize_client.post(
+                    "/tokenize",
+                    json={
+                        "model": model,
+                        "prompt": extracted_answer,
+                        "add_special_tokens": False,
+                    },
+                )
+                token_response.raise_for_status()
+                answer_tokens = int(token_response.json()["count"])
+                if answer_tokens > max_final_answer_tokens:
+                    result["extractor_error"] = (
+                        f"Extracted answer uses {answer_tokens} tokens; "
+                        f"the limit is {max_final_answer_tokens}."
+                    )
+                    return result
+                result["final_answer_tokens"] = answer_tokens
+
+            result["extracted_answer"] = extracted_answer
+            result.pop("extractor_error", None)
+        except Exception as exc:
+            result["answer_extraction_method"] = ANSWER_EXTRACTION_METHOD
+            result["extractor_model"] = model
+            result["extractor_error"] = (
+                f"{type(exc).__name__}: {exc}"
+            )[:500]
+    return result
+
+
+async def _extract_from_sources(
+    client,
+    semaphore: asyncio.Semaphore,
+    record: dict,
+    question: dict,
+    sources: list[tuple[str, dict[str, dict[str, Any]]]],
+    *,
+    current_diagnostics: str,
+    model: str,
+    max_tokens: int,
+    seed: int,
+    max_final_answer_tokens: int | None,
+    tokenize_client=None,
+) -> dict:
+    question_id = str(question["question_id"])
+    candidates: list[tuple[str, Any]] = []
+    current_output = record.get("output")
+    seen_hashes: set[str] = set()
+    if current_output:
+        current_hash = hashlib.sha256(str(current_output).encode("utf-8")).hexdigest()
+        seen_hashes.add(current_hash)
+        if not record.get("answer_extraction_method"):
+            candidates.append((current_diagnostics, current_output))
+
+    for source_name, source_records in sources:
+        source_record = source_records.get(question_id)
+        source_output = source_record.get("output") if source_record else None
+        if not source_output:
+            continue
+        source_hash = hashlib.sha256(str(source_output).encode("utf-8")).hexdigest()
+        if source_hash in seen_hashes:
+            continue
+        seen_hashes.add(source_hash)
+        candidates.append((source_name, source_output))
+
+    result = record
+    for source_name, source_output in candidates:
+        result = await _extract_one(
+            client,
+            semaphore,
+            result,
+            question,
+            model=model,
+            max_tokens=max_tokens,
+            seed=seed,
+            max_final_answer_tokens=max_final_answer_tokens,
+            tokenize_client=tokenize_client,
+            candidate_output=source_output,
+            source_diagnostics=source_name,
+        )
+        if _usable_record(result, question):
+            break
+    return result
+
+
 def _usable_record(record: dict[str, Any], question: dict[str, Any]) -> bool:
     if record.get("error"):
         return False
-    return bool(
-        final_answer(record.get("output"), str(question.get("answer_type") or "text"))
-    )
+    return bool(record_answer(record, str(question.get("answer_type") or "text")))
 
 
-def _resume_records(
+def _diagnostic_records(
     diagnostics_path: Path,
     selected: list[dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
@@ -162,6 +471,15 @@ def _resume_records(
             + "; ".join(details)
             + ". Remove the file or use the matching benchmark run."
         )
+    return records_by_id
+
+
+def _resume_records(
+    diagnostics_path: Path,
+    selected: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    questions_by_id = {str(item["question_id"]): item for item in selected}
+    records_by_id = _diagnostic_records(diagnostics_path, selected)
 
     return {
         question_id: row
@@ -194,6 +512,7 @@ async def _run(
 ) -> tuple[list[dict], list[dict]]:
     try:
         from openai import AsyncOpenAI
+        import httpx
     except ImportError as exc:
         raise EvaluationPipelineError(
             "The openai package is required. Install evaluation/requirements-vllm.txt."
@@ -212,9 +531,90 @@ async def _run(
         )
         for endpoint in endpoints
     ]
+    needs_separate_answer_check = (
+        args.max_final_answer_tokens is not None
+        and (
+            args.extract_unparseable_only
+            or args.max_tokens is None
+            or args.max_tokens > args.max_final_answer_tokens
+        )
+    )
+    tokenize_clients = [
+        httpx.AsyncClient(
+            base_url=_tokenize_base_url(endpoint),
+            timeout=args.request_timeout,
+        )
+        if needs_separate_answer_check
+        else None
+        for endpoint in endpoints
+    ]
     completed_by_id = (
         _resume_records(diagnostics_path, selected) if args.resume else {}
     )
+    if args.extract_unparseable_only:
+        if not args.resume:
+            raise EvaluationPipelineError(
+                "--extract-unparseable-only requires --resume."
+            )
+        records_by_id = _diagnostic_records(diagnostics_path, selected)
+        extraction_sources = [
+            (path.name, _diagnostic_records(path, selected))
+            for path in args.extraction_source_diagnostics
+        ]
+        missing = [
+            str(item["question_id"])
+            for item in selected
+            if str(item["question_id"]) not in records_by_id
+        ]
+        if missing:
+            raise EvaluationPipelineError(
+                "Answer extraction requires complete diagnostics; missing "
+                + ", ".join(missing[:5])
+                + "."
+            )
+        candidates = [
+            item
+            for item in selected
+            if not _usable_record(records_by_id[str(item["question_id"])], item)
+            and not records_by_id[str(item["question_id"])].get("error")
+            and records_by_id[str(item["question_id"])].get("output")
+        ]
+        if candidates:
+            print(
+                f"[{track.task_id}] extracting answers from {len(candidates)} "
+                "unparseable responses with the served model",
+                flush=True,
+            )
+        extraction_semaphore = asyncio.Semaphore(args.concurrency)
+        extraction_jobs = [
+            _extract_from_sources(
+                clients[index % len(clients)],
+                extraction_semaphore,
+                records_by_id[str(item["question_id"])],
+                item,
+                extraction_sources,
+                current_diagnostics=diagnostics_path.name,
+                model=args.model,
+                max_tokens=args.extractor_max_tokens,
+                seed=args.seed,
+                max_final_answer_tokens=args.max_final_answer_tokens,
+                tokenize_client=tokenize_clients[index % len(tokenize_clients)],
+            )
+            for index, item in enumerate(candidates)
+        ]
+        for future in asyncio.as_completed(extraction_jobs):
+            record = await future
+            records_by_id[str(record["question_id"])] = record
+        completed = [records_by_id[str(item["question_id"])] for item in selected]
+        write_diagnostics(diagnostics_path, completed)
+        await asyncio.gather(
+            *(client.close() for client in clients), return_exceptions=True
+        )
+        await asyncio.gather(
+            *(client.aclose() for client in tokenize_clients if client is not None),
+            return_exceptions=True,
+        )
+        return questions, completed
     pending = [
         item for item in selected if str(item["question_id"]) not in completed_by_id
     ]
@@ -248,6 +648,10 @@ async def _run(
             frequency_penalty=args.frequency_penalty,
             seed=args.seed,
             extra_body=extra_body,
+            stop=args.stop,
+            include_stop_str_in_output=args.include_stop_str_in_output,
+            max_final_answer_tokens=args.max_final_answer_tokens,
+            tokenize_client=tokenize_clients[index % len(tokenize_clients)],
         )
         for index, item in enumerate(pending)
     ]
@@ -275,6 +679,10 @@ async def _run(
                 )
     finally:
         await asyncio.gather(*(client.close() for client in clients), return_exceptions=True)
+        await asyncio.gather(
+            *(client.aclose() for client in tokenize_clients if client is not None),
+            return_exceptions=True,
+        )
 
     order = {item["question_id"]: index for index, item in enumerate(selected)}
     completed = list(completed_by_id.values())
@@ -301,7 +709,23 @@ def _parser(track: VisualTrackConfig) -> argparse.ArgumentParser:
         help="Optional dataset root; image_url is used when a local image is unavailable",
     )
     parser.add_argument("--prompt-mode", choices=("noncot", "cot"), default="noncot")
-    parser.add_argument("--max-tokens", type=int)
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        help=(
+            "Maximum completion tokens, including reasoning tokens. Omit to let "
+            "the server use the remaining model context."
+        ),
+    )
+    parser.add_argument(
+        "--max-final-answer-tokens",
+        type=int,
+        help=(
+            "Maximum tokens in the locally extracted final answer. When the total "
+            "completion is uncapped, the served model's /tokenize endpoint enforces "
+            "this separately from reasoning tokens."
+        ),
+    )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=1.0)
     parser.add_argument("--top-k", type=int, default=-1)
@@ -328,9 +752,44 @@ def _parser(track: VisualTrackConfig) -> argparse.ArgumentParser:
         help="Additional JSON fields passed to the OpenAI-compatible endpoint",
     )
     parser.add_argument(
+        "--stop",
+        action="append",
+        default=[],
+        help="Stop string; repeat the option to configure more than one",
+    )
+    parser.add_argument(
+        "--include-stop-str-in-output",
+        action="store_true",
+        help="Ask vLLM to retain a matched stop string in the returned text",
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Keep valid responses in the diagnostics file and retry the rest",
+    )
+    parser.add_argument(
+        "--extract-unparseable-only",
+        action="store_true",
+        help=(
+            "Use the served model as a text-only answer extractor for existing "
+            "unparseable diagnostics; never rerun image inference"
+        ),
+    )
+    parser.add_argument(
+        "--extractor-max-tokens",
+        type=int,
+        default=512,
+        help="Maximum completion tokens for each text-only extractor request",
+    )
+    parser.add_argument(
+        "--extraction-source-diagnostics",
+        action="append",
+        type=Path,
+        default=[],
+        help=(
+            "Archived diagnostics to try as extractor input after the current "
+            "response; repeat in deterministic source order"
+        ),
     )
     parser.add_argument(
         "--checkpoint-every",
@@ -346,6 +805,16 @@ def _parser(track: VisualTrackConfig) -> argparse.ArgumentParser:
     )
     parser.add_argument("--out", type=Path, help="Canonical submission JSONL destination")
     parser.add_argument("--diagnostics", type=Path, help="Raw-output diagnostics destination")
+    parser.add_argument(
+        "--raw-output-fallback",
+        action="store_true",
+        help="Export exact nonempty raw model outputs that remain unparseable",
+    )
+    parser.add_argument(
+        "--finalize-existing-diagnostics",
+        action="store_true",
+        help="Export an existing complete diagnostics file without inference",
+    )
     parser.add_argument(
         "--strict-partial",
         action="store_true",
@@ -371,10 +840,26 @@ def main(track: VisualTrackConfig, argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    if args.max_tokens is None:
-        args.max_tokens = 2048 if args.prompt_mode == "cot" else 256
-    if args.max_tokens < 1:
+    if args.max_tokens is not None and args.max_tokens < 1:
         print("Evaluation failed: --max-tokens must be positive.", file=sys.stderr)
+        return 2
+    if args.extractor_max_tokens < 1:
+        print("Evaluation failed: --extractor-max-tokens must be positive.", file=sys.stderr)
+        return 2
+    if args.max_final_answer_tokens is not None and args.max_final_answer_tokens < 1:
+        print(
+            "Evaluation failed: --max-final-answer-tokens must be positive.",
+            file=sys.stderr,
+        )
+        return 2
+    if args.finalize_existing_diagnostics and (
+        args.limit or args.extract_unparseable_only
+    ):
+        print(
+            "Evaluation failed: --finalize-existing-diagnostics cannot be combined "
+            "with --limit or --extract-unparseable-only.",
+            file=sys.stderr,
+        )
         return 2
     if (
         args.temperature < 0
@@ -399,8 +884,12 @@ def main(track: VisualTrackConfig, argv: list[str] | None = None) -> int:
         f"{output_path.stem}.{args.prompt_mode}.diagnostics.jsonl"
     )
     try:
-        all_questions, records = asyncio.run(_run(args, track, diagnostics_path))
-        write_diagnostics(diagnostics_path, records)
+        if args.finalize_existing_diagnostics:
+            all_questions = load_questions(args.questions, track)
+            records = read_diagnostics([diagnostics_path])
+        else:
+            all_questions, records = asyncio.run(_run(args, track, diagnostics_path))
+            write_diagnostics(diagnostics_path, records)
         if args.limit:
             selected_questions = all_questions[: args.limit]
             invalid = _invalid_records(records, selected_questions)
@@ -415,7 +904,12 @@ def main(track: VisualTrackConfig, argv: list[str] | None = None) -> int:
                 flush=True,
             )
             return 0
-        report = export_submission(records, all_questions, output_path)
+        report = export_submission(
+            records,
+            all_questions,
+            output_path,
+            raw_output_fallback=args.raw_output_fallback,
+        )
     except (EvaluationPipelineError, OSError) as exc:
         print(f"Evaluation failed: {exc}", file=sys.stderr)
         return 2

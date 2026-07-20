@@ -20,6 +20,29 @@ from urllib.request import Request, urlopen
 STANDARD_CONDITION = "standard"
 MAX_REMOTE_IMAGE_BYTES = 50 * 1024 * 1024
 SUPPORTED_ANSWER_TYPES = {"integer", "mcq_index_1_4", "mcq_letter", "text"}
+INTEGER_WORDS = {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+}
 
 
 class EvaluationPipelineError(ValueError):
@@ -252,10 +275,24 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
     if not text:
         return ""
 
-    answer_blocks = re.findall(r"<answer>(.*?)</answer>", text, flags=re.I | re.S)
+    answer_blocks = re.findall(
+        r"<answer>((?:(?!<answer>).)*?)</answer>",
+        text,
+        flags=re.I | re.S,
+    )
     if answer_blocks:
         text = answer_blocks[-1].strip()
-    elif re.search(r"<think>", text, flags=re.I) and not re.search(
+    else:
+        native_box_blocks = re.findall(
+            r"<\|begin_of_box\|>"
+            r"((?:(?!<\|begin_of_box\|>).)*?)"
+            r"<\|end_of_box\|>",
+            text,
+            flags=re.I | re.S,
+        )
+        if native_box_blocks:
+            text = native_box_blocks[-1].strip()
+    if re.search(r"<think>", text, flags=re.I) and not re.search(
         r"</think>", text, flags=re.I
     ):
         return ""
@@ -267,7 +304,13 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
         values = re.findall(
             r"(?<![A-Za-z0-9])-?\d(?:[\d,]*\d)?(?![A-Za-z0-9])", text
         )
-        return values[-1].replace(",", "") if values else ""
+        if values:
+            return values[-1].replace(",", "")
+        matches = re.findall(
+            rf"\b({'|'.join(INTEGER_WORDS)})\b", text, flags=re.I
+        )
+        normalized = {INTEGER_WORDS[word.lower()] for word in matches}
+        return str(normalized.pop()) if len(normalized) == 1 else ""
     if answer_type == "mcq_index_1_4":
         exact = re.fullmatch(r"[\[(]?([1-4])[\])]?[.,:]?", text, flags=re.I)
         if exact:
@@ -295,6 +338,20 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
         )
         if explicit:
             return explicit[-1].upper()
+        odd_figure_matches = re.findall(
+            r"(?i)\bfigure\s+([A-F])\s+does\s+not\s+adhere\b"
+            r"|\b(?:the\s+)?figure\s+that\s+does\s+not\s+adhere"
+            r"(?:\s+to\s+(?:this|the)\s+concept)?\s+is\s+([A-F])\b",
+            text,
+        )
+        odd_figure_letters = {
+            letter.upper()
+            for match in odd_figure_matches
+            for letter in match
+            if letter
+        }
+        if len(odd_figure_letters) == 1:
+            return odd_figure_letters.pop()
         final_line = text.splitlines()[-1].strip() if text.splitlines() else ""
         line_match = re.fullmatch(r"[\[(]?([A-Fa-f])[\])]?[.,:]?", final_line)
         return line_match.group(1).upper() if line_match else ""
@@ -306,6 +363,30 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
         flags=re.I,
     ).strip()
     return text.strip('"\' ').strip()
+
+
+def record_answer(record: dict[str, Any], answer_type: str) -> str:
+    extracted = record.get("extracted_answer")
+    if extracted is not None:
+        normalized = final_answer(extracted, answer_type)
+        if normalized:
+            return normalized
+    return final_answer(record.get("output"), answer_type)
+
+
+def stated_integer_values(raw_output: Any) -> set[int]:
+    if isinstance(raw_output, (dict, list)) or raw_output is None:
+        return set()
+    text = str(raw_output)
+    values = {
+        int(value.replace(",", ""))
+        for value in re.findall(
+            r"(?<![A-Za-z0-9])-?\d(?:[\d,]*\d)?(?![A-Za-z0-9])", text
+        )
+    }
+    words = re.findall(rf"\b({'|'.join(INTEGER_WORDS)})\b", text, flags=re.I)
+    values.update(INTEGER_WORDS[word.lower()] for word in words)
+    return values
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -343,6 +424,34 @@ def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
             row["finish_reason"] = str(item["finish_reason"])
         if item.get("completion_tokens") is not None:
             row["completion_tokens"] = int(item["completion_tokens"])
+        if item.get("final_answer_tokens") is not None:
+            row["final_answer_tokens"] = int(item["final_answer_tokens"])
+        if item.get("answer_extraction_method"):
+            row["answer_extraction_method"] = str(item["answer_extraction_method"])
+        if item.get("extractor_model"):
+            row["extractor_model"] = str(item["extractor_model"])
+        if item.get("extractor_output") is not None:
+            row["extractor_output"] = item["extractor_output"]
+        if item.get("extractor_finish_reason"):
+            row["extractor_finish_reason"] = str(item["extractor_finish_reason"])
+        if item.get("extractor_completion_tokens") is not None:
+            row["extractor_completion_tokens"] = int(
+                item["extractor_completion_tokens"]
+            )
+        if item.get("extractor_error"):
+            row["extractor_error"] = str(item["extractor_error"])
+        if item.get("extractor_source_diagnostics"):
+            row["extractor_source_diagnostics"] = str(
+                item["extractor_source_diagnostics"]
+            )
+        if item.get("extractor_source_output_sha256"):
+            row["extractor_source_output_sha256"] = str(
+                item["extractor_source_output_sha256"]
+            )
+        if item.get("extractor_attempts"):
+            row["extractor_attempts"] = list(item["extractor_attempts"])
+        if item.get("extracted_answer") is not None:
+            row["extracted_answer"] = str(item["extracted_answer"])
         rows.append(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
     _atomic_write(path, "\n".join(rows) + ("\n" if rows else ""))
 
@@ -351,6 +460,8 @@ def export_submission(
     records: Sequence[dict[str, Any]],
     expected_questions: Sequence[dict[str, Any]],
     output_path: Path,
+    *,
+    raw_output_fallback: bool = False,
 ) -> dict[str, Any]:
     """Validate complete coverage and write backend-ready three-field JSONL."""
     expected_ids = [str(item["question_id"]) for item in expected_questions]
@@ -382,6 +493,7 @@ def export_submission(
         )
 
     rows: list[dict[str, str]] = []
+    raw_output_fallback_question_ids: list[str] = []
     invalid: list[str] = []
     for expected in expected_questions:
         question_id = str(expected["question_id"])
@@ -389,7 +501,14 @@ def export_submission(
         if record.get("error"):
             invalid.append(f"{question_id} (inference error)")
             continue
-        answer = final_answer(record.get("output"), str(expected.get("answer_type") or "text"))
+        answer = record_answer(record, str(expected.get("answer_type") or "text"))
+        if not answer and raw_output_fallback:
+            raw_output = record.get("output")
+            if not isinstance(raw_output, (dict, list)) and raw_output is not None:
+                raw_answer = str(raw_output)
+                if raw_answer.strip():
+                    answer = raw_answer
+                    raw_output_fallback_question_ids.append(question_id)
         if not answer:
             invalid.append(f"{question_id} (empty or unparseable output)")
             continue
@@ -420,6 +539,7 @@ def export_submission(
         "row_count": len(rows),
         "schema": ["question_id", "condition", "answer"],
         "condition": STANDARD_CONDITION,
+        "raw_output_fallback_question_ids": raw_output_fallback_question_ids,
     }
 
 

@@ -204,3 +204,16 @@ The app runs Waitress by default — no extra config needed.
 - **Mind's Eye** — arXiv:2604.16054  
 - **CoT Degrades Spatial Reasoning** — arXiv:2604.16060
 
+
+
+
+
+The standard visual evaluation runner and final-results workflow are documented in [Combined-Leaderboard/evaluation/README.md](Combined-Leaderboard/evaluation/README.md). Run models into staging roots with `evaluation/run_visual_suite.sh`, then validate and consolidate the newest complete DYS and Mind's Eye tracks:
+
+```bash
+cd Combined-Leaderboard
+python -m evaluation.finalize_visual_results --dry-run
+python -m evaluation.finalize_visual_results
+```
+
+The authoritative local inventory is `evaluation/results/final/index.json`. Source runs are pruned only after canonical validation and never while an `.active-run.json` PID is alive.
