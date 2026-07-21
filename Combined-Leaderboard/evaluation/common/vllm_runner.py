@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse, urlunparse
@@ -100,7 +101,7 @@ def _message_text(content) -> str:
 
 async def _infer_one(
     client,
-    semaphore: asyncio.Semaphore,
+    semaphore: asyncio.Semaphore | None,
     item: dict,
     *,
     image_root: Path | None,
@@ -117,7 +118,7 @@ async def _infer_one(
     include_stop_str_in_output: bool,
 ) -> dict:
     result = dict(item)
-    async with semaphore:
+    async with (semaphore if semaphore is not None else nullcontext()):
         try:
             image = image_for_openai(item, image_root)
             request: dict[str, Any] = {
@@ -230,7 +231,7 @@ def _answer_domain(answer_type: str) -> str:
 
 async def _extract_one(
     client,
-    semaphore: asyncio.Semaphore,
+    semaphore: asyncio.Semaphore | None,
     record: dict,
     question: dict,
     *,
@@ -286,7 +287,7 @@ async def _extract_one(
         result["extractor_source_output_sha256"] = hashlib.sha256(
             str(raw_candidate or "").encode("utf-8")
         ).hexdigest()
-    async with semaphore:
+    async with (semaphore if semaphore is not None else nullcontext()):
         try:
             extra_body: dict[str, Any] = {"include_stop_str_in_output": True}
             if chat_template_kwargs:
@@ -415,39 +416,40 @@ async def _infer_and_extract_one(
     tokenize_client=None,
     source_diagnostics: str,
 ) -> dict:
-    record = await _infer_one(
-        inference_client,
-        semaphore,
-        item,
-        image_root=image_root,
-        system_prompt=system_prompt,
-        model=model,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=top_p,
-        presence_penalty=presence_penalty,
-        frequency_penalty=frequency_penalty,
-        seed=seed,
-        extra_body=extra_body,
-        stop=stop,
-        include_stop_str_in_output=include_stop_str_in_output,
-    )
-    if record.get("error"):
-        record["inference_error"] = record.pop("error")
-    return await _extract_one(
-        extractor_client,
-        semaphore,
-        record,
-        item,
-        model=extractor_model,
-        max_tokens=extractor_max_tokens,
-        seed=extractor_seed,
-        max_final_answer_tokens=max_final_answer_tokens,
-        tokenize_client=tokenize_client,
-        source_diagnostics=source_diagnostics,
-        chat_template_kwargs=extractor_chat_template_kwargs,
-        extractor_revision=extractor_revision,
-    )
+    async with semaphore:
+        record = await _infer_one(
+            inference_client,
+            None,
+            item,
+            image_root=image_root,
+            system_prompt=system_prompt,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            presence_penalty=presence_penalty,
+            frequency_penalty=frequency_penalty,
+            seed=seed,
+            extra_body=extra_body,
+            stop=stop,
+            include_stop_str_in_output=include_stop_str_in_output,
+        )
+        if record.get("error"):
+            record["inference_error"] = record.pop("error")
+        return await _extract_one(
+            extractor_client,
+            None,
+            record,
+            item,
+            model=extractor_model,
+            max_tokens=extractor_max_tokens,
+            seed=extractor_seed,
+            max_final_answer_tokens=max_final_answer_tokens,
+            tokenize_client=tokenize_client,
+            source_diagnostics=source_diagnostics,
+            chat_template_kwargs=extractor_chat_template_kwargs,
+            extractor_revision=extractor_revision,
+        )
 
 
 def _usable_record(record: dict[str, Any], question: dict[str, Any]) -> bool:

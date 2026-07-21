@@ -454,6 +454,92 @@ def test_every_visual_inference_is_followed_by_gold_blind_extraction(tmp_path):
     assert result["extractor_revision"] == "extractor-revision-a"
 
 
+def test_concurrency_slot_covers_inference_and_extraction(tmp_path):
+    image = tmp_path / "sample.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\nbenchmark-image")
+    events = []
+
+    class InferenceCompletions:
+        async def create(self, **request):
+            question = request["messages"][1]["content"][0]["text"]
+            events.append(f"infer:{question}")
+            await asyncio.sleep(0)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="Final answer is C."),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=SimpleNamespace(completion_tokens=4),
+            )
+
+    class ExtractorCompletions:
+        async def create(self, **request):
+            payload = json.loads(request["messages"][1]["content"])
+            events.append(f"extract:{payload['question']}")
+            await asyncio.sleep(0)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="<answer>C</answer>"),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=SimpleNamespace(completion_tokens=4),
+            )
+
+    inference_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=InferenceCompletions())
+    )
+    extractor_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=ExtractorCompletions())
+    )
+    semaphore = asyncio.Semaphore(1)
+
+    async def run_jobs():
+        jobs = []
+        for question_id in ("q1", "q2"):
+            jobs.append(
+                _infer_and_extract_one(
+                    inference_client,
+                    extractor_client,
+                    semaphore,
+                    {
+                        "question_id": question_id,
+                        "question": question_id,
+                        "answer_type": "mcq_letter",
+                        "image": str(image),
+                    },
+                    image_root=None,
+                    system_prompt="Analyze the image.",
+                    model="inference/model",
+                    max_tokens=8192,
+                    temperature=1.0,
+                    top_p=0.95,
+                    presence_penalty=0.0,
+                    frequency_penalty=0.0,
+                    seed=0,
+                    extra_body={},
+                    stop=[],
+                    include_stop_str_in_output=False,
+                    extractor_model="extractor/model",
+                    extractor_max_tokens=200,
+                    extractor_seed=0,
+                    extractor_chat_template_kwargs={"enable_thinking": False},
+                    extractor_revision="extractor-revision-a",
+                    max_final_answer_tokens=None,
+                    source_diagnostics="do_you_see_me.diagnostics.jsonl",
+                )
+            )
+        return await asyncio.gather(*jobs)
+
+    results = asyncio.run(run_jobs())
+
+    assert events == ["infer:q1", "extract:q1", "infer:q2", "extract:q2"]
+    assert [result["extracted_answer"] for result in results] == ["C", "C"]
+
+
 def test_extraction_diagnostics_preserve_custom_source_fields(tmp_path):
     output = tmp_path / "diagnostics.jsonl"
     write_diagnostics(
