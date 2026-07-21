@@ -378,6 +378,9 @@ def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> d
     source_files = [candidate.submission, candidate.diagnostics]
     source_files.extend(sorted(candidate.source_dir.glob(f"{candidate.track}.attempt-*.diagnostics.jsonl")))
     source_files.extend(sorted(candidate.source_dir.glob(f"{candidate.track}.smoke*.diagnostics.jsonl")))
+    source_files.extend(sorted(candidate.source_dir.glob(f"{candidate.track}.inference.diagnostics.jsonl")))
+    source_files.extend(sorted(candidate.source_dir.glob(f"{candidate.track}.inference.smoke*.diagnostics.jsonl")))
+    source_files.extend(sorted(candidate.source_dir.glob(f"{candidate.track}.evidence_extraction.jsonl")))
     copied: dict[str, dict[str, Any]] = {}
     for source in source_files:
         target = destination / source.name

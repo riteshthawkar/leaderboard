@@ -130,6 +130,24 @@ def test_builds_canonical_results_from_newest_complete_bf16_tracks(tmp_path):
         "minds_eye",
         200,
     )
+    for track, directory in (
+        ("do_you_see_me", newest_dys),
+        ("minds_eye", minds_eye),
+    ):
+        _write_jsonl(
+            directory / f"{track}.inference.diagnostics.jsonl",
+            [
+                {"question_id": question_id, "output": "raw response"}
+                for question_id in TRACK_IDS[track]
+            ],
+        )
+        _write_jsonl(
+            directory / f"{track}.evidence_extraction.jsonl",
+            [
+                {"question_id": question_id, "status": "committed"}
+                for question_id in TRACK_IDS[track]
+            ],
+        )
     _make_candidate(
         results_root,
         "visual_suite_quantized/model-a",
@@ -170,6 +188,15 @@ def test_builds_canonical_results_from_newest_complete_bf16_tracks(tmp_path):
             manifest["tracks"][track]["artifacts"][submission.name]["sha256"]
             == sha256(submission)
         )
+        for suffix in (
+            "inference.diagnostics.jsonl",
+            "evidence_extraction.jsonl",
+        ):
+            artifact = model_dir / f"{track}.{suffix}"
+            assert artifact.is_file()
+            assert manifest["tracks"][track]["artifacts"][artifact.name][
+                "sha256"
+            ] == sha256(artifact)
     assert index["models"][0]["manifest_sha256"] == sha256(manifest_path)
 
 
