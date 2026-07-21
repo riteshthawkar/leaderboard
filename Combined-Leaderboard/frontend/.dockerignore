@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-static
+.vite
+tests
+.env
+.env.*
+!.env.example
+npm-debug.log*

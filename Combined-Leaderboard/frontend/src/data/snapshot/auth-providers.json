@@ -1,0 +1,8 @@
+{
+  "providers": [
+    {
+      "id": "microsoft",
+      "label": "Microsoft"
+    }
+  ]
+}

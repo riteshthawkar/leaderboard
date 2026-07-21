@@ -6,23 +6,16 @@ export function cn(...inputs) {
 }
 
 export function fmtPct(value) {
-  return value == null ? "—" : `${(value * 100).toFixed(1)}%`;
+  return value == null ? "N/A" : `${(value * 100).toFixed(1)}%`;
 }
 
 export function fmtVci(value) {
-  return value == null ? "—" : (value * 100).toFixed(1);
+  return value == null ? "N/A" : (value * 100).toFixed(1);
 }
 
 export function fmtDelta(value) {
-  if (value == null) return "—";
+  if (value == null) return "N/A";
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}`;
-}
-
-export function fmtMeanStd(mean, std) {
-  if (mean == null) return "—";
-  let text = (mean * 100).toFixed(1);
-  if (std != null) text += ` ± ${(std * 100).toFixed(1)}`;
-  return `${text}%`;
 }
 
 export function prettyLabel(value) {
@@ -32,11 +25,18 @@ export function prettyLabel(value) {
 }
 
 export function modelType(meta) {
-  if (!meta) return "—";
-  const value = meta.type || meta.access || meta.org || meta.family;
-  return value ? prettyLabel(value) : "—";
+  if (!meta) return "N/A";
+  const value = meta.type || meta.access;
+  return value ? prettyLabel(value) : "N/A";
 }
 
 export function safeNext(value, fallback = "/submit") {
-  return /^\/[^/]/.test(value || "") ? value : fallback;
+  const candidate = String(value || "");
+  const hasControlCharacter = Array.from(candidate).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+  return /^\/[^/]/.test(candidate) && !candidate.includes("\\") && !hasControlCharacter
+    ? candidate
+    : fallback;
 }

@@ -1,0 +1,22 @@
+{
+  "description": "Visual cognition: can the model transform and compose shapes in the mind's eye?",
+  "grading": {
+    "method": "jsonl_exact",
+    "paper": "Mind's Eye (arXiv:2604.16054)",
+    "random_baseline": 0.22916666666666666,
+    "server_ground_truth_evaluation": true,
+    "submission_format": "jsonl"
+  },
+  "group_by": "capability",
+  "label": "Mind's Eye",
+  "layer": "cognition",
+  "paper_total_samples": 800,
+  "request_id": "c62ccb34-cff0-48ed-973a-e23ba1f328c8",
+  "score_description": "Unweighted mean of the eight task accuracies.",
+  "score_method": "unweighted_task_macro",
+  "score_provenance": "leaderboard_release_suite",
+  "section": "visual_cognition",
+  "supports_diagnostics": false,
+  "task_id": "minds_eye",
+  "total_samples": 799
+}

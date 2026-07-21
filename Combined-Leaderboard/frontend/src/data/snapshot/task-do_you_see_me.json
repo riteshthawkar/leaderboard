@@ -1,0 +1,22 @@
+{
+  "description": "Low-level visual perception: can the model SEE what is in the image?",
+  "grading": {
+    "method": "jsonl_exact",
+    "paper": "Do You See Me (arXiv:2506.02022)",
+    "random_baseline": null,
+    "server_ground_truth_evaluation": true,
+    "submission_format": "jsonl"
+  },
+  "group_by": "capability",
+  "label": "Do You See Me",
+  "layer": "perception",
+  "paper_total_samples": 2612,
+  "request_id": "55f74ece-d4cb-4b45-a85b-527d4cc29718",
+  "score_description": "Mean task accuracy within 2D and 3D, followed by an equal mean across the two dimensions.",
+  "score_method": "dimension_balanced_task_macro",
+  "score_provenance": "leaderboard_release_suite",
+  "section": "visual_cognition",
+  "supports_diagnostics": false,
+  "task_id": "do_you_see_me",
+  "total_samples": 4500
+}
