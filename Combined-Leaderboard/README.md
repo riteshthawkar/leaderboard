@@ -208,7 +208,7 @@ On a Linux machine with a free 40 GB-class BF16 NVIDIA GPU, run configured Do Yo
 bash evaluation/run_visual_suite.sh
 ```
 
-The command provisions a pinned shared environment, downloads verified public data and pinned model revisions, performs strict smoke runs, resumes checkpoints, and writes upload-ready JSONL files under `evaluation/results/visual_suite_bf16/`. Every raw visual response is canonicalized afterward by the same pinned independent text-only extractor, with no image or ground-truth access. See [`evaluation/README.md`](evaluation/README.md) for the paper-aligned track protocols, two-GPU commands, extraction provenance, audit behavior, and explicit deviations from the papers.
+The command provisions a pinned shared environment, downloads verified public data and pinned model revisions, performs strict smoke runs, resumes checkpoints, and writes upload-ready JSONL files under `evaluation/results/visual_suite_bf16/`. Visual inference first uses all assigned GPUs and saves hash-addressed responses; those servers unload before the same GPUs run the sole pinned v4 evidence extractor with no image or ground-truth access. Its evidence artifact is reused directly by canonical packaging, so no second extractor pass is needed. See [`evaluation/README.md`](evaluation/README.md) for the paper-aligned track protocols, two-GPU commands, extraction provenance, audit behavior, and explicit deviations from the papers.
 
 ## Score Semantics
 

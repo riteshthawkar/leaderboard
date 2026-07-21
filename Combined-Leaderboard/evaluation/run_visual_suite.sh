@@ -53,7 +53,7 @@ HF_HUB_ENABLE_HF_TRANSFER="0"
 HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
 BASE_SEED="${BASE_SEED:-0}"
 ANSWER_EXTRACTOR_SEED="${ANSWER_EXTRACTOR_SEED:-$BASE_SEED}"
-ANSWER_EXTRACTOR_MAX_TOKENS="${ANSWER_EXTRACTOR_MAX_TOKENS:-200}"
+ANSWER_EXTRACTOR_MAX_TOKENS="${ANSWER_EXTRACTOR_MAX_TOKENS:-256}"
 ANSWER_EXTRACTOR_MODEL="${ANSWER_EXTRACTOR_MODEL:-Qwen/Qwen3-8B}"
 ANSWER_EXTRACTOR_REVISION="${ANSWER_EXTRACTOR_REVISION:-b968826d9c46dd6066d109eabc6255188de91218}"
 ANSWER_EXTRACTOR_ENDPOINTS="${ANSWER_EXTRACTOR_ENDPOINTS:-}"
@@ -63,6 +63,7 @@ ANSWER_EXTRACTOR_PORT="${ANSWER_EXTRACTOR_PORT:-8035}"
 ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION="${ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION:-0.70}"
 ANSWER_EXTRACTOR_MAX_MODEL_LEN="${ANSWER_EXTRACTOR_MAX_MODEL_LEN:-32768}"
 EXTRACT_EXISTING_ONLY="${EXTRACT_EXISTING_ONLY:-0}"
+PIPELINE_PHASE="${PIPELINE_PHASE:-all}"
 SAMPLING_TOP_K="${SAMPLING_TOP_K:--1}"
 SAMPLING_MIN_P="${SAMPLING_MIN_P:-0.0}"
 PRESENCE_PENALTY="${PRESENCE_PENALTY:-0.0}"
@@ -91,9 +92,9 @@ QWEN36_MAX_TOKENS="${QWEN36_MAX_TOKENS:-8192}"
 VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
 VLLM_PHI4MM_MASK_SUM_PATCH_ID="vllm-0.25.1-phi4mm-fp32-mask-sum-v1"
 VLLM_DEEPSEEK_VL2_CONFIG_OVERRIDE_ID="vllm-0.25.1-deepseek-vl2-config-defaults-v1"
-ANSWER_EXTRACTION_METHOD_ID="mandatory-gold-blind-text-extractor-v2"
-UNPARSEABLE_ANSWER_POLICY_ID="mandatory-extractor-unresolved-token-v1"
-PIPELINE_REVISION_ID="unquantized-bf16-mandatory-extraction-v11"
+ANSWER_EXTRACTION_METHOD_ID="qwen3-8b-gold-blind-evidence-extractor-v4"
+UNPARSEABLE_ANSWER_POLICY_ID="evidence-extractor-terminal-status-v1"
+PIPELINE_REVISION_ID="unquantized-bf16-single-evidence-extraction-v13"
 
 # slug|repository|revision|weight loading|max context
 MODEL_SPECS=(
@@ -159,17 +160,29 @@ Common overrides:
   QWEN36_MAX_TOKENS=8192             Bound Qwen3.6 completions
   ANSWER_EXTRACTOR_MODEL=model-id    Dedicated extractor (default: Qwen/Qwen3-8B)
   ANSWER_EXTRACTOR_REVISION=commit   Immutable dedicated extractor revision
-  ANSWER_EXTRACTOR_GPU_IDS=7         Launch the managed extractor on dedicated GPU(s)
+  ANSWER_EXTRACTOR_GPU_IDS=0,1       GPUs reused by the managed extraction phase
   ANSWER_EXTRACTOR_ENDPOINTS=url     Use an already-managed extractor instead
-  EXTRACT_EXISTING_ONLY=1            Extract every existing diagnostic; no images
+  PIPELINE_PHASE=all                 Run inference, unload it, then extract (default)
+  PIPELINE_PHASE=inference           Save hash-addressed responses; do not extract
+  PIPELINE_PHASE=extraction          Extract saved responses; do not load images
+  EXTRACT_EXISTING_ONLY=1            Deprecated alias for PIPELINE_PHASE=extraction
 
 The runner uses the original checkpoint tensors with BF16 compute. It never
 loads 4-bit or 8-bit weights, resizes benchmark images, or creates a synthetic
-answer. Every visual response is followed by a gold-blind text-only LLM
-extraction request. Only that extractor decision is submitted. Missing,
+answer. Visual inference and gold-blind text-only extraction run as separate,
+resumable phases. Inference responses are stored with SHA-256 provenance before
+the visual model unloads; only later extractor decisions are submitted. Missing,
 ambiguous, malformed, empty, or failed responses become the standardized token
 UNRESOLVED; there are no answer-format reruns or raw-output fallbacks.
 EOF
+}
+
+effective_pipeline_phase() {
+  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+    printf '%s\n' extraction
+  else
+    printf '%s\n' "$PIPELINE_PHASE"
+  fi
 }
 
 log() {
@@ -521,6 +534,12 @@ validate_settings() {
   [[ -n "$ANSWER_EXTRACTOR_MODEL" ]] || die "ANSWER_EXTRACTOR_MODEL must not be empty."
   [[ "$ANSWER_EXTRACTOR_REVISION" =~ ^[0-9a-f]{40}$ ]] \
     || die "ANSWER_EXTRACTOR_REVISION must be a full 40-character commit hash."
+  local phase
+  phase="$(effective_pipeline_phase)"
+  if [[ "$phase" =~ ^(all|extraction)$ ]] \
+    && [[ -z "$ANSWER_EXTRACTOR_GPU_IDS" && -z "$ANSWER_EXTRACTOR_ENDPOINTS" ]]; then
+    ANSWER_EXTRACTOR_GPU_IDS="${GPU_ID_LIST[0]}"
+  fi
   if [[ -n "$ANSWER_EXTRACTOR_GPU_IDS" ]]; then
     [[ -z "$ANSWER_EXTRACTOR_ENDPOINTS" ]] \
       || die "Set either ANSWER_EXTRACTOR_GPU_IDS or ANSWER_EXTRACTOR_ENDPOINTS, not both."
@@ -529,12 +548,6 @@ validate_settings() {
     for extractor_gpu in "${extractor_gpu_list[@]}"; do
       [[ "$extractor_gpu" =~ ^[0-9]+$ ]] \
         || die "ANSWER_EXTRACTOR_GPU_IDS must be comma-separated GPU indices."
-      if [[ "$EXTRACT_EXISTING_ONLY" != "1" ]]; then
-        for visual_gpu in "${GPU_ID_LIST[@]}"; do
-          [[ "$extractor_gpu" != "$visual_gpu" ]] \
-            || die "Extractor GPU $extractor_gpu overlaps visual GPU_IDS; use a dedicated GPU."
-        done
-      fi
     done
     ANSWER_EXTRACTOR_ENDPOINTS="http://127.0.0.1:$ANSWER_EXTRACTOR_PORT/v1"
     EXTRACTOR_SERVER_MANAGED=1
@@ -572,9 +585,17 @@ validate_settings() {
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
   validate_flag "HF_HUB_DISABLE_XET" "$HF_HUB_DISABLE_XET"
   validate_flag "EXTRACT_EXISTING_ONLY" "$EXTRACT_EXISTING_ONLY"
+  [[ "$PIPELINE_PHASE" =~ ^(all|inference|extraction)$ ]] \
+    || die "PIPELINE_PHASE must be all, inference, or extraction."
   if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
     [[ "$FORCE" != "1" ]] || die "EXTRACT_EXISTING_ONLY cannot be combined with FORCE=1."
     [[ "$SMOKE_ONLY" != "1" ]] || die "EXTRACT_EXISTING_ONLY cannot be combined with SMOKE_ONLY=1."
+  fi
+  if [[ "$(effective_pipeline_phase)" == "extraction" ]]; then
+    [[ "$FORCE" != "1" ]] \
+      || die "PIPELINE_PHASE=extraction cannot be combined with FORCE=1 because the inference source is immutable."
+    [[ "$SMOKE_ONLY" != "1" ]] \
+      || die "PIPELINE_PHASE=extraction cannot be combined with SMOKE_ONLY=1."
   fi
   [[ -n "$(selected_tracks)" ]] || die "TRACKS must select do_you_see_me, minds_eye, or all."
   (( $(selected_model_count) > 0 )) || die "MODELS did not match any configured model slug."
@@ -585,8 +606,10 @@ validate_settings() {
 }
 
 print_plan() {
-  local track max_tokens dys_max_tokens me_max_tokens stop_sequence spec slug model_id revision loading model_max_len effective_model_len adapter_name reasoning_profile
+  local track max_tokens dys_max_tokens me_max_tokens stop_sequence spec slug model_id revision loading model_max_len effective_model_len adapter_name reasoning_profile phase
+  phase="$(effective_pipeline_phase)"
   log "Evaluation plan"
+  printf '  Pipeline phase: %s (split inference -> extraction)\n' "$phase"
   printf '  GPUs: %s (tensor parallel size %s, data parallel size %s, request concurrency %s)\n' \
     "$GPU_IDS" "$TENSOR_PARALLEL_SIZE" "$DATA_PARALLEL_SIZE" "$CONCURRENCY"
   printf '  Serving replica mode: %s\n' "$SERVING_REPLICA_MODE"
@@ -598,12 +621,18 @@ print_plan() {
     "$VLLM_DTYPE" "$VLLM_KV_CACHE_DTYPE"
   printf '  Serving engine: vLLM %s\n' "$VLLM_VERSION"
   printf '  Image preprocessing: original image bytes, no runner resize or recompression\n'
-  printf '  Mandatory answer extraction: model=%s, endpoints=%s, text only, temperature=0, max_tokens=%s, seed=%s\n' \
+  printf '  Sole v4 evidence extraction: model=%s, endpoints=%s, text only, temperature=0, max_tokens=%s, seed=%s\n' \
     "${ANSWER_EXTRACTOR_MODEL:-same-as-inference}" \
     "${ANSWER_EXTRACTOR_ENDPOINTS:-same-as-inference}" \
     "$ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_SEED"
-  printf '  Missing/ambiguous response token: UNRESOLVED; extractor transport failures stop finalization\n'
-  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+  if [[ "$EXTRACTOR_SERVER_MANAGED" == "1" ]]; then
+    printf '  Managed extractor GPUs: %s (started only after visual shutdown)\n' \
+      "$ANSWER_EXTRACTOR_GPU_IDS"
+  fi
+  printf '  Missing/ambiguous response token: UNRESOLVED; extractor transport/schema failures stop finalization\n'
+  if [[ "$phase" == "inference" ]]; then
+    printf '  Mode: hash-addressed visual inference only; no extractor requests\n'
+  elif [[ "$phase" == "extraction" ]]; then
     printf '  Mode: extract every existing diagnostic response; no visual requests\n'
   fi
   printf '  Shared sampling: top_k=%s, min_p=%s, presence=%s, frequency=%s, repetition=%s\n' \
@@ -1495,6 +1524,50 @@ print(f"Validated {output}: {len(rows)} canonical rows")
 PY
 }
 
+validate_inference_diagnostics() {
+  local diagnostics="$1" questions="$2"
+  "$PYTHON_BIN" - "$diagnostics" "$questions" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+diagnostics = Path(sys.argv[1])
+questions = Path(sys.argv[2])
+if not diagnostics.is_file():
+  raise SystemExit(f"inference diagnostics do not exist: {diagnostics}")
+expected = [
+  str(json.loads(line)["question_id"])
+  for line in questions.read_text(encoding="utf-8").splitlines()
+  if line.strip()
+]
+rows = [
+  json.loads(line)
+  for line in diagnostics.read_text(encoding="utf-8").splitlines()
+  if line.strip()
+]
+actual = [str(row.get("question_id") or "") for row in rows]
+if actual != expected:
+  raise SystemExit(
+    f"{diagnostics.name} coverage/order mismatch: expected "
+    f"{len(expected)} rows, got {len(actual)}"
+  )
+for index, row in enumerate(rows, 1):
+  output = row.get("output")
+  if not isinstance(output, str) or not output.strip():
+    raise SystemExit(f"{diagnostics.name} row {index} has no response")
+  if row.get("error") or row.get("inference_error"):
+    raise SystemExit(f"{diagnostics.name} row {index} has an inference error")
+  digest = hashlib.sha256(output.encode("utf-8")).hexdigest()
+  if (
+    row.get("inference_method") != "visual-inference-output-sha256-v1"
+    or row.get("inference_output_sha256") != digest
+  ):
+    raise SystemExit(f"{diagnostics.name} row {index} has invalid provenance")
+print(f"Validated {diagnostics}: {len(rows)} hash-addressed inference rows")
+PY
+}
+
 runner_base_args() {
   local slug="$1" model_id="$2" track="$3" seed="$4"
   local prompt_mode max_tokens stop_sequence temperature top_p chat_kwargs
@@ -1547,57 +1620,41 @@ runner_base_args() {
   fi
 }
 
-run_track() {
+run_inference_track() {
   local slug="$1" model_id="$2" track="$3"
-  local module questions model_dir output diagnostics smoke_diagnostics
+  local module questions model_dir output diagnostics inference_diagnostics smoke_diagnostics
   module="$(track_module "$track")"
   questions="$(track_questions "$track")"
   model_dir="$OUTPUT_ROOT/$slug"
   output="$model_dir/${track}_submission.jsonl"
   diagnostics="$model_dir/${track}.diagnostics.jsonl"
-  smoke_diagnostics="$model_dir/${track}.smoke.diagnostics.jsonl"
+  inference_diagnostics="$model_dir/${track}.inference.diagnostics.jsonl"
+  smoke_diagnostics="$model_dir/${track}.inference.smoke.diagnostics.jsonl"
   mkdir -p "$model_dir"
 
-  if [[ "$EXTRACT_EXISTING_ONLY" != "1" && "$FORCE" != "1" ]] \
+  if [[ "$FORCE" != "1" ]] \
     && validate_submission "$output" "$questions" >/dev/null 2>&1; then
     log "$slug/$track already has a complete canonical output; skipping"
     return 0
   fi
   if [[ "$FORCE" == "1" ]]; then
-    rm -f -- "$output" "$diagnostics" "$smoke_diagnostics"
+    rm -f -- "$output" "$diagnostics" "$inference_diagnostics" "$smoke_diagnostics"
     rm -f -- "$model_dir/${track}.attempt-"*.diagnostics.jsonl
     rm -f -- "$model_dir/${track}.smoke.attempt-"*.diagnostics.jsonl
   elif [[ -f "$output" ]]; then
     mv -- "$output" "$output.invalid.$(date -u '+%Y%m%dT%H%M%SZ')"
   fi
   runner_base_args "$slug" "$model_id" "$track" "$BASE_SEED"
-  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
-    [[ -f "$diagnostics" ]] || {
-      printf 'Evaluation failed: %s/%s has no existing diagnostics at %s\n' \
-        "$slug" "$track" "$diagnostics" >&2
-      return 1
-    }
-    log "Running mandatory gold-blind extraction for every existing $slug/$track response"
-    "$PYTHON_BIN" -m "$module" \
-      "${RUNNER_ARGS[@]}" \
-      --questions "$questions" \
-      --resume \
-      --extract-existing-diagnostics \
-      --out "$output" \
-      --diagnostics "$diagnostics" \
-      && validate_submission "$output" "$questions"
-    return
-  fi
-
-  rm -f -- "$smoke_diagnostics"
-  log "Running strict $SMOKE_SAMPLES-sample smoke test with mandatory extraction for $slug/$track"
+  log "Running strict $SMOKE_SAMPLES-sample inference smoke test for $slug/$track"
   if ! "$PYTHON_BIN" -m "$module" \
     "${RUNNER_ARGS[@]}" \
     --questions "$questions" \
     --limit "$SMOKE_SAMPLES" \
     --strict-partial \
+    --inference-only \
+    --resume \
     --diagnostics "$smoke_diagnostics"; then
-    printf 'Evaluation failed: %s/%s mandatory-extractor smoke test failed. Diagnostics remain in %s.\n' \
+    printf 'Evaluation failed: %s/%s inference smoke test failed. Diagnostics remain in %s.\n' \
       "$slug" "$track" "$smoke_diagnostics" >&2
     return 1
   fi
@@ -1605,21 +1662,78 @@ run_track() {
     return 0
   fi
 
-  log "Running $slug/$track full evaluation with mandatory extraction"
+  log "Running $slug/$track hash-addressed inference phase"
   if "$PYTHON_BIN" -m "$module" \
     "${RUNNER_ARGS[@]}" \
     --questions "$questions" \
+    --inference-only \
     --resume \
-    --out "$output" \
-    --diagnostics "$diagnostics" \
-    && validate_submission "$output" "$questions"; then
+    --diagnostics "$inference_diagnostics" \
+    && validate_inference_diagnostics "$inference_diagnostics" "$questions"; then
     rm -f -- "$smoke_diagnostics"
     return 0
   fi
 
-  printf 'Evaluation failed: %s/%s did not complete its single inference-plus-extraction pass. Diagnostics remain in %s. No submission file was finalized.\n' \
-    "$slug" "$track" "$diagnostics" >&2
+  printf 'Evaluation failed: %s/%s did not complete its inference phase. Diagnostics remain in %s. No submission file was finalized.\n' \
+    "$slug" "$track" "$inference_diagnostics" >&2
   return 1
+}
+
+run_extraction_track() {
+  local slug="$1" model_id="$2" track="$3"
+  local questions model_dir output diagnostics inference_diagnostics evidence
+  questions="$(track_questions "$track")"
+  model_dir="$OUTPUT_ROOT/$slug"
+  output="$model_dir/${track}_submission.jsonl"
+  diagnostics="$model_dir/${track}.diagnostics.jsonl"
+  inference_diagnostics="$model_dir/${track}.inference.diagnostics.jsonl"
+  evidence="$model_dir/${track}.evidence_extraction.jsonl"
+
+  if [[ "$FORCE" != "1" ]] \
+    && validate_submission "$output" "$questions" >/dev/null 2>&1; then
+    log "$slug/$track already has a complete canonical output; skipping"
+    return 0
+  fi
+  validate_inference_diagnostics "$inference_diagnostics" "$questions" || {
+    printf 'Evaluation failed: %s/%s extraction requires complete hash-addressed diagnostics at %s\n' \
+      "$slug" "$track" "$inference_diagnostics" >&2
+    return 1
+  }
+  if [[ -f "$output" ]]; then
+    mv -- "$output" "$output.invalid.$(date -u '+%Y%m%dT%H%M%SZ')"
+  fi
+  log "Running the single production v4 evidence extractor for every saved $slug/$track response"
+  "$PYTHON_BIN" -m evaluation.extract_staging_evidence \
+    --model-slug "$slug" \
+    --track "$track" \
+    --questions "$questions" \
+    --source "$inference_diagnostics" \
+    --evidence "$evidence" \
+    --out "$output" \
+    --diagnostics "$diagnostics" \
+    --endpoint "$ANSWER_EXTRACTOR_ENDPOINTS" \
+    --model "$ANSWER_EXTRACTOR_MODEL" \
+    --revision "$ANSWER_EXTRACTOR_REVISION" \
+    --max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
+    --concurrency "$CONCURRENCY" \
+    --timeout "$REQUEST_TIMEOUT_SECONDS" \
+    --endpoint-start-timeout "$MODEL_START_TIMEOUT_SECONDS" \
+    --retries 2 \
+    --report-every "$CHECKPOINT_EVERY" \
+    && validate_submission "$output" "$questions"
+}
+
+run_track() {
+  local phase
+  phase="$(effective_pipeline_phase)"
+  case "$phase" in
+    inference) run_inference_track "$@" ;;
+    extraction) run_extraction_track "$@" ;;
+    all)
+      run_inference_track "$@" \
+        && { [[ "$SMOKE_ONLY" == "1" ]] || run_extraction_track "$@"; }
+      ;;
+  esac
 }
 
 completed_tracks() {
@@ -1634,10 +1748,12 @@ completed_tracks() {
 }
 
 ensure_run_config() {
-  local slug="$1" model_id="$2" revision="$3" loading="$4" model_max_len="$5"
+  local slug="$1" model_id="$2" revision="$3" loading="$4" model_max_len="$5" selected_track_csv
+  selected_track_csv="$(selected_tracks | paste -sd, -)"
   resolve_max_num_seqs_per_replica
   mkdir -p "$OUTPUT_ROOT/$slug"
   RUN_CONFIG_PATH="$OUTPUT_ROOT/$slug/.run_config.json" \
+  RUN_CONFIG_SELECTED_TRACKS="$selected_track_csv" \
   RUN_CONFIG_MODEL_ID="$model_id" RUN_CONFIG_REVISION="$revision" \
   RUN_CONFIG_LOADING="$loading" RUN_CONFIG_MODEL_MAX_LEN="$model_max_len" \
   RUN_CONFIG_DTYPE="$VLLM_DTYPE" RUN_CONFIG_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" \
@@ -1693,8 +1809,13 @@ import json
 import os
 from pathlib import Path
 
+from evaluation.evidence_contract import extractor_contract_sha256
+
 path = Path(os.environ["RUN_CONFIG_PATH"])
 root = Path(os.environ["RUN_CONFIG_PROJECT_ROOT"])
+selected_tracks = {
+  track for track in os.environ["RUN_CONFIG_SELECTED_TRACKS"].split(",") if track
+}
 
 def sha256(file_path: Path) -> str:
   digest = hashlib.sha256()
@@ -1717,7 +1838,7 @@ def protocol(prefix: str, track: str) -> dict:
         "max_tokens_policy": os.environ[f"RUN_CONFIG_{prefix}_MAX_TOKENS_POLICY"],
           "final_answer_max_tokens": final_answer_max_tokens,
           "final_answer_token_enforcement": (
-            "post-extraction-served-model-tokenizer"
+            "v4-evidence-domain-validation"
             if needs_separate_answer_check
             else "total-completion-cap"
           ),
@@ -1738,7 +1859,7 @@ def protocol(prefix: str, track: str) -> dict:
     }
 
 desired = {
-  "schema_version": 11,
+  "schema_version": 13,
     "model_id": os.environ["RUN_CONFIG_MODEL_ID"],
     "model_revision": os.environ["RUN_CONFIG_REVISION"],
     "reasoning_profile": os.environ["RUN_CONFIG_REASONING_PROFILE"],
@@ -1793,20 +1914,29 @@ desired = {
     },
     "image_preprocessing": "original-bytes-no-runner-resize-or-recompression",
     "answer_extraction": {
-      "mode": "mandatory-after-every-model-response",
+      "mode": "separate-post-inference-phase",
+      "phase_order": ["inference", "extraction"],
+      "inference_artifact": "<track>.inference.diagnostics.jsonl",
+      "evidence_artifact": "<track>.evidence_extraction.jsonl",
+      "inference_method": "visual-inference-output-sha256-v1",
+      "source_immutability": "extract-from-separate-hash-validated-artifact",
       "authoritative_answer_field": "diagnostics.extracted_answer",
       "extractor": {
         "method": os.environ["RUN_CONFIG_ANSWER_EXTRACTION_METHOD"],
+        "contract_sha256": extractor_contract_sha256(
+          os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MODEL"],
+          int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS"]),
+          os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_REVISION"],
+        ),
         "model": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MODEL"],
         "revision": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_REVISION"],
         "endpoints": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_ENDPOINTS"].split(","),
         "input_fields": [
           "question",
           "answer_type",
-          "answer_domain",
-          "required_output_format",
-          "response_metadata",
           "candidate_response",
+          "response_metadata",
+          "task",
         ],
         "image_supplied": False,
         "ground_truth_supplied": False,
@@ -1814,17 +1944,15 @@ desired = {
         "top_p": 1.0,
         "seed": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_SEED"]),
         "max_tokens": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS"]),
-        "stop_sequences": ["</answer>"],
-        "include_stop_str_in_output": True,
         "chat_template_kwargs": json.loads(
           os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_CHAT_KWARGS"]
         ),
-        "support_validation": "answer-must-be-stated-in-candidate-response",
+        "support_validation": "literal-evidence-quote-and-commitment-validation",
         "source_provenance": [
-          "diagnostics_filename",
+          "inference_diagnostics_filename",
           "candidate-response-utf8-sha256",
         ],
-        "output_contract": "exactly-one-answer-block",
+        "output_contract": "strict-json-verdict-answer-evidence",
         "unresolved_token": "UNRESOLVED",
       },
     },
@@ -1844,6 +1972,8 @@ desired = {
         "runner": {
             "visual_pipeline": sha256(root / "evaluation" / "common" / "visual_pipeline.py"),
             "vllm_runner": sha256(root / "evaluation" / "common" / "vllm_runner.py"),
+          "evidence_extractor": sha256(root / "evaluation" / "extract_canonical_answers.py"),
+          "staging_evidence_adapter": sha256(root / "evaluation" / "extract_staging_evidence.py"),
         },
     },
 }
@@ -1882,12 +2012,159 @@ def is_supported_extraction_upgrade(existing: dict) -> bool:
     and (
       existing.get("schema_version"), existing.get("pipeline_revision")
     ) == (10, "unquantized-bf16-smoke-and-full-text-extraction-v10")
-    and desired.get("schema_version") == 11
+    and desired.get("schema_version") == 13
     and desired.get("pipeline_revision")
-    == "unquantized-bf16-mandatory-extraction-v11"
+    == "unquantized-bf16-single-evidence-extraction-v13"
     and extraction_upgrade_invariants(existing)
     == extraction_upgrade_invariants(desired)
   )
+
+def split_phase_upgrade_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  for key in (
+    "schema_version",
+    "answer_extraction",
+    "pipeline_revision",
+    "artifact_migrations",
+  ):
+    invariant.pop(key, None)
+  invariant.get("source_hashes", {}).pop("runner", None)
+  return invariant
+
+def is_supported_split_phase_upgrade(existing: dict) -> bool:
+  model_dir = path.parent
+  return (
+    existing.get("schema_version") == 11
+    and existing.get("pipeline_revision")
+    == "unquantized-bf16-mandatory-extraction-v11"
+    and desired.get("schema_version") == 13
+    and desired.get("pipeline_revision")
+    == "unquantized-bf16-single-evidence-extraction-v13"
+    and any(
+      (model_dir / f"{track}.diagnostics.jsonl").is_file()
+      for track in ("do_you_see_me", "minds_eye")
+    )
+    and split_phase_upgrade_invariants(existing)
+    == split_phase_upgrade_invariants(desired)
+  )
+
+def archive_split_phase_upgrade(existing: dict) -> dict:
+  from evaluation.common.vllm_runner import (
+    EXTRACTOR_PROVENANCE_FIELDS,
+    INFERENCE_METHOD,
+  )
+
+  model_dir = path.parent
+  converted = {}
+  stripped_fields = {
+    *EXTRACTOR_PROVENANCE_FIELDS,
+    "extracted_answer",
+    "extractor_attempts",
+    "final_answer_tokens",
+  }
+
+  def convert_source(source: Path, target: Path, archive: Path) -> dict:
+    original_bytes = source.read_bytes()
+    rows = [
+      json.loads(line)
+      for line in original_bytes.decode("utf-8").splitlines()
+      if line.strip()
+    ]
+    inference_rows = []
+    for index, row in enumerate(rows, 1):
+      output = row.get("output")
+      if not isinstance(output, str) or not output.strip():
+        raise SystemExit(
+          f"Cannot migrate {source.name}: row {index} has no visual response."
+        )
+      if row.get("error") or row.get("inference_error"):
+        raise SystemExit(
+          f"Cannot migrate {source.name}: row {index} has an inference error."
+        )
+      output_sha256 = hashlib.sha256(output.encode("utf-8")).hexdigest()
+      if row.get("extractor_source_output_sha256") != output_sha256:
+        raise SystemExit(
+          f"Cannot migrate {source.name}: row {index} response hash differs "
+          "from its extractor provenance."
+        )
+      inference_row = {
+        key: value for key, value in row.items() if key not in stripped_fields
+      }
+      inference_row["inference_method"] = INFERENCE_METHOD
+      inference_row["inference_output_sha256"] = output_sha256
+      inference_rows.append(inference_row)
+
+    inference_content = "".join(
+      json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+      for row in inference_rows
+    ).encode("utf-8")
+    if target.exists():
+      if target.read_bytes() != inference_content:
+        raise SystemExit(f"Existing split-phase source differs: {target.name}.")
+    else:
+      temporary = target.with_suffix(".jsonl.tmp")
+      temporary.write_bytes(inference_content)
+      os.replace(temporary, target)
+    if archive.exists():
+      if archive.read_bytes() != original_bytes:
+        raise SystemExit(
+          f"Split-phase archive differs from {source.name}: {archive.name}."
+        )
+    else:
+      archive.write_bytes(original_bytes)
+    return {
+      "source_diagnostics": source.name,
+      "source_diagnostics_sha256": hashlib.sha256(original_bytes).hexdigest(),
+      "archive": archive.name,
+      "inference_diagnostics": target.name,
+      "inference_diagnostics_sha256": hashlib.sha256(
+        inference_content
+      ).hexdigest(),
+      "row_count": len(rows),
+    }
+
+  for track in ("do_you_see_me", "minds_eye"):
+    diagnostics = model_dir / f"{track}.diagnostics.jsonl"
+    if not diagnostics.is_file():
+      continue
+    inference_diagnostics = model_dir / f"{track}.inference.diagnostics.jsonl"
+    archive = model_dir / f"{track}.pre-split-phase.diagnostics.jsonl"
+    track_conversion = convert_source(
+      diagnostics, inference_diagnostics, archive
+    )
+    submission = model_dir / f"{track}_submission.jsonl"
+    canonical_action = "retained-complete"
+    if track in selected_tracks and not submission.is_file():
+      diagnostics.unlink()
+      canonical_action = "archived-for-post-inference-reextraction"
+    track_conversion["canonical_action"] = canonical_action
+
+    smoke = model_dir / f"{track}.smoke.diagnostics.jsonl"
+    if smoke.is_file():
+      inference_smoke = (
+        model_dir / f"{track}.inference.smoke.diagnostics.jsonl"
+      )
+      smoke_archive = (
+        model_dir / f"{track}.pre-split-phase.smoke.diagnostics.jsonl"
+      )
+      track_conversion["smoke"] = convert_source(
+        smoke, inference_smoke, smoke_archive
+      )
+      smoke.unlink()
+    converted[track] = {
+      **track_conversion,
+      "canonical_action": canonical_action,
+    }
+
+  return {
+    "reason": "provenance-preserving-split-inference-extraction-upgrade",
+    "from_schema_version": existing["schema_version"],
+    "from_pipeline_revision": existing["pipeline_revision"],
+    "to_schema_version": desired["schema_version"],
+    "to_pipeline_revision": desired["pipeline_revision"],
+    "converted_tracks": converted,
+    "final_extraction_policy": "rerun-after-complete-inference-source",
+  }
 
 def serving_resource_invariants(config: dict) -> dict:
   invariant = json.loads(json.dumps(config))
@@ -2198,20 +2475,30 @@ def is_supported_serving_topology_resume(existing: dict) -> bool:
   model_dir = path.parent
   has_checkpoint = any(
     (model_dir / f"{track}.diagnostics.jsonl").is_file()
-    for track in ("do_you_see_me", "minds_eye")
+    or (model_dir / f"{track}.inference.diagnostics.jsonl").is_file()
+    for track in selected_tracks
+  )
+  selected_track_complete = any(
+    (model_dir / f"{track}_submission.jsonl").is_file()
+    for track in selected_tracks
   )
   topology_changed = (
     existing.get("data_parallel_size") != desired.get("data_parallel_size")
     or existing.get("request_concurrency") != desired.get("request_concurrency")
   )
   return (
-    existing.get("schema_version") == desired.get("schema_version") == 10
+    existing.get("schema_version") == desired.get("schema_version")
     and existing.get("pipeline_revision")
     == desired.get("pipeline_revision")
-    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and desired.get("pipeline_revision") in {
+      "unquantized-bf16-smoke-and-full-text-extraction-v10",
+      "unquantized-bf16-mandatory-extraction-v11",
+      "unquantized-bf16-split-inference-extraction-v12",
+      "unquantized-bf16-single-evidence-extraction-v13",
+    }
     and has_checkpoint
     and topology_changed
-    and not list(model_dir.glob("*_submission.jsonl"))
+    and not selected_track_complete
     and serving_topology_resume_invariants(existing)
     == serving_topology_resume_invariants(desired)
   )
@@ -2525,6 +2812,8 @@ def archive_glm_extended_retry(existing: dict) -> dict:
 def archive_serving_topology_resume(existing: dict) -> dict:
   model_dir = path.parent
   baselines = {}
+  inference_baselines = {}
+  preserved_submissions = {}
   archived_attempts = []
   for track in ("do_you_see_me", "minds_eye"):
     diagnostics = model_dir / f"{track}.diagnostics.jsonl"
@@ -2548,6 +2837,42 @@ def archive_serving_topology_resume(existing: dict) -> dict:
         "row_count": sum(
           bool(line.strip())
           for line in diagnostics_bytes.decode("utf-8").splitlines()
+        ),
+      }
+
+    inference_diagnostics = model_dir / f"{track}.inference.diagnostics.jsonl"
+    if inference_diagnostics.is_file():
+      inference_archive = (
+        model_dir
+        / f"{track}.pre-serving-topology-resume.inference.diagnostics.jsonl"
+      )
+      inference_bytes = inference_diagnostics.read_bytes()
+      inference_digest = hashlib.sha256(inference_bytes).hexdigest()
+      if inference_archive.exists():
+        if sha256(inference_archive) != inference_digest:
+          raise SystemExit(
+            f"Topology archive differs from {inference_diagnostics.name}: "
+            f"{inference_archive.name}. Refusing to overwrite it."
+          )
+      else:
+        inference_archive.write_bytes(inference_bytes)
+      inference_baselines[track] = {
+        "file": inference_archive.name,
+        "sha256": inference_digest,
+        "row_count": sum(
+          bool(line.strip())
+          for line in inference_bytes.decode("utf-8").splitlines()
+        ),
+      }
+
+    submission = model_dir / f"{track}_submission.jsonl"
+    if submission.is_file():
+      preserved_submissions[track] = {
+        "file": submission.name,
+        "sha256": sha256(submission),
+        "row_count": sum(
+          bool(line.strip())
+          for line in submission.read_text(encoding="utf-8").splitlines()
         ),
       }
 
@@ -2580,6 +2905,8 @@ def archive_serving_topology_resume(existing: dict) -> dict:
   return {
     "reason": "provenance-preserving-serving-topology-resume",
     "baseline_diagnostics": baselines,
+    "inference_baseline_diagnostics": inference_baselines,
+    "preserved_submission_artifacts": preserved_submissions,
     "archived_attempt_diagnostics": archived_attempts,
     "previous_serving": serving_protocol(existing),
     "current_serving": serving_protocol(desired),
@@ -2626,6 +2953,17 @@ elif path.is_file():
             f"Migrated {path.parent.name} run fingerprint from schema "
             f"{existing['schema_version']} to {desired['schema_version']}; "
             "existing diagnostics were preserved."
+          )
+        elif is_supported_split_phase_upgrade(existing):
+          migration = archive_split_phase_upgrade(existing)
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            migration,
+          ]
+          print(
+            f"Migrated {path.parent.name} to separate inference and extraction "
+            "phases; verified raw responses were preserved and incomplete "
+            "canonical diagnostics will be re-extracted."
           )
         elif is_supported_serving_resource_upgrade(existing):
           desired["artifact_migrations"] = [
@@ -2821,6 +3159,16 @@ tracks = {}
 for track in os.environ["MANIFEST_TRACKS"].split(","):
     output = path.parent / f"{track}_submission.jsonl"
     diagnostics = path.parent / f"{track}.diagnostics.jsonl"
+    inference_diagnostics = path.parent / f"{track}.inference.diagnostics.jsonl"
+    evidence_extraction = path.parent / f"{track}.evidence_extraction.jsonl"
+    if not inference_diagnostics.is_file():
+      raise SystemExit(
+        f"Cannot write manifest without {inference_diagnostics.name}."
+      )
+    if not evidence_extraction.is_file():
+      raise SystemExit(
+        f"Cannot write manifest without {evidence_extraction.name}."
+      )
     rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line]
     diagnostic_rows = [
       json.loads(line)
@@ -2840,6 +3188,10 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
         "row_count": len(rows),
         "submission_sha256": sha256(output),
         "diagnostics_sha256": sha256(diagnostics),
+        "inference_diagnostics_file": inference_diagnostics.name,
+        "inference_diagnostics_sha256": sha256(inference_diagnostics),
+        "evidence_extraction_file": evidence_extraction.name,
+        "evidence_extraction_sha256": sha256(evidence_extraction),
         "resolved_answer_count": len(rows) - len(unresolved_answer_question_ids),
         "unresolved_answer_count": len(unresolved_answer_question_ids),
         "unresolved_answer_question_ids": unresolved_answer_question_ids,
@@ -2869,7 +3221,7 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     }
 
 manifest = {
-  "schema_version": 11,
+  "schema_version": 13,
     "created_at": datetime.now(timezone.utc).isoformat(),
     "model_id": os.environ["MANIFEST_MODEL_ID"],
     "model_revision": os.environ["MANIFEST_REVISION"],
@@ -2935,6 +3287,16 @@ model_outputs_complete() {
   done < <(selected_tracks)
 }
 
+model_inference_outputs_complete() {
+  local slug="$1" track questions diagnostics
+  while IFS= read -r track; do
+    questions="$(track_questions "$track")"
+    diagnostics="$OUTPUT_ROOT/$slug/${track}.inference.diagnostics.jsonl"
+    validate_inference_diagnostics "$diagnostics" "$questions" >/dev/null 2>&1 \
+      || return 1
+  done < <(selected_tracks)
+}
+
 model_was_skipped() {
   local requested="$1" skipped
   for skipped in "${SKIPPED_MODELS[@]}"; do
@@ -2945,13 +3307,14 @@ model_was_skipped() {
 
 run_model() {
   local slug="$1" model_id="$2" revision="$3" loading="$4" model_max_len="$5"
-  local model_cache="$CACHE_ROOT/models/$slug" request_model track track_failed=0
+  local model_cache="$CACHE_ROOT/models/$slug" request_model track track_failed=0 phase
+  phase="$(effective_pipeline_phase)"
   if [[ "$MAX_MODEL_LEN" != "auto" ]]; then
     model_max_len="$MAX_MODEL_LEN"
   fi
 
   ensure_run_config "$slug" "$model_id" "$revision" "$loading" "$model_max_len" || return 1
-  if [[ "$EXTRACT_EXISTING_ONLY" != "1" && "$SMOKE_ONLY" != "1" && "$FORCE" != "1" ]] \
+  if [[ "$phase" != "inference" && "$SMOKE_ONLY" != "1" && "$FORCE" != "1" ]] \
     && model_outputs_complete "$slug"; then
     log "$slug is already complete; skipping model startup"
     write_manifest "$slug" "$model_id" "$revision" "$loading" "$model_max_len"
@@ -2960,13 +3323,49 @@ run_model() {
     return 0
   fi
 
+  if [[ "$phase" == "inference" && "$SMOKE_ONLY" != "1" && "$FORCE" != "1" ]] \
+    && model_inference_outputs_complete "$slug"; then
+    log "$slug already has complete hash-addressed inference outputs; skipping model startup"
+    SKIPPED_MODELS+=("$slug")
+    return 0
+  fi
+
   request_model="$(model_request_name "$slug" "$model_id")"
-  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+  if [[ "$phase" =~ ^(all|inference)$ ]]; then
+    if ! model_inference_outputs_complete "$slug" || [[ "$SMOKE_ONLY" == "1" ]]; then
+      if ! start_server "$slug" "$model_id" "$revision" "$loading" "$model_cache" "$model_max_len"; then
+        delete_model_cache "$model_cache"
+        return 1
+      fi
+      while IFS= read -r track; do
+        if ! run_inference_track "$slug" "$request_model" "$track"; then
+          track_failed=1
+          log "$slug/$track inference failed; remaining extraction is blocked"
+        fi
+      done < <(selected_tracks)
+      stop_server
+    else
+      log "$slug already has complete hash-addressed inference outputs; visual startup skipped"
+    fi
+    if [[ "$track_failed" == "1" ]]; then
+      delete_model_cache "$model_cache"
+      return 1
+    fi
+    if [[ "$phase" == "inference" || "$SMOKE_ONLY" == "1" ]]; then
+      return 0
+    fi
+  fi
+
+  if [[ "$phase" =~ ^(all|extraction)$ ]]; then
+    if ! model_inference_outputs_complete "$slug"; then
+      log "$slug extraction is blocked because inference diagnostics are incomplete"
+      return 1
+    fi
     if ! start_extractor_server; then
       return 1
     fi
     while IFS= read -r track; do
-      if ! run_track "$slug" "$request_model" "$track"; then
+      if ! run_extraction_track "$slug" "$request_model" "$track"; then
         track_failed=1
         log "$slug/$track extraction failed; continuing with remaining selected tracks"
       fi
@@ -2975,33 +3374,6 @@ run_model() {
     if [[ "$track_failed" == "1" ]]; then
       return 1
     fi
-    write_manifest "$slug" "$model_id" "$revision" "$loading" "$model_max_len"
-    return 0
-  fi
-
-  if ! start_server "$slug" "$model_id" "$revision" "$loading" "$model_cache" "$model_max_len"; then
-    delete_model_cache "$model_cache"
-    return 1
-  fi
-  if ! start_extractor_server; then
-    stop_server
-    delete_model_cache "$model_cache"
-    return 1
-  fi
-  while IFS= read -r track; do
-    if ! run_track "$slug" "$request_model" "$track"; then
-      track_failed=1
-      log "$slug/$track failed; continuing with remaining selected tracks"
-    fi
-  done < <(selected_tracks)
-  stop_extractor_server
-  stop_server
-  if [[ "$track_failed" == "1" ]]; then
-    delete_model_cache "$model_cache"
-    return 1
-  fi
-
-  if [[ "$SMOKE_ONLY" != "1" ]]; then
     write_manifest "$slug" "$model_id" "$revision" "$loading" "$model_max_len"
     delete_model_cache "$model_cache"
   fi
@@ -3025,7 +3397,7 @@ main() {
   setup_environment
   apply_model_compatibility_patches
   verify_vllm_cli
-  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+  if [[ "$(effective_pipeline_phase)" == "extraction" ]]; then
     log "Extraction-only mode uses public question files and existing diagnostics; image dataset preparation is skipped"
   else
     prepare_dataset

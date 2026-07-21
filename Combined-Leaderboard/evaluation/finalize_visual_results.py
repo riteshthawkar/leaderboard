@@ -29,6 +29,8 @@ CURRENT_PIPELINE_REVISION = "unquantized-bf16-evidence-extraction-v12"
 SUPPORTED_PIPELINE_REVISIONS = {
     "unquantized-bf16-smoke-and-full-text-extraction-v10",
     "unquantized-bf16-mandatory-extraction-v11",
+    "unquantized-bf16-split-inference-extraction-v12",
+    "unquantized-bf16-single-evidence-extraction-v13",
     CURRENT_PIPELINE_REVISION,
 }
 SUBMISSION_FIELDS = {"question_id", "condition", "answer"}

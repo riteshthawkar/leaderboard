@@ -16,6 +16,8 @@ from typing import Any, Iterable, Sequence
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from visual_answer_contract import INVALID_FORMAT_TOKEN
+
 
 STANDARD_CONDITION = "standard"
 MISSING_ANSWER_TOKEN = "UNRESOLVED"
@@ -384,6 +386,8 @@ def extracted_record_answer(record: dict[str, Any], answer_type: str) -> str:
     extracted = record.get("extracted_answer")
     if str(extracted).strip().upper() == MISSING_ANSWER_TOKEN:
         return MISSING_ANSWER_TOKEN
+    if str(extracted).strip() == INVALID_FORMAT_TOKEN:
+        return INVALID_FORMAT_TOKEN
     return final_answer(extracted, answer_type)
 
 
@@ -443,6 +447,12 @@ def write_diagnostics(
             row["error"] = str(item["error"])
         if item.get("inference_error"):
             row["inference_error"] = str(item["inference_error"])
+        if item.get("inference_method"):
+            row["inference_method"] = str(item["inference_method"])
+        if item.get("inference_output_sha256"):
+            row["inference_output_sha256"] = str(
+                item["inference_output_sha256"]
+            )
         if item.get("finish_reason"):
             row["finish_reason"] = str(item["finish_reason"])
         if item.get("completion_tokens") is not None:

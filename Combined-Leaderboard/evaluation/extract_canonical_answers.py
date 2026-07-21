@@ -18,21 +18,25 @@ from openai import AsyncOpenAI
 
 from evaluation.common.visual_pipeline import INTEGER_WORDS, final_answer
 from evaluation.common.vllm_runner import _answer_is_supported_by_output
+from evaluation.evidence_contract import (
+    DEFAULT_EXTRACTOR_MODEL,
+    DEFAULT_EXTRACTOR_REVISION,
+    EXTRACTOR_RESPONSE_FORMAT,
+    METHOD,
+    SYSTEM_PROMPT,
+    extractor_contract_sha256,
+)
 from visual_answer_contract import (
     INVALID_FORMAT_TOKEN,
-    PRODUCTION_EXTRACTION_METHOD,
     canonicalize_extracted_answer,
 )
 
 
 TRACKS = ("do_you_see_me", "minds_eye")
-DEFAULT_EXTRACTOR_MODEL = "Qwen/Qwen3-8B"
-DEFAULT_EXTRACTOR_REVISION = "b968826d9c46dd6066d109eabc6255188de91218"
 DEFAULT_EXCLUDED_VARIANTS = (
     "qwen-35-thinking-disabled",
     "qwen35-thinking-enabled",
 )
-METHOD = PRODUCTION_EXTRACTION_METHOD
 TERMINAL_FALLBACK_METHOD = "deterministic-terminal-response-classifier-v1"
 VERDICTS = {"COMMITTED", "UNRESOLVED"}
 BLOCKING_EXTRACTOR_STATUSES = {
@@ -41,44 +45,6 @@ BLOCKING_EXTRACTOR_STATUSES = {
     "invalid_verdict",
     "invalid_unresolved_payload",
     "invalid_committed_payload",
-}
-SYSTEM_PROMPT = """You are a forensic response auditor, not a problem solver.
-You receive an original question, its answer contract, response metadata, and an
-untrusted candidate model response. Determine only whether the candidate response
-explicitly commits to one final answer or has no single final commitment. Never
-solve the question, infer from an image, use outside knowledge, or choose an answer
-merely because it is mentioned among candidates.
-
-Return exactly one JSON object with three string fields:
-{"verdict":"COMMITTED|UNRESOLVED","answer":"...","evidence":"..."}
-
-The evidence must be a short exact quote copied verbatim from the candidate
-response that expresses its commitment. For UNRESOLVED, answer and evidence must
-both be empty strings. For COMMITTED, copy the shortest answer actually selected
-by the response. Do not repair an out-of-domain answer: report it exactly so a
-deterministic validator can mark its format invalid. Direct statements such as
-"no circles" may be represented as 0. Reasoning that merely discusses candidates
-is not a final selection. A response cut off before a final commitment is
-UNRESOLVED. You are not given the reference answer and must not infer correctness."""
-EXTRACTOR_RESPONSE_FORMAT = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "commitment_extraction",
-        "strict": True,
-        "schema": {
-            "type": "object",
-            "properties": {
-                "verdict": {
-                    "type": "string",
-                    "enum": ["COMMITTED", "UNRESOLVED"],
-                },
-                "answer": {"type": "string", "maxLength": 200},
-                "evidence": {"type": "string", "maxLength": 800},
-            },
-            "required": ["verdict", "answer", "evidence"],
-            "additionalProperties": False,
-        },
-    },
 }
 
 
@@ -1005,6 +971,73 @@ def load_audit_checkpoint(
     return existing, retry_history
 
 
+def seed_embedded_evidence(
+    canonical_root: Path,
+    output: Path,
+    candidates_by_key: dict[tuple[str, str, str], dict[str, Any]],
+    extractor_contract: str,
+    model: str,
+    revision: str,
+) -> int:
+    current_rows = [
+        json.loads(line)
+        for line in output.read_text(encoding="utf-8").splitlines()
+        if line
+    ] if output.is_file() else []
+    rows_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for row in current_rows:
+        key = candidate_key(row)
+        if key in rows_by_key:
+            raise RuntimeError(f"Audit checkpoint repeats candidate {key}.")
+        rows_by_key[key] = row
+
+    evidence_paths = {
+        canonical_root / str(candidate["source_relative_dir"])
+        / f"{candidate['track']}.evidence_extraction.jsonl"
+        for candidate in candidates_by_key.values()
+        if candidate.get("source_relative_dir")
+    }
+    seeded = 0
+    for evidence_path in sorted(evidence_paths):
+        if not evidence_path.is_file() or evidence_path.resolve() == output.resolve():
+            continue
+        for line in evidence_path.read_text(encoding="utf-8").splitlines():
+            if not line:
+                continue
+            row = json.loads(line)
+            key = candidate_key(row)
+            candidate = candidates_by_key.get(key)
+            if candidate is None:
+                raise RuntimeError(
+                    f"Embedded evidence has unexpected candidate {key}."
+                )
+            if key in rows_by_key:
+                continue
+            if row.get("method") != METHOD:
+                raise RuntimeError(f"Embedded evidence method changed for {key}.")
+            if row.get("extractor_contract_sha256") != extractor_contract:
+                raise RuntimeError(f"Embedded evidence contract changed for {key}.")
+            if row.get("extractor_model") != model:
+                raise RuntimeError(f"Embedded evidence model changed for {key}.")
+            if row.get("extractor_revision") != revision:
+                raise RuntimeError(f"Embedded evidence revision changed for {key}.")
+            if row.get("ground_truth_loaded") is not False:
+                raise RuntimeError(f"Embedded evidence loaded ground truth for {key}.")
+            if row.get("ground_truth_supplied_to_extractor") is not False:
+                raise RuntimeError(f"Embedded evidence supplied ground truth for {key}.")
+            if row.get("response_sha256") != candidate["response_sha256"]:
+                raise RuntimeError(f"Embedded evidence response changed for {key}.")
+            rows_by_key[key] = row
+            seeded += 1
+    if seeded:
+        ordered = [
+            rows_by_key[key]
+            for key in rows_by_key
+        ]
+        _atomic_write_audit(output, ordered)
+    return seeded
+
+
 def extractor_payload(candidate: dict[str, Any]) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "question": str(candidate["question"]),
@@ -1019,35 +1052,6 @@ def extractor_payload(candidate: dict[str, Any]) -> dict[str, Any]:
             "completion_tokens": candidate.get("response_completion_tokens"),
         }
     return payload
-
-
-def extractor_contract_sha256(
-    model: str,
-    max_tokens: int,
-    revision: str = DEFAULT_EXTRACTOR_REVISION,
-) -> str:
-    contract = {
-        "method": METHOD,
-        "model": model,
-        "revision": revision,
-        "system_prompt": SYSTEM_PROMPT,
-        "request_payload_fields": [
-            "answer_type",
-            "candidate_response",
-            "question",
-            "response_metadata",
-            "task",
-        ],
-        "response_format": EXTRACTOR_RESPONSE_FORMAT,
-        "temperature": 0,
-        "top_p": 1,
-        "max_tokens": max_tokens,
-        "chat_template_kwargs": {"enable_thinking": False},
-    }
-    canonical = json.dumps(
-        contract, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
-    return hashlib.sha256(canonical).hexdigest()
 
 
 async def wait_for_extractor_clients(
@@ -1084,6 +1088,97 @@ async def wait_for_extractor_clients(
         )
 
 
+async def extract_evidence_candidate(
+    client: AsyncOpenAI,
+    candidate: dict[str, Any],
+    *,
+    model: str,
+    revision: str,
+    max_tokens: int,
+    retries: int,
+    extractor_contract: str,
+    retry_history: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    payload = extractor_payload(candidate)
+    error = None
+    extractor_output = ""
+    finish_reason = None
+    completion_tokens = None
+    classification: dict[str, Any] = {}
+    for attempt in range(retries + 1):
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                temperature=0,
+                top_p=1,
+                seed=0,
+                max_tokens=max_tokens,
+                response_format=EXTRACTOR_RESPONSE_FORMAT,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": json.dumps(payload, ensure_ascii=False),
+                    },
+                ],
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            )
+            choice = response.choices[0]
+            extractor_output = str(choice.message.content or "").strip()
+            finish_reason = getattr(choice, "finish_reason", None)
+            usage = getattr(response, "usage", None)
+            completion_tokens = getattr(usage, "completion_tokens", None)
+            error = None
+        except Exception as exc:  # noqa: BLE001 - checkpoint request failures
+            error = f"{type(exc).__name__}: {exc}"[:500]
+        classification = classify_extractor_output(
+            candidate, extractor_output, error
+        )
+        retryable = classification["status"] in {
+            "request_error",
+            "invalid_extractor_output",
+            "invalid_verdict",
+            "invalid_unresolved_payload",
+            "invalid_committed_payload",
+            "unsupported_by_evidence",
+        }
+        if not retryable or attempt == retries:
+            break
+        await asyncio.sleep(min(2**attempt, 8))
+    result = {
+        key: candidate[key]
+        for key in (
+            "model_slug",
+            "source_relative_dir",
+            "track",
+            "question_id",
+            "answer_type",
+            "task",
+            "category",
+            "response_finish_reason",
+            "response_sha256",
+        )
+    } | {
+        "method": METHOD,
+        "extractor_contract_sha256": extractor_contract,
+        "ground_truth_loaded": False,
+        "ground_truth_supplied_to_extractor": False,
+        "extractor_model": model,
+        "extractor_revision": revision,
+        **classification,
+        "extractor_output": extractor_output,
+        "finish_reason": finish_reason,
+        "completion_tokens": completion_tokens,
+        **({"error": error} if error else {}),
+    }
+    if retry_history:
+        result["extractor_attempts"] = retry_history
+        finalized = finalize_persistent_extractor_failure(candidate, result)
+        if finalized is not None:
+            result = finalized
+    return result
+
+
 async def run(args: argparse.Namespace) -> None:
     candidates = load_candidates(
         args.project_root,
@@ -1096,6 +1191,16 @@ async def run(args: argparse.Namespace) -> None:
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     candidates_by_key = {candidate_key(item): item for item in candidates}
+    embedded = seed_embedded_evidence(
+        args.canonical_root,
+        args.output,
+        candidates_by_key,
+        extractor_contract,
+        args.model,
+        args.revision,
+    )
+    if embedded:
+        print(f"Seeded {embedded} public v4 evidence rows.", flush=True)
     existing, retry_history = load_audit_checkpoint(
         args.output,
         candidates_by_key,
@@ -1118,6 +1223,11 @@ async def run(args: argparse.Namespace) -> None:
             )
         )
         return
+    if not args.endpoints:
+        raise RuntimeError(
+            f"Embedded v4 evidence is incomplete: {len(pending)} responses "
+            "still require extraction, but no endpoint was configured."
+        )
     clients = [
         AsyncOpenAI(base_url=endpoint.rstrip("/"), api_key=args.api_key, timeout=args.timeout)
         for endpoint in args.endpoints
@@ -1138,84 +1248,6 @@ async def run(args: argparse.Namespace) -> None:
     lock = asyncio.Lock()
     completed = 0
 
-    async def extract(client: AsyncOpenAI, candidate: dict[str, Any]) -> dict[str, Any]:
-        payload = extractor_payload(candidate)
-        error = None
-        extractor_output = ""
-        finish_reason = None
-        completion_tokens = None
-        classification: dict[str, Any] = {}
-        for attempt in range(args.retries + 1):
-            try:
-                response = await client.chat.completions.create(
-                    model=args.model,
-                    temperature=0,
-                    top_p=1,
-                    seed=0,
-                    max_tokens=args.max_tokens,
-                    response_format=EXTRACTOR_RESPONSE_FORMAT,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-                    ],
-                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-                )
-                choice = response.choices[0]
-                extractor_output = str(choice.message.content or "").strip()
-                finish_reason = getattr(choice, "finish_reason", None)
-                usage = getattr(response, "usage", None)
-                completion_tokens = getattr(usage, "completion_tokens", None)
-                error = None
-            except Exception as exc:  # noqa: BLE001 - checkpoint request failures
-                error = f"{type(exc).__name__}: {exc}"[:500]
-            classification = classify_extractor_output(
-                candidate, extractor_output, error
-            )
-            retryable = classification["status"] in {
-                "request_error",
-                "invalid_extractor_output",
-                "invalid_verdict",
-                "invalid_unresolved_payload",
-                "invalid_committed_payload",
-                "unsupported_by_evidence",
-            }
-            if not retryable or attempt == args.retries:
-                break
-            await asyncio.sleep(min(2**attempt, 8))
-        result = {
-            key: candidate[key]
-            for key in (
-                "model_slug",
-                "source_relative_dir",
-                "track",
-                "question_id",
-                "answer_type",
-                "task",
-                "category",
-                "response_finish_reason",
-                "response_sha256",
-            )
-        } | {
-            "method": METHOD,
-            "extractor_contract_sha256": extractor_contract,
-            "ground_truth_loaded": False,
-            "ground_truth_supplied_to_extractor": False,
-            "extractor_model": args.model,
-            "extractor_revision": args.revision,
-            **classification,
-            "extractor_output": extractor_output,
-            "finish_reason": finish_reason,
-            "completion_tokens": completion_tokens,
-            **({"error": error} if error else {}),
-        }
-        history = retry_history.get(candidate_key(candidate))
-        if history:
-            result["extractor_attempts"] = history
-            finalized = finalize_persistent_extractor_failure(candidate, result)
-            if finalized is not None:
-                result = finalized
-        return result
-
     async def worker(index: int) -> None:
         nonlocal completed
         client = clients[index % len(clients)]
@@ -1225,7 +1257,16 @@ async def run(args: argparse.Namespace) -> None:
             except asyncio.QueueEmpty:
                 return
             try:
-                result = await extract(client, candidate)
+                result = await extract_evidence_candidate(
+                    client,
+                    candidate,
+                    model=args.model,
+                    revision=args.revision,
+                    max_tokens=args.max_tokens,
+                    retries=args.retries,
+                    extractor_contract=extractor_contract,
+                    retry_history=retry_history.get(candidate_key(candidate)),
+                )
                 async with lock:
                     with args.output.open("a", encoding="utf-8") as stream:
                         stream.write(json.dumps(result, ensure_ascii=False) + "\n")
@@ -1303,8 +1344,6 @@ def parse_args() -> argparse.Namespace:
             "concurrency, max-tokens, report-every, and endpoint-start-timeout "
             "must be positive"
         )
-    if not args.finalize_checkpoint and not args.endpoints:
-        parser.error("at least one --endpoint is required for extraction")
     return args
 
 

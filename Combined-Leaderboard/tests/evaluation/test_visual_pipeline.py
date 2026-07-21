@@ -2,16 +2,19 @@ import asyncio
 import base64
 import hashlib
 import json
+import sys
 from types import SimpleNamespace
 
 from evaluation.common.vllm_runner import (
     ANSWER_EXTRACTION_METHOD,
+    INFERENCE_METHOD,
     _answer_is_supported_by_output,
     _current_extractor_record,
     _extract_one,
     _extractor_answer,
     _infer_and_extract_one,
     _infer_one,
+    _resume_inference_records,
     _resume_records,
     main,
 )
@@ -210,6 +213,207 @@ def test_resume_accepts_a_provenance_preserving_extracted_answer(tmp_path):
 
     assert resumed["q1"]["output"] == raw_output
     assert resumed["q1"]["extracted_answer"] == "6"
+
+
+def test_inference_resume_requires_current_output_hash(tmp_path):
+    diagnostics = tmp_path / "inference.diagnostics.jsonl"
+    output = "Final answer is C."
+    write_diagnostics(
+        diagnostics,
+        [
+            {
+                "question_id": "q1",
+                "answer_type": "mcq_letter",
+                "output": output,
+                "inference_method": INFERENCE_METHOD,
+                "inference_output_sha256": hashlib.sha256(
+                    output.encode("utf-8")
+                ).hexdigest(),
+            }
+        ],
+    )
+    questions = [{"question_id": "q1", "answer_type": "mcq_letter"}]
+
+    assert _resume_inference_records(diagnostics, questions)["q1"]["output"] == output
+
+    row = json.loads(diagnostics.read_text(encoding="utf-8"))
+    row["output"] = "Final answer is D."
+    diagnostics.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    assert _resume_inference_records(diagnostics, questions) == {}
+
+
+def test_inference_only_persists_hash_addressed_diagnostics(tmp_path, monkeypatch):
+    image = tmp_path / "sample.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\nbenchmark-image")
+    prompts = tmp_path / "prompts"
+    prompts.mkdir()
+    (prompts / "noncot.txt").write_text("Analyze the image.", encoding="utf-8")
+    questions = tmp_path / "questions.jsonl"
+    diagnostics = tmp_path / "inference.diagnostics.jsonl"
+    output = tmp_path / "must-not-exist.jsonl"
+    questions.write_text(
+        json.dumps(
+            {
+                "question_id": "q1",
+                "question": "Which option is correct?",
+                "answer_type": "mcq_letter",
+                "image": str(image),
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class Completions:
+        async def create(self, **request):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="Final answer is C."),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=SimpleNamespace(completion_tokens=4),
+            )
+
+    class AsyncOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=Completions())
+
+        async def close(self):
+            return None
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(AsyncOpenAI=AsyncOpenAI))
+    monkeypatch.setitem(sys.modules, "httpx", SimpleNamespace(AsyncClient=object))
+    track = VisualTrackConfig(
+        task_id="minds_eye",
+        label="Mind's Eye",
+        source_subsets=(),
+        questions_path=questions,
+        package_dir=tmp_path,
+    )
+
+    result = main(
+        track,
+        [
+            "--model",
+            "test/inference-model",
+            "--questions",
+            str(questions),
+            "--image-root",
+            str(tmp_path),
+            "--inference-only",
+            "--diagnostics",
+            str(diagnostics),
+            "--out",
+            str(output),
+        ],
+    )
+
+    assert result == 0
+    assert not output.exists()
+    row = json.loads(diagnostics.read_text(encoding="utf-8"))
+    assert row["inference_method"] == INFERENCE_METHOD
+    assert row["inference_output_sha256"] == hashlib.sha256(
+        row["output"].encode("utf-8")
+    ).hexdigest()
+
+
+def test_extraction_phase_preserves_immutable_inference_source(
+    tmp_path, monkeypatch
+):
+    questions = tmp_path / "questions.jsonl"
+    source = tmp_path / "minds_eye.inference.diagnostics.jsonl"
+    diagnostics = tmp_path / "minds_eye.diagnostics.jsonl"
+    output = tmp_path / "minds_eye_submission.jsonl"
+    raw_output = "The final answer is C."
+    questions.write_text(
+        json.dumps(
+            {
+                "question_id": "q1",
+                "question": "Which option is correct?",
+                "answer_type": "mcq_letter",
+                "image": "unused.png",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    write_diagnostics(
+        source,
+        [
+            {
+                "question_id": "q1",
+                "answer_type": "mcq_letter",
+                "output": raw_output,
+                "inference_method": INFERENCE_METHOD,
+                "inference_output_sha256": hashlib.sha256(
+                    raw_output.encode("utf-8")
+                ).hexdigest(),
+            }
+        ],
+    )
+    source_bytes = source.read_bytes()
+
+    class Completions:
+        async def create(self, **request):
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="<answer>C</answer>"),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=SimpleNamespace(completion_tokens=4),
+            )
+
+    class AsyncOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=Completions())
+
+        async def close(self):
+            return None
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(AsyncOpenAI=AsyncOpenAI))
+    monkeypatch.setitem(sys.modules, "httpx", SimpleNamespace(AsyncClient=object))
+    track = VisualTrackConfig(
+        task_id="minds_eye",
+        label="Mind's Eye",
+        source_subsets=(),
+        questions_path=questions,
+        package_dir=tmp_path,
+    )
+
+    result = main(
+        track,
+        [
+            "--model",
+            "unused/inference-model",
+            "--extractor-model",
+            "test/extractor",
+            "--extractor-revision",
+            "revision-a",
+            "--questions",
+            str(questions),
+            "--resume",
+            "--extract-existing-diagnostics",
+            "--extraction-source-diagnostics",
+            str(source),
+            "--diagnostics",
+            str(diagnostics),
+            "--out",
+            str(output),
+        ],
+    )
+
+    assert result == 0
+    assert source.read_bytes() == source_bytes
+    extracted = json.loads(diagnostics.read_text(encoding="utf-8"))
+    assert extracted["extractor_source_diagnostics"] == source.name
+    assert extracted["extractor_source_output_sha256"] == hashlib.sha256(
+        raw_output.encode("utf-8")
+    ).hexdigest()
+    assert json.loads(output.read_text(encoding="utf-8"))["answer"] == "C"
 
 
 def test_same_model_extractor_is_text_only_and_preserves_raw_output():

@@ -267,6 +267,8 @@ def copy_optional_source_files(
     for pattern in (
         f"{track}.attempt-*.diagnostics.jsonl",
         f"{track}.smoke*.diagnostics.jsonl",
+        f"{track}.inference.diagnostics.jsonl",
+        f"{track}.inference.smoke*.diagnostics.jsonl",
     ):
         for source in sorted(source_dir.glob(pattern)):
             target = destination / source.name
