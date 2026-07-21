@@ -691,16 +691,20 @@ def terminal_source_classification(candidate: dict[str, Any]) -> dict[str, Any] 
                 "status": "invalid_format_committed",
             }
 
-    if answer_type == "text" and task == "letter_disambiguation" and len(response) <= 800:
-        direct_list = bool(re.fullmatch(r"\[\s*['\"][A-Za-z]['\"].*\]", response, re.S))
+    if answer_type == "text" and task == "letter_disambiguation":
         direct_symbol_string = not bool(re.search(r"\s", response))
-        explicit_letter_report = bool(
-            re.fullmatch(
-                r"(?is)(?:(?:on|in)\b[^.\n]{0,100}\bletters?\b[^.\n]{0,100}"
-                r"\b(?:visible|shown|present|can\s+be\s+seen)\b[.!]?\s*)+",
-                response,
+        direct_list = explicit_letter_report = False
+        if len(response) <= 800:
+            direct_list = bool(
+                re.fullmatch(r"\[\s*['\"][A-Za-z]['\"].*\]", response, re.S)
             )
-        )
+            explicit_letter_report = bool(
+                re.fullmatch(
+                    r"(?is)(?:(?:on|in)\b[^.\n]{0,100}\bletters?\b[^.\n]{0,100}"
+                    r"\b(?:visible|shown|present|can\s+be\s+seen)\b[.!]?\s*)+",
+                    response,
+                )
+            )
         if direct_list or direct_symbol_string or explicit_letter_report:
             canonical = canonicalize_extracted_answer(
                 response,

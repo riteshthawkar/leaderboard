@@ -612,6 +612,24 @@ def test_terminal_source_classification_refuses_ordinary_reasoning_mentions():
     ) is None
 
 
+def test_terminal_source_classification_rejects_long_direct_letter_stream():
+    response = "BBOLELLEL" + "SE" * 1000
+    result = terminal_source_classification(
+        {
+            "answer_type": "text",
+            "task": "letter_disambiguation",
+            "response": response,
+            "response_finish_reason": "length",
+        }
+    )
+
+    assert result is not None
+    assert result["status"] == "invalid_format_committed"
+    assert result["answer"] == "__INVALID_FORMAT__"
+    assert result["proposed_answer"] == response
+    assert result["evidence"] == response
+
+
 def test_terminal_fallback_requires_prior_retry_history():
     candidate = {
         "answer_type": "mcq_index_1_4",
