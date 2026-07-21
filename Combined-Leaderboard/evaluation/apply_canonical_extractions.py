@@ -1,4 +1,4 @@
-"""Apply a completed gold-aware commitment audit to a new canonical result copy."""
+"""Apply a completed gold-blind commitment audit to a new canonical result copy."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 from collections import Counter, defaultdict
@@ -49,7 +50,11 @@ PRIOR_EXTRACTOR_FIELDS = (
     "extractor_evidence",
     "extractor_commitment_verdict",
     "extractor_ground_truth_sha256",
+    "extractor_contract_sha256",
     "ground_truth_supplied",
+    "ground_truth_available_to_validator",
+    "ground_truth_loaded_by_extractor_process",
+    "ground_truth_supplied_to_extractor",
     "independent_extraction_status",
     "extracted_answer",
 )
@@ -84,8 +89,23 @@ def load_completed_audit(
             raise ApplyExtractionError(f"Audit candidate {key} uses an incompatible method.")
         if row.get("ground_truth_sha256") != ground_truth_sha256:
             raise ApplyExtractionError(f"Audit candidate {key} uses different ground truth.")
-        if row.get("ground_truth_supplied") is not True:
-            raise ApplyExtractionError(f"Audit candidate {key} lacks gold-aware provenance.")
+        if row.get("ground_truth_available_to_validator") is not True:
+            raise ApplyExtractionError(
+                f"Audit candidate {key} lacks post-validation provenance."
+            )
+        if row.get("ground_truth_supplied_to_extractor") is not False:
+            raise ApplyExtractionError(
+                f"Audit candidate {key} is not from a gold-blind extractor."
+            )
+        if row.get("ground_truth_loaded_by_extractor_process") is not False:
+            raise ApplyExtractionError(
+                f"Audit candidate {key} is not process-isolated from ground truth."
+            )
+        contract_sha256 = str(row.get("extractor_contract_sha256") or "")
+        if not re.fullmatch(r"[0-9a-f]{64}", contract_sha256):
+            raise ApplyExtractionError(
+                f"Audit candidate {key} lacks an extractor contract hash."
+            )
         audit[key] = row
     missing = expected_keys - set(audit)
     extra = set(audit) - expected_keys
@@ -119,6 +139,21 @@ def apply_result(
     if audit.get("ground_truth_sha256") != ground_truth_sha256:
         raise ApplyExtractionError(
             f"Ground truth changed for {diagnostic.get('question_id')}."
+        )
+    if audit.get("ground_truth_supplied_to_extractor") is not False:
+        raise ApplyExtractionError(
+            f"Ground truth was exposed to the extractor for "
+            f"{diagnostic.get('question_id')}."
+        )
+    if audit.get("ground_truth_loaded_by_extractor_process") is not False:
+        raise ApplyExtractionError(
+            f"Extractor process loaded ground truth for "
+            f"{diagnostic.get('question_id')}."
+        )
+    contract_sha256 = str(audit.get("extractor_contract_sha256") or "")
+    if not re.fullmatch(r"[0-9a-f]{64}", contract_sha256):
+        raise ApplyExtractionError(
+            f"Extractor contract is missing for {diagnostic.get('question_id')}."
         )
     answer_type = str(audit["answer_type"])
     answer = final_answer(audit.get("answer"), answer_type)
@@ -158,7 +193,10 @@ def apply_result(
     diagnostic["extractor_evidence"] = evidence
     diagnostic["extractor_commitment_verdict"] = expected_verdict
     diagnostic["extractor_ground_truth_sha256"] = ground_truth_sha256
-    diagnostic["ground_truth_supplied"] = True
+    diagnostic["extractor_contract_sha256"] = contract_sha256
+    diagnostic["ground_truth_available_to_validator"] = True
+    diagnostic["ground_truth_loaded_by_extractor_process"] = False
+    diagnostic["ground_truth_supplied_to_extractor"] = False
     diagnostic["extractor_finish_reason"] = audit.get("finish_reason")
     diagnostic["extractor_completion_tokens"] = audit.get("completion_tokens")
     diagnostic["extractor_source_output_sha256"] = output_sha256
@@ -265,6 +303,13 @@ def apply_completed_audit(
                         (str(item["extractor_model"]) for item in track_audit), ""
                     ),
                     "audit_sha256": audit_sha256,
+                    "extractor_contract_sha256": next(
+                        (
+                            str(item["extractor_contract_sha256"])
+                            for item in track_audit
+                        ),
+                        "",
+                    ),
                     "candidate_count": len(track_audit),
                     "status_counts": dict(
                         Counter(str(item["status"]) for item in track_audit)
@@ -273,11 +318,12 @@ def apply_completed_audit(
                     "input_fields": [
                         "question",
                         "answer_type",
-                        "gold_answer",
                         "candidate_response",
                     ],
                     "image_supplied": False,
-                    "ground_truth_supplied": True,
+                    "ground_truth_available_to_validator": True,
+                    "ground_truth_loaded_by_extractor_process": False,
+                    "ground_truth_supplied_to_extractor": False,
                     "ground_truth_sha256": ground_truth_sha256,
                     "evidence_requirement": "literal-source-quote-and-commitment-validation",
                 }
@@ -289,7 +335,9 @@ def apply_completed_audit(
                     "method": METHOD,
                     "source_audit_sha256": audit_sha256,
                     "ground_truth_sha256": ground_truth_sha256,
-                    "ground_truth_supplied": True,
+                    "ground_truth_available_to_validator": True,
+                    "ground_truth_loaded_by_extractor_process": False,
+                    "ground_truth_supplied_to_extractor": False,
                 }
                 manifest_path.write_text(
                     json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -313,7 +361,9 @@ def apply_completed_audit(
             "method": METHOD,
             "source_audit_sha256": audit_sha256,
             "ground_truth_sha256": ground_truth_sha256,
-            "ground_truth_supplied": True,
+            "ground_truth_available_to_validator": True,
+            "ground_truth_loaded_by_extractor_process": False,
+            "ground_truth_supplied_to_extractor": False,
             "candidate_count": len(expected),
             "applied_counts": dict(summary),
         }

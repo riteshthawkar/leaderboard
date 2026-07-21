@@ -5,14 +5,18 @@ import json
 from types import SimpleNamespace
 
 from evaluation.common.vllm_runner import (
+    ANSWER_EXTRACTION_METHOD,
     _answer_is_supported_by_output,
+    _current_extractor_record,
     _extract_one,
     _extractor_answer,
+    _infer_and_extract_one,
     _infer_one,
     _resume_records,
     main,
 )
 from evaluation.common.visual_pipeline import (
+    MISSING_ANSWER_TOKEN,
     VisualTrackConfig,
     export_submission,
     final_answer,
@@ -118,32 +122,9 @@ def test_record_answer_preserves_raw_output_and_prefers_extracted_answer():
     assert record["output"] == "<think>unfinished reasoning"
 
 
-def test_export_submission_can_opt_in_to_exact_raw_output_fallback(tmp_path):
-    output_path = tmp_path / "submission.jsonl"
-    unfinished = "  <think>Still comparing options A and B\n"
-
-    result = export_submission(
-        [
-            {"question_id": "q1", "output": "<answer>C</answer>"},
-            {"question_id": "q2", "output": unfinished},
-        ],
-        [
-            {"question_id": "q1", "answer_type": "mcq_letter"},
-            {"question_id": "q2", "answer_type": "mcq_letter"},
-        ],
-        output_path,
-        raw_output_fallback=True,
-    )
-
-    rows = [json.loads(line) for line in output_path.read_text().splitlines()]
-    assert rows == [
-        {"question_id": "q1", "condition": "standard", "answer": "C"},
-        {"question_id": "q2", "condition": "standard", "answer": unfinished},
-    ]
-    assert result["raw_output_fallback_question_ids"] == ["q2"]
-
-
-def test_runner_finalizes_existing_faulty_output_without_inference(tmp_path):
+def test_runner_finalizes_existing_unresolved_extractor_decision_without_inference(
+    tmp_path,
+):
     questions = tmp_path / "questions.jsonl"
     diagnostics = tmp_path / "diagnostics.jsonl"
     output = tmp_path / "submission.jsonl"
@@ -161,7 +142,18 @@ def test_runner_finalizes_existing_faulty_output_without_inference(tmp_path):
         encoding="utf-8",
     )
     diagnostics.write_text(
-        json.dumps({"question_id": "q1", "output": faulty_output}) + "\n",
+        json.dumps(
+            {
+                "question_id": "q1",
+                "output": faulty_output,
+                "answer_extraction_method": ANSWER_EXTRACTION_METHOD,
+                "extractor_model": "test/extractor",
+                "extractor_output": "<answer>UNRESOLVED</answer>",
+                "extractor_status": "unresolved",
+                "extracted_answer": MISSING_ANSWER_TOKEN,
+            }
+        )
+        + "\n",
         encoding="utf-8",
     )
     track = VisualTrackConfig(
@@ -184,12 +176,13 @@ def test_runner_finalizes_existing_faulty_output_without_inference(tmp_path):
             "--out",
             str(output),
             "--finalize-existing-diagnostics",
-            "--raw-output-fallback",
         ],
     )
 
     assert result == 0
-    assert json.loads(output.read_text(encoding="utf-8"))["answer"] == faulty_output
+    assert json.loads(output.read_text(encoding="utf-8"))["answer"] == (
+        MISSING_ANSWER_TOKEN
+    )
 
 
 def test_resume_accepts_a_provenance_preserving_extracted_answer(tmp_path):
@@ -202,7 +195,7 @@ def test_resume_accepts_a_provenance_preserving_extracted_answer(tmp_path):
                 "question_id": "q1",
                 "answer_type": "integer",
                 "output": raw_output,
-                "answer_extraction_method": "same-served-model-text-only-v1",
+                "answer_extraction_method": ANSWER_EXTRACTION_METHOD,
                 "extractor_model": "test/model",
                 "extractor_output": "<answer>6</answer>",
                 "extracted_answer": "6",
@@ -257,6 +250,7 @@ def test_same_model_extractor_is_text_only_and_preserves_raw_output():
                 "question_id": "q1",
                 "answer_type": "integer",
                 "output": raw_output,
+                "final_answer_tokens": 99,
             },
             {
                 "question_id": "q1",
@@ -273,22 +267,33 @@ def test_same_model_extractor_is_text_only_and_preserves_raw_output():
 
     assert result["output"] == raw_output
     assert result["extracted_answer"] == "6"
-    assert result["answer_extraction_method"] == "same-served-model-text-only-v1"
+    assert result["answer_extraction_method"] == ANSWER_EXTRACTION_METHOD
+    assert result["extractor_status"] == "resolved"
     assert result["extractor_model"] == "test/model"
     assert result["extractor_output"] == "<answer>6</answer>"
     assert result["extractor_completion_tokens"] == 5
+    assert result["final_answer_tokens"] == 1
     request = requests[0]
     assert request["temperature"] == 0.0
     assert request["top_p"] == 1.0
     assert request["seed"] == 17
     assert request["max_tokens"] == 200
-    assert all("image" not in json.dumps(message) for message in request["messages"])
+    serialized_request = json.dumps(request)
+    assert "image_url" not in serialized_request
+    assert "data:image" not in serialized_request
     payload = json.loads(request["messages"][1]["content"])
-    assert payload == {
-        "question": "How many objects are visible?",
-        "answer_type": "integer",
-        "candidate_response": raw_output,
+    assert payload["question"] == "How many objects are visible?"
+    assert payload["answer_type"] == "integer"
+    assert payload["answer_domain"] == "one base-10 integer written with digits"
+    assert payload["required_output_format"].startswith("Exactly <answer>VALUE</answer>")
+    assert payload["response_metadata"] == {
+        "finish_reason": None,
+        "completion_tokens": None,
+        "inference_error": None,
     }
+    assert payload["candidate_response"] == raw_output
+    assert "image" not in json.dumps(payload).lower()
+    assert "ground_truth" not in payload
     assert tokenization_requests == [
         (
             "/tokenize",
@@ -349,13 +354,158 @@ def test_same_model_extractor_rejects_unsupported_or_ambiguous_answers():
     assert unsupported["extractor_error"] == (
         "The extracted answer is not stated in the candidate response."
     )
-    assert unresolved["extractor_error"] == "The extractor returned UNRESOLVED."
+    assert unresolved["extractor_status"] == "unresolved"
+    assert unresolved["extracted_answer"] == MISSING_ANSWER_TOKEN
     assert malformed["extractor_error"] == (
         "The extractor did not return a parseable answer block."
     )
-    assert all(
-        "extracted_answer" not in result
-        for result in (unsupported, unresolved, malformed)
+    assert unsupported["extracted_answer"] == MISSING_ANSWER_TOKEN
+    assert malformed["extracted_answer"] == MISSING_ANSWER_TOKEN
+
+
+def test_every_visual_inference_is_followed_by_gold_blind_extraction(tmp_path):
+    image = tmp_path / "sample.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\nbenchmark-image")
+    inference_requests = []
+    extractor_requests = []
+
+    class InferenceCompletions:
+        async def create(self, **request):
+            inference_requests.append(request)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="Reasoning. Final answer is C."),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=SimpleNamespace(completion_tokens=12),
+            )
+
+    class ExtractorCompletions:
+        async def create(self, **request):
+            extractor_requests.append(request)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content="<answer>C</answer>"),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=SimpleNamespace(completion_tokens=4),
+            )
+
+    result = asyncio.run(
+        _infer_and_extract_one(
+            SimpleNamespace(chat=SimpleNamespace(completions=InferenceCompletions())),
+            SimpleNamespace(chat=SimpleNamespace(completions=ExtractorCompletions())),
+            asyncio.Semaphore(1),
+            {
+                "question_id": "q1",
+                "question": "Which option is correct?",
+                "answer_type": "mcq_letter",
+                "image": str(image),
+            },
+            image_root=None,
+            system_prompt="Analyze the image.",
+            model="inference/model",
+            max_tokens=200,
+            temperature=0.1,
+            top_p=1.0,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            seed=0,
+            extra_body={},
+            stop=[],
+            include_stop_str_in_output=False,
+            extractor_model="extractor/model",
+            extractor_max_tokens=200,
+            extractor_seed=11,
+            extractor_chat_template_kwargs={"enable_thinking": False},
+            extractor_revision="extractor-revision-a",
+            max_final_answer_tokens=None,
+            source_diagnostics="minds_eye.diagnostics.jsonl",
+        )
+    )
+
+    assert len(inference_requests) == 1
+    assert len(extractor_requests) == 1
+    assert "image_url" in json.dumps(inference_requests[0])
+    serialized_extractor_request = json.dumps(extractor_requests[0]).lower()
+    assert "image_url" not in serialized_extractor_request
+    assert "data:image" not in serialized_extractor_request
+    payload = json.loads(extractor_requests[0]["messages"][1]["content"])
+    assert payload["candidate_response"] == "Reasoning. Final answer is C."
+    assert set(payload) == {
+        "question",
+        "answer_type",
+        "answer_domain",
+        "required_output_format",
+        "response_metadata",
+        "candidate_response",
+    }
+    assert extractor_requests[0]["model"] == "extractor/model"
+    assert extractor_requests[0]["extra_body"]["chat_template_kwargs"] == {
+        "enable_thinking": False
+    }
+    assert result["output"] == "Reasoning. Final answer is C."
+    assert result["extracted_answer"] == "C"
+    assert result["extractor_status"] == "resolved"
+    assert result["extractor_revision"] == "extractor-revision-a"
+
+
+def test_extraction_diagnostics_preserve_custom_source_fields(tmp_path):
+    output = tmp_path / "diagnostics.jsonl"
+    write_diagnostics(
+        output,
+        [
+            {
+                "question_id": "q1",
+                "source_subset": "subset",
+                "answer_type": "mcq_letter",
+                "output": "Final answer is C.",
+                "reasoning_content": "private model reasoning",
+                "analysis_output": "separate analysis pass",
+                "answer_choices": ["A", "B", "C", "D"],
+                "extractor_model": "Qwen/Qwen3-8B",
+                "extractor_revision": "revision-a",
+                "extracted_answer": "C",
+            }
+        ],
+        preserve_extra_fields=True,
+    )
+
+    row = json.loads(output.read_text(encoding="utf-8"))
+    assert row["reasoning_content"] == "private model reasoning"
+    assert row["analysis_output"] == "separate analysis pass"
+    assert row["answer_choices"] == ["A", "B", "C", "D"]
+    assert row["extractor_revision"] == "revision-a"
+
+
+def test_extractor_resume_requires_model_revision_and_current_output_hash():
+    output = "Final answer is C."
+    record = {
+        "question_id": "q1",
+        "output": output,
+        "answer_extraction_method": ANSWER_EXTRACTION_METHOD,
+        "extractor_model": "Qwen/Qwen3-8B",
+        "extractor_revision": "revision-a",
+        "extractor_source_output_sha256": hashlib.sha256(
+            output.encode("utf-8")
+        ).hexdigest(),
+        "extracted_answer": "C",
+    }
+    question = {"question_id": "q1", "answer_type": "mcq_letter"}
+
+    assert _current_extractor_record(
+        record, question, model="Qwen/Qwen3-8B", revision="revision-a"
+    )
+    assert not _current_extractor_record(
+        record, question, model="Qwen/Qwen3-8B", revision="revision-b"
+    )
+    changed = {**record, "output": "Final answer is D."}
+    assert not _current_extractor_record(
+        changed, question, model="Qwen/Qwen3-8B", revision="revision-a"
     )
 
 
@@ -557,8 +707,6 @@ def test_vllm_request_honors_capped_and_uncapped_max_tokens(tmp_path):
             extra_body={},
             stop=stop or [],
             include_stop_str_in_output=include_stop_str_in_output,
-            max_final_answer_tokens=200,
-            tokenize_client=tokenize_client,
         )
 
     asyncio.run(
@@ -577,42 +725,20 @@ def test_vllm_request_honors_capped_and_uncapped_max_tokens(tmp_path):
     assert requests[1]["max_tokens"] == 200
     assert "stop" not in requests[1]
     assert requests[2]["max_tokens"] == 8192
-    assert tokenization_requests == [
-        (
-            "/tokenize",
-            {
-                "model": "test/model",
-                "prompt": "1",
-                "add_special_tokens": False,
-            },
-        ),
-        (
-            "/tokenize",
-            {
-                "model": "test/model",
-                "prompt": "1",
-                "add_special_tokens": False,
-            },
-        ),
-    ]
+    assert tokenization_requests == []
 
 
-def test_uncapped_response_rejects_final_answer_over_token_limit(tmp_path):
-    image = tmp_path / "sample.png"
-    image.write_bytes(b"\x89PNG\r\n\x1a\nbenchmark-image")
-
+def test_extractor_rejects_final_answer_over_token_limit():
     class Completions:
         async def create(self, **request):
             return SimpleNamespace(
                 choices=[
                     SimpleNamespace(
-                        message=SimpleNamespace(
-                            content="<think>reasoning</think><answer>result</answer>"
-                        ),
+                        message=SimpleNamespace(content="<answer>result</answer>"),
                         finish_reason="stop",
                     )
                 ],
-                usage=SimpleNamespace(completion_tokens=500),
+                usage=SimpleNamespace(completion_tokens=5),
             )
 
     class TokenizeResponse:
@@ -627,34 +753,29 @@ def test_uncapped_response_rejects_final_answer_over_token_limit(tmp_path):
             return TokenizeResponse()
 
     result = asyncio.run(
-        _infer_one(
+        _extract_one(
             SimpleNamespace(chat=SimpleNamespace(completions=Completions())),
             asyncio.Semaphore(1),
             {
                 "question_id": "q1",
+                "answer_type": "text",
+                "output": "The final answer is result.",
+            },
+            {
+                "question_id": "q1",
                 "question": "What is shown?",
                 "answer_type": "text",
-                "image": str(image),
             },
-            image_root=None,
-            system_prompt="Return the answer.",
             model="test/model",
-            max_tokens=None,
-            temperature=0.1,
-            top_p=1.0,
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
             seed=0,
-            extra_body={},
-            stop=["</answer>"],
-            include_stop_str_in_output=True,
+            max_tokens=200,
             max_final_answer_tokens=200,
             tokenize_client=TokenizeClient(),
         )
     )
 
-    assert result["output"].endswith("</answer>")
-    assert result["final_answer_tokens"] == 201
-    assert result["error"] == (
-        "Extracted final answer uses 201 tokens; the limit is 200."
+    assert result["extracted_answer"] == MISSING_ANSWER_TOKEN
+    assert result["extractor_status"] == "failed"
+    assert result["extractor_error"] == (
+        "Extracted answer uses 201 tokens; the limit is 200."
     )

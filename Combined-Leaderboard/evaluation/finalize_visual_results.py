@@ -11,11 +11,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from evaluation.common.visual_pipeline import record_answer
+from evaluation.common.vllm_runner import ANSWER_EXTRACTION_METHOD
+from evaluation.common.visual_pipeline import (
+    MISSING_ANSWER_TOKEN,
+    extracted_record_answer,
+    record_answer,
+)
 
 
 TRACKS = ("do_you_see_me", "minds_eye")
-CURRENT_PIPELINE_REVISION = "unquantized-bf16-smoke-and-full-text-extraction-v10"
+CURRENT_PIPELINE_REVISION = "unquantized-bf16-mandatory-extraction-v11"
+SUPPORTED_PIPELINE_REVISIONS = {
+    "unquantized-bf16-smoke-and-full-text-extraction-v10",
+    CURRENT_PIPELINE_REVISION,
+}
 SUBMISSION_FIELDS = {"question_id", "condition", "answer"}
 
 
@@ -150,21 +159,31 @@ def validate_diagnostics(
 
 def answer_provenance_counts(
     submission_rows: list[dict[str, Any]], diagnostics_by_id: dict[str, dict[str, Any]]
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     strict_count = 0
+    unresolved_count = 0
     exact_raw_count = 0
     for submission in submission_rows:
         question_id = str(submission["question_id"])
         diagnostic = diagnostics_by_id[question_id]
-        parsed = record_answer(
-            diagnostic, str(diagnostic.get("answer_type") or "text")
+        answer_type = str(diagnostic.get("answer_type") or "text")
+        mandatory = (
+            diagnostic.get("answer_extraction_method") == ANSWER_EXTRACTION_METHOD
+        )
+        parsed = (
+            extracted_record_answer(diagnostic, answer_type)
+            if mandatory
+            else record_answer(diagnostic, answer_type)
         )
         if parsed:
             if submission["answer"] != parsed:
                 raise FinalizationError(
                     f"Submission answer for {question_id} differs from its parsed diagnostic."
                 )
-            strict_count += 1
+            if parsed == MISSING_ANSWER_TOKEN:
+                unresolved_count += 1
+            else:
+                strict_count += 1
         elif (
             not diagnostic.get("error")
             and diagnostic.get("output")
@@ -175,7 +194,7 @@ def answer_provenance_counts(
             raise FinalizationError(
                 f"Submission answer for {question_id} has no verified diagnostic source."
             )
-    return strict_count, exact_raw_count
+    return strict_count, unresolved_count, exact_raw_count
 
 
 def discover_candidates(
@@ -206,7 +225,7 @@ def discover_candidates(
             if (
                 config.get("weight_loading") != "unquantized"
                 or config.get("compute_dtype") != "bfloat16"
-                or config.get("pipeline_revision") != CURRENT_PIPELINE_REVISION
+                or config.get("pipeline_revision") not in SUPPORTED_PIPELINE_REVISIONS
             ):
                 continue
             model_id = str(config.get("model_id") or "")
@@ -329,7 +348,7 @@ def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> d
         candidate.diagnostics,
         [str(row["question_id"]) for row in submission_rows],
     )
-    strict_count, exact_raw_count = answer_provenance_counts(
+    strict_count, unresolved_count, exact_raw_count = answer_provenance_counts(
         submission_rows, diagnostics_by_id
     )
 
@@ -356,6 +375,7 @@ def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> d
     return {
         "row_count": len(submission_rows),
         "strict_answer_count": strict_count,
+        "unresolved_answer_count": unresolved_count,
         "exact_raw_output_fallback_count": exact_raw_count,
         "source_run": candidate.source_run,
         "source_submission_modified_at": datetime.fromtimestamp(
@@ -422,12 +442,14 @@ def verify_canonical_results(output_root: Path, project_root: Path) -> dict[str,
             _diagnostic_rows, diagnostics_by_id = validate_diagnostics(
                 diagnostics, expected[track]
             )
-            strict_count, exact_raw_count = answer_provenance_counts(
+            strict_count, unresolved_count, exact_raw_count = answer_provenance_counts(
                 submission_rows, diagnostics_by_id
             )
             if (
                 track_record.get("row_count") != len(submission_rows)
                 or track_record.get("strict_answer_count") != strict_count
+                or track_record.get("unresolved_answer_count", 0)
+                != unresolved_count
                 or track_record.get("exact_raw_output_fallback_count")
                 != exact_raw_count
             ):
@@ -507,6 +529,9 @@ def build_canonical_results(
                         track: {
                             "row_count": record["row_count"],
                             "strict_answer_count": record["strict_answer_count"],
+                            "unresolved_answer_count": record[
+                                "unresolved_answer_count"
+                            ],
                             "exact_raw_output_fallback_count": record[
                                 "exact_raw_output_fallback_count"
                             ],

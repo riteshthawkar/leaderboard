@@ -30,6 +30,7 @@ MIN_FREE_GPU_MEMORY_MIB="${MIN_FREE_GPU_MEMORY_MIB:-38000}"
 MIN_FREE_DISK_GB_PER_MODEL="${MIN_FREE_DISK_GB_PER_MODEL:-32}"
 MIN_FREE_DISK_RESERVE_GB="${MIN_FREE_DISK_RESERVE_GB:-64}"
 DRY_RUN="${DRY_RUN:-0}"
+ANSWER_EXTRACTOR_ENDPOINTS="${ANSWER_EXTRACTOR_ENDPOINTS:-http://127.0.0.1:8035/v1}"
 
 usage() {
   cat <<'EOF'
@@ -39,11 +40,13 @@ Examples:
   # Two models, each on one 40 GB GPU.
   GPU_GROUPS='0;1' \
   MODEL_LIST=internvl35-8b,minicpm-v46 \
+  ANSWER_EXTRACTOR_ENDPOINTS=http://127.0.0.1:8035/v1 \
     bash evaluation/run_visual_suite_multi_gpu.sh
 
   # Two models, each tensor-parallel across two GPUs.
   GPU_GROUPS='0,1;2,3' \
   MODEL_LIST=internvl35-8b,minicpm-v46 \
+  ANSWER_EXTRACTOR_ENDPOINTS=http://127.0.0.1:8035/v1 \
     bash evaluation/run_visual_suite_multi_gpu.sh
 
 Compatibility syntax:
@@ -52,6 +55,9 @@ Compatibility syntax:
 `GPU_GROUPS` is semicolon separated. Commas inside a group assign multiple GPUs
 to one model using tensor parallelism. `GPU_IDS` retains the legacy one GPU per
 model meaning and is used only when `GPU_GROUPS` is not supplied.
+
+All workers use the externally supervised Qwen3-8B endpoint configured through
+`ANSWER_EXTRACTOR_ENDPOINTS`; this launcher never starts one extractor per worker.
 EOF
 }
 
@@ -124,6 +130,8 @@ main() {
   validate_flag "FORCE" "$FORCE"
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
   validate_flag "DRY_RUN" "$DRY_RUN"
+  [[ "$ANSWER_EXTRACTOR_ENDPOINTS" =~ ^https?:// ]] \
+    || die "ANSWER_EXTRACTOR_ENDPOINTS must be an absolute HTTP(S) URL."
 
   GPU_GROUPS="$(normalize "$GPU_GROUPS")"
   GPU_IDS="$(normalize "$GPU_IDS")"
@@ -181,6 +189,7 @@ main() {
 
     MODELS="$model" DRY_RUN=1 GPU_IDS="$group" \
       TENSOR_PARALLEL_SIZE="${#group_gpus[@]}" PORT="$port" \
+      ANSWER_EXTRACTOR_ENDPOINTS="$ANSWER_EXTRACTOR_ENDPOINTS" \
       VENV_DIR="$VENV_DIR" CACHE_ROOT="$CACHE_ROOT" DATASET_DIR="$DATASET_DIR" \
       OUTPUT_ROOT="$OUTPUT_ROOT" VLLM_DTYPE="$VLLM_DTYPE" \
       VLLM_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" bash "$RUNNER" >/dev/null
@@ -233,6 +242,7 @@ PY
       VENV_DIR="$VENV_DIR" CACHE_ROOT="$CACHE_ROOT" DATASET_DIR="$DATASET_DIR" \
       OUTPUT_ROOT="$OUTPUT_ROOT" GPU_IDS="$group" \
       TENSOR_PARALLEL_SIZE="${#group_gpus[@]}" PORT="$port" MODELS="$model" \
+      ANSWER_EXTRACTOR_ENDPOINTS="$ANSWER_EXTRACTOR_ENDPOINTS" \
       TRACKS="$TRACKS" VLLM_DTYPE="$VLLM_DTYPE" \
       VLLM_KV_CACHE_DTYPE="$VLLM_KV_CACHE_DTYPE" \
       GPU_MEMORY_UTILIZATION="$GPU_MEMORY_UTILIZATION" \

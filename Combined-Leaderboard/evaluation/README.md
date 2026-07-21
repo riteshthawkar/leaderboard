@@ -7,7 +7,7 @@ Evaluation tooling is isolated from the production API and frontend:
 - `spatial_reasoning/` produces the spatial reasoning proof bundle.
 - `common/` contains strict shared loading, inference, and export code.
 
-Canonical visual submission files are written only after complete question coverage, unique identifiers, and successful nonempty inference outputs have been verified. Strictly parsed answers are preferred. If all visual retries and same-model text extraction are exhausted, the exact nonempty model output is retained in the submission even when it is outside the benchmark answer domain; this preserves a faulty model response rather than fabricating a replacement. Raw model responses remain in separate diagnostic files.
+Canonical visual submission files are written only after complete question coverage, unique identifiers, and one gold-blind LLM extraction decision for every model response. `Qwen/Qwen3-8B` at revision `b968826d9c46dd6066d109eabc6255188de91218` is the default dedicated extractor with native thinking disabled. A clear commitment becomes the normalized answer; an empty, missing, truncated, conflicting, or ambiguous response becomes the standardized `UNRESOLVED` token. Raw model responses remain unchanged in separate diagnostic files.
 
 ## Standard evaluation lifecycle
 
@@ -17,7 +17,7 @@ Use this lifecycle for every evaluation:
 
 1. Run `DRY_RUN=1` and verify the resolved checkpoint, context, precision, topology, and per-track generation policy.
 2. Run both tracks in a unique staging output root. A live run writes `.active-run.json`; cleanup tools refuse to prune while that PID exists.
-3. Let strict smoke tests, complete visual passes, deterministic format retries, same-model extraction, and exact raw fallback finish normally.
+3. Let the strict smoke test and complete visual pass run once. Every visual response is immediately followed by mandatory text-only extraction; there are no answer-format reruns, archived-response selection, local-parser answer selection, or raw-output fallback.
 4. Dry-run final selection, then atomically rebuild the canonical result set:
 
 ```bash
@@ -39,10 +39,10 @@ The finalizer accepts only the current unquantized BF16 pipeline revision, exclu
 A new model profile is complete only when all of the following are explicit and tested:
 
 - Immutable repository revision, original checkpoint loading, BF16 compute, resolved BF16 KV cache, and a context no larger than the checkpoint contract.
-- Thinking classification, supported chat-template arguments, per-track completion ceilings, stop handling, and the separate 200-token final-answer check.
+- Thinking classification, supported chat-template arguments, per-track completion ceilings, stop handling, and the separate 200-token extracted-answer check.
 - A valid single-replica, tensor-parallel, built-in data-parallel, or independent-replica topology with model identity checked at every endpoint.
 - Gated access, required adapters, alternate official checkpoint sources, legacy engine mode, or config overrides represented in `.run_config.json` and the final manifest.
-- A profile dry-run regression plus the shared parser, retry, extraction, raw-fallback, resume, manifest, and finalizer tests.
+- A profile dry-run regression plus mandatory extraction, `UNRESOLVED`, resume, manifest, and finalizer tests.
 
 Model-specific compatibility work may restore omitted released defaults or required adapters, but it must never change checkpoint tensors, benchmark images, prompts, sampling policy, or answers.
 
@@ -57,23 +57,23 @@ The two benchmark prompt and sampling protocols are intentionally different:
 | Do You See Me | Direct answer, non-CoT | 1.0 | 0.95 | [Paper, Appendix C](https://arxiv.org/abs/2506.02022) |
 | Mind's Eye | Structured CoT | 0.1 | 1.0 | [Paper and released evaluation code](https://arxiv.org/abs/2604.16054) |
 
-Generation budgets follow the checkpoint rather than the benchmark name. InternVL3.5, GLM-4.6V-Flash, MiniCPM-V-4.6, Qwen2.5-VL, and Qwen3-VL use a hard 8,192-token completion ceiling on both tracks, configurable with `INTERNVL35_MAX_TOKENS`; Qwen3.6 uses the same default ceiling through `QWEN36_MAX_TOKENS`. Gemma 3, Kimi-VL, and Llama 3.2 Vision keep the paper-compatible 200-token DYS cap but use `INTERNVL35_MAX_TOKENS` for Mind's Eye when structured-CoT smoke outputs saturate the former 200-token ceiling. Qwen3.5 may use the remaining configured 32,768-token context. MiniCPM is included because its structured CoT responses consistently exhausted the former 200-token total cap before reaching an answer. After generation, the runner extracts the final answer and sends only that answer to the serving endpoint's `/tokenize` route. Answers over 200 tokens are retained in diagnostics, marked invalid, and retried; they are never truncated or rewritten. Other nonthinking checkpoints use a 200-token total completion cap, which necessarily bounds their final answer to at most 200 tokens. Every run fingerprint records the checkpoint reasoning profile, total-completion policy, separate final-answer cap, and enforcement mechanism.
+Generation budgets follow the checkpoint rather than the benchmark name. Qwen3.5, InternVL3.5, GLM-4.6V-Flash, MiniCPM-V-4.6, Qwen2.5-VL, and Qwen3-VL use a hard 8,192-token completion ceiling on both tracks, configurable with `INTERNVL35_MAX_TOKENS`; Qwen3.6 uses the same default ceiling through `QWEN36_MAX_TOKENS`. Gemma 3, Kimi-VL, and Llama 3.2 Vision keep the paper-compatible 200-token DYS cap but use `INTERNVL35_MAX_TOKENS` for Mind's Eye. After each generation, the dedicated extractor emits one answer or `UNRESOLVED`; its extracted answer is checked separately against the 200-token final-answer limit. The raw model response is never truncated or rewritten. Every run fingerprint records both model contracts and the extraction decision provenance.
 
 The Do You See Me paper applies temperature 1.0, top-p 0.95, and a 200-token completion cap to its evaluated models. The Mind's Eye main table reports CoT prompting, and its released open-model handlers use roughly 1,000 total completion tokens and temperature 0.1. The model-based budget is a deliberate cross-benchmark policy requested for this suite: models observed to produce longer supported reasoning receive enough room to reach an explicit answer without allowing malformed generations to consume the full context. For CoT prompts, vLLM also stops on and retains the closing `</answer>` delimiter.
 
 All models also use neutral shared sampling defaults: `top_k=-1`, `min_p=0`, presence and frequency penalties of `0`, and repetition penalty `1`. Repository-specific generation defaults and model-card sampling recommendations are not silently applied because that would give different decoding policies to different leaderboard entries.
 
-Both papers use an expert LLM to extract answers from free-form model output. This suite first applies a strict local parser. After deterministic visual retries are exhausted, the same pinned checkpoint may act as a text-only answer extractor for the remaining responses. The extractor receives the original question, answer type, and raw candidate response, but no image or ground truth. It runs with temperature 0, top-p 1, a 200-token completion cap, and an exact `<answer>...</answer>` contract. The current response is judged once, followed by distinct archived visual attempts in ascending attempt and seed order. An extracted answer is accepted only when it is explicitly present in the selected raw response; ambiguous responses return `UNRESOLVED` and the next archived attempt is considered. The current raw response and complete extractor transcript are stored separately in diagnostics; when an archived response supplies the answer, its diagnostics filename and response SHA-256 are also recorded. This remains a deliberate protocol choice, so these results are leaderboard evaluations on the pinned public bundle, not exact reproductions of the papers' historical tables.
+Both papers use an expert LLM to extract answers from free-form model output. This suite makes that extraction authoritative for every sample. The default extractor is pinned `Qwen/Qwen3-8B`, served separately from the evaluated visual checkpoint with `enable_thinking=false`, temperature 0, top-p 1, a 200-token completion cap, and an exact `<answer>...</answer>` contract. It receives the public question, answer type, allowed answer domain, required output format, response finish metadata, and raw candidate response. It receives no image, image reference, or ground truth. It must not solve the question; it may only identify the response's final clear commitment. Empty, missing, truncated-before-commitment, conflicting, ambiguous, malformed, or unsupported responses become `UNRESOLVED`. Extractor transport failures stop finalization rather than silently producing missing answers. The raw response, extractor transcript, model/revision, status, and response hash remain in diagnostics.
 
-Qwen3.5 and InternVL3.5 are explicitly classified as thinking checkpoints. Qwen3.5 receives its supported `enable_thinking=true` chat-template argument on both tracks. Qwen3.6 is a unified checkpoint that thinks by default, but this profile explicitly evaluates its supported nonthinking mode with `enable_thinking=false` on both tracks. GLM-4.6V-Flash is also classified as nonthinking and receives the pinned template's supported `enable_thinking=false` argument. InternVL3.5's pinned template has no `enable_thinking` switch, so no unsupported template argument is injected; its completion is capped at 8,192 tokens by default and its extracted answer is checked separately. The remaining configured instruction checkpoints are classified as nonthinking unless their pinned model contract is updated and revalidated.
+InternVL3.5 is explicitly classified as a thinking checkpoint. Qwen3.5 and Qwen3.6 are unified checkpoints that think by default, but these profiles explicitly evaluate their supported nonthinking mode with `enable_thinking=false`; benchmark-level CoT is supplied by the shared prompt rather than hidden model-native reasoning. GLM-4.6V-Flash is also classified as nonthinking and receives the pinned template's supported `enable_thinking=false` argument. InternVL3.5's pinned template has no `enable_thinking` switch, so no unsupported template argument is injected; its completion is capped at 8,192 tokens by default and its extracted answer is checked separately. The remaining configured instruction checkpoints are classified as nonthinking unless their pinned model contract is updated and revalidated.
 
 ## What is not changed for speed
 
 - No BitsAndBytes, AWQ, GPTQ, FP8, or other weight quantization. The KV cache is also pinned to BF16 rather than FP8.
 - No benchmark image resize, tiling override, downsampling, or recompression in the runner.
 - No checkpoint is configured beyond or below its released context window. DeepSeek-VL2 uses its native 4,096-token limit; every other configured model receives a 32,768-token context. InternVL's 8,192-token completion ceiling is not a context-window reduction.
-- No speculative decoding, speed-only LoRA adapter, CPU weight offload, synthetic answer, or invalid-answer sentinel. An explicitly emitted faulty answer may be retained unchanged after recovery is exhausted. Phi's checkpoint-required vision adapter is the documented exception.
-- No shorter output budget on retries. Every attempt uses the same track protocol.
+- No speculative decoding, speed-only LoRA adapter, CPU weight offload, synthetic answer, local-parser answer selection, or raw-response substitution. `UNRESOLVED` explicitly represents no extractable final commitment. Phi's checkpoint-required vision adapter is the documented exception.
+- No answer-format generation retries. Transient HTTP retries may repeat a failed transport request, but they do not select among different model answers.
 
 The runner supplies the original image bytes without its own resize or recompression step. A checkpoint's native vision processor may still resize, crop, or tile the image as defined by that checkpoint; the suite does not override those model-specific operations.
 
@@ -87,7 +87,7 @@ If Hugging Face's repository transport is unavailable, `PHI_OFFICIAL_SNAPSHOT_PA
 
 ## Host prerequisites
 
-- Linux with a working NVIDIA driver and at least one free 40 GB-class GPU with native BF16 support.
+- Linux with a working NVIDIA driver and enough BF16 GPU memory for the evaluated checkpoint plus a dedicated Qwen3-8B extractor. The managed default uses a separate GPU; an externally managed extractor endpoint is also supported.
 - At least 32 GB of system RAM.
 - Python 3.10 through 3.14 with `venv` support.
 - `curl` and at least 96 GiB of free disk for a single-model run. Concurrent launches reserve 64 GiB for the host plus 32 GiB for every model cache.
@@ -112,24 +112,29 @@ DRY_RUN=1 MODELS=internvl35-8b bash evaluation/run_visual_suite.sh
 DRY_RUN=1 MODELS=internvl35-8b INTERNVL35_MAX_TOKENS=4096 \
   bash evaluation/run_visual_suite.sh
 
-# Run one unquantized model on one GPU.
-GPU_IDS=0 MODELS=internvl35-8b FORCE=1 \
+# Run one unquantized model on GPU 0 and the managed extractor on GPU 7.
+GPU_IDS=0 ANSWER_EXTRACTOR_GPU_IDS=7 MODELS=internvl35-8b FORCE=1 \
   bash evaluation/run_visual_suite.sh
 
 # Run one 8B model as four replicas for higher throughput without changing
 # prompts, sampling, token policy, image bytes, or checkpoint precision.
-GPU_IDS=0,1,2,3 TENSOR_PARALLEL_SIZE=1 DATA_PARALLEL_SIZE=4 CONCURRENCY=4 \
+GPU_IDS=0,1,2,3 ANSWER_EXTRACTOR_GPU_IDS=7 \
+TENSOR_PARALLEL_SIZE=1 DATA_PARALLEL_SIZE=4 CONCURRENCY=4 \
 MODELS=internvl35-8b FORCE=1 \
   bash evaluation/run_visual_suite.sh
 
-# Recover only unparseable rows in an existing complete diagnostics file.
-# This starts the pinned checkpoint but sends no visual requests.
-GPU_IDS=0,1,2,3 TENSOR_PARALLEL_SIZE=1 DATA_PARALLEL_SIZE=4 CONCURRENCY=4 \
-MODELS=internvl35-8b TRACKS=do_you_see_me EXTRACT_UNPARSEABLE_ONLY=1 \
+# Migrate every raw response in an existing complete diagnostics file to the
+# mandatory extractor contract without loading the visual checkpoint.
+GPU_IDS=7 ANSWER_EXTRACTOR_GPU_IDS=7 MODELS=internvl35-8b \
+TRACKS=do_you_see_me EXTRACT_EXISTING_ONLY=1 \
   bash evaluation/run_visual_suite.sh
+
+# Alternatively, use a separately supervised Qwen3-8B endpoint.
+GPU_IDS=0 ANSWER_EXTRACTOR_ENDPOINTS=http://127.0.0.1:8035/v1 \
+MODELS=internvl35-8b FORCE=1 bash evaluation/run_visual_suite.sh
 ```
 
-For checkpoints that fit on one A100, data parallelism is the preferred throughput topology: `TENSOR_PARALLEL_SIZE=1`, `DATA_PARALLEL_SIZE` equal to the number of assigned GPUs, and matching `CONCURRENCY`. Tensor parallelism is reserved for checkpoints that need multiple GPUs for one request. Parallel topology and request concurrency are recorded in the schema-v10 run fingerprint and final manifest; they do not alter the benchmark generation contract.
+For checkpoints that fit on one A100, data parallelism is the preferred throughput topology: `TENSOR_PARALLEL_SIZE=1`, `DATA_PARALLEL_SIZE` equal to the number of visual-model GPUs, and matching `CONCURRENCY`. Managed extractor GPUs must not overlap visual-model GPUs during normal inference. Tensor parallelism is reserved for checkpoints that need multiple GPUs for one request. Both serving contracts and request concurrency are recorded in the schema-v11 fingerprint and final manifest.
 
 The available slugs are:
 
@@ -183,6 +188,7 @@ Use one shared environment and dataset cache, with one independent model per GPU
 ```bash
 GPU_GROUPS='0;1' \
 MODEL_LIST=internvl35-8b,minicpm-v46 \
+ANSWER_EXTRACTOR_ENDPOINTS=http://127.0.0.1:8035/v1 \
 FORCE=1 \
   bash evaluation/run_visual_suite_multi_gpu.sh
 ```
@@ -192,13 +198,14 @@ To split each model over two GPUs instead, use two comma-separated GPU IDs insid
 ```bash
 GPU_GROUPS='0,1;2,3' \
 MODEL_LIST=internvl35-8b,minicpm-v46 \
+ANSWER_EXTRACTOR_ENDPOINTS=http://127.0.0.1:8035/v1 \
 FORCE=1 \
   bash evaluation/run_visual_suite_multi_gpu.sh
 ```
 
 Run a dry check first by adding `DRY_RUN=1`. `GPU_IDS=0,1` remains supported by the multi-GPU wrapper as legacy shorthand for two independent one-GPU workers; use `GPU_GROUPS` whenever tensor parallel grouping is needed.
 
-Do not start concurrent single-model runners on the same `PORT`. The multi-GPU launcher allocates a distinct port for every worker and verifies that each ready endpoint is serving the expected checkpoint before evaluation begins.
+Do not start concurrent single-model runners on the same `PORT`. The multi-GPU launcher allocates a distinct visual-model port for every worker. Concurrent workers share an externally supervised Qwen3-8B extractor through `ANSWER_EXTRACTOR_ENDPOINTS`; the endpoint identity is checked by every worker before evaluation.
 
 The multi-model launcher also protects 64 GiB of host free space and budgets 32 GiB for each checkpoint being downloaded. If the model cache filesystem is small, run models sequentially or set `CACHE_ROOT` to a larger mounted filesystem. Do not lower these guards merely to bypass a failed preflight.
 
@@ -206,15 +213,15 @@ The multi-model launcher also protects 64 GiB of host free space and budgets 32 
 
 - A strict 20-sample smoke test runs before each full track.
 - Diagnostics are saved atomically every 25 new responses.
-- A rerun preserves parseable responses and requests only missing, failed, or unparseable samples.
-- Format recovery uses a deterministic seed sequence beginning at seed 0. It never checks correctness when deciding whether to retry.
-- Every failed formatting pass is archived as `<track>.attempt-N.diagnostics.jsonl`; its hash is included in the final manifest.
-- After the configured visual attempts, remaining unparseable responses receive one deterministic same-model text-only extraction pass. If that also fails, complete nonerror records are finalized with the exact `diagnostics.output` string, without normalization or a scoreable placeholder. Missing, empty, or inference-error records still fail the track.
+- A resume preserves rows that already have the current mandatory extractor decision and requests only missing rows.
+- Each sample has one visual response and one authoritative Qwen3-8B extraction decision. No alternate visual answer is generated for formatting recovery.
+- Empty, missing, conflicting, ambiguous, unsupported, or truncated-before-commitment responses become `UNRESOLVED`. Extractor service or transport failures stop finalization.
+- Existing complete diagnostics may be migrated with `EXTRACT_EXISTING_ONLY=1`; this sends every stored raw response to Qwen3-8B without loading the visual checkpoint or consulting archived attempts.
 - Model, dataset, dependency, prompt, and source revisions are pinned or hashed.
-- A schema-v10 run fingerprint prevents checkpoints from different dtypes, prompts, model reasoning profiles, completion, extraction and final-answer policies, context limits, or parallel topologies from being mixed. Guarded schema-v7 through schema-v9 migrations record the previous parser, extraction policy, and runner hashes while preserving existing diagnostics.
+- A schema-v11 fingerprint prevents checkpoints from different dtypes, prompts, reasoning profiles, completion contracts, extractor models/revisions, context limits, or parallel topologies from being mixed. The only supported in-place upgrade is extraction-only migration from complete schema-v10 diagnostics; raw response bytes are preserved.
 - The final manifest records weight loading, BF16 compute and KV-cache dtypes, GPU assignment, tensor parallel size, per-track generation settings, and output hashes.
 - MiniCPM-V-4.6 applies a version-checked vLLM 0.25.1 weight mapping correction. The patch ID and source hash are recorded.
-- Model caches are removed after each attempt by default. Set `KEEP_MODEL_CACHE=1` only when disk capacity is sufficient.
+- Visual-model caches are removed after each completed model by default. Set `KEEP_MODEL_CACHE=1` only when disk capacity is sufficient.
 
 `FORCE=1` is required when replacing earlier 4-bit results. The unquantized runner defaults to `evaluation/results/visual_suite_bf16/`, so old quantized outputs are not silently mixed into the new record. For repeated experiments, set a unique `OUTPUT_ROOT`; the finalizer discovers valid staging roots recursively.
 
@@ -224,34 +231,32 @@ Each staging run writes to `<OUTPUT_ROOT>/<model-slug>/`:
 
 - `do_you_see_me_submission.jsonl`: canonical perception responses.
 - `minds_eye_submission.jsonl`: canonical cognition responses.
-- `<track>.diagnostics.jsonl`: raw model responses, finish reasons, token counts, errors, and separate extractor provenance where used.
+- `<track>.diagnostics.jsonl`: raw model responses, finish reasons, token counts, inference errors, and mandatory extractor provenance.
 - `.run_config.json`: immutable checkpoint compatibility fingerprint.
 - `run_manifest.json`: final protocol, hardware, provenance, and output hashes.
 - `vllm.log`: model download, startup, and serving diagnostics.
 
 The canonical root is `evaluation/results/final/`:
 
-- `index.json`: authoritative model inventory, pinned revisions, row counts, strict-answer counts, raw-fallback counts, and per-model manifest hashes.
+- `index.json`: authoritative model inventory, pinned revisions, row counts, resolved-answer counts, `UNRESOLVED` counts, legacy raw-fallback counts, and per-model manifest hashes.
 - `<model-slug>/final_manifest.json`: track-specific source run, topology, generation contract, answer provenance, and every retained artifact hash.
 - `<model-slug>/<track>_submission.jsonl`: uploadable canonical benchmark response.
-- `<model-slug>/<track>.diagnostics.jsonl`, retry archives, run configurations, and source manifests: retained audit record.
+- `<model-slug>/<track>.diagnostics.jsonl`, run configurations, and source manifests: retained audit record. Legacy canonical models may also retain pre-schema-v11 retry archives.
 
 Retain the canonical diagnostics and manifests with the experimental record. Only the two submission JSONL files are uploaded as benchmark responses. Staging roots and `.cache` are disposable after finalization and after all active runs have stopped.
 
-## Gold-aware malformed-response audit
+## Gold-blind malformed-response audit
 
-Post-hoc recovery of a long or malformed response is a response-commitment audit, not a second attempt to solve the image. `extract_canonical_answers.py` therefore requires the complete held-out answer map and gives the verifier the question, answer type, gold answer, and original response. It does not give the verifier an image. The verifier must return a literal quote from the response and classify it as `GOLD_COMMITTED`, `OTHER_COMMITTED`, or `UNRESOLVED`; code independently validates the quote, answer domain, commitment language, and answer-versus-gold verdict.
+Post-hoc recovery of a long or malformed response is a response-commitment audit, not a second attempt to solve the image. The extraction process receives only the public questions, canonical responses, and serving endpoint. It has no ground-truth CLI argument and does not load answer-key files. The LLM receives only the question, answer type, and original response; it receives neither the image nor the ground-truth answer. It must return `COMMITTED` with an answer and literal source quote, or `UNRESOLVED`. Code independently validates the quote, answer domain, and commitment language but does not score correctness. Only after extraction has finished does the separate offline revalidation process load the held-out key and assign `GOLD_COMMITTED` or `OTHER_COMMITTED`. This process boundary prevents label leakage from influencing which answer the extractor selects.
 
 Ground truth may be supplied as one or more JSON or JSONL files. Their union must cover exactly the 4,500 DYS and 799 Mind's Eye IDs in `tasks/<track>/questions.jsonl`. JSON maps may use either `"question_id": "answer"` or `"question_id": {"answer": "..."}`. JSONL rows use `question_id` and `answer`. The 175-entry files in `tasks/<track>/ground_truth.json` belong to a different private leaderboard subset; the audit rejects them because their IDs do not match the canonical visual set. Keep full answer keys outside Git.
 
 ```bash
 python -m evaluation.extract_canonical_answers \
-  --ground-truth /secure/path/dysm-full.json \
-  --ground-truth /secure/path/minds-eye-full.json \
   --endpoint http://127.0.0.1:8031/v1 \
   --model Qwen/Qwen3.6-27B \
   --policy high_risk \
-  --output /share/data/visual-answer-extraction/gold-aware-v6/audit.jsonl
+  --output /share/data/visual-answer-extraction/gold-blind-v3/raw-audit.jsonl
 ```
 
 Resume is append-only and requires the same method, full-ground-truth digest, candidate set, and response hashes. Earlier text-only and verifier checkpoints are intentionally incompatible. Once every selected candidate has an audit row, apply it only to a separate canonical copy:
@@ -262,18 +267,18 @@ If deterministic evidence rules are refined after a complete audit, reuse the im
 python -m evaluation.revalidate_canonical_audit \
   --ground-truth /secure/path/dysm-full.json \
   --ground-truth /secure/path/minds-eye-full.json \
-  --source-audit /share/data/visual-answer-extraction/gold-aware-v3/audit.jsonl \
+  --source-audit /share/data/visual-answer-extraction/gold-blind-v3/raw-audit.jsonl \
   --policy high_risk \
-  --output /share/data/visual-answer-extraction/gold-aware-v6/audit.jsonl
+  --output /share/data/visual-answer-extraction/gold-blind-v3/validated-audit.jsonl
 ```
 
 ```bash
 python -m evaluation.apply_canonical_extractions \
   --ground-truth /secure/path/dysm-full.json \
   --ground-truth /secure/path/minds-eye-full.json \
-  --audit /share/data/visual-answer-extraction/gold-aware-v6/audit.jsonl \
+  --audit /share/data/visual-answer-extraction/gold-blind-v3/validated-audit.jsonl \
   --policy high_risk \
   --output-root evaluation/results/final-extracted
 ```
 
-Application rechecks full audit coverage, the normalized ground-truth digest, response hashes, literal evidence, and deterministic verdicts before changing an answer. Both explicit correct and explicit incorrect commitments are preserved; unresolved rows remain unchanged. The source `evaluation/results/final/` tree is never modified.
+Offline revalidation refuses a source audit unless it records that the extractor process loaded no ground truth and the LLM received no ground truth. Application accepts only the resulting validated audit, rechecks full coverage, the normalized post-validation ground-truth digest, extractor-contract and response hashes, literal evidence, and deterministic verdicts before changing an answer. Both explicit correct and explicit incorrect commitments are preserved; unresolved rows remain unchanged. The source `evaluation/results/final/` tree is never modified.

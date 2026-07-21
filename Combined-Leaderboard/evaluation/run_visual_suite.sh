@@ -33,7 +33,6 @@ FORCE="${FORCE:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 KEEP_MODEL_CACHE="${KEEP_MODEL_CACHE:-0}"
 CONTINUE_ON_MODEL_ERROR="${CONTINUE_ON_MODEL_ERROR:-1}"
-MAX_EVAL_ATTEMPTS="${MAX_EVAL_ATTEMPTS:-3}"
 CHECKPOINT_EVERY="${CHECKPOINT_EVERY:-25}"
 REQUEST_TIMEOUT_SECONDS="${REQUEST_TIMEOUT_SECONDS:-600}"
 MODEL_START_TIMEOUT_SECONDS="${MODEL_START_TIMEOUT_SECONDS:-7200}"
@@ -55,8 +54,15 @@ HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
 BASE_SEED="${BASE_SEED:-0}"
 ANSWER_EXTRACTOR_SEED="${ANSWER_EXTRACTOR_SEED:-$BASE_SEED}"
 ANSWER_EXTRACTOR_MAX_TOKENS="${ANSWER_EXTRACTOR_MAX_TOKENS:-200}"
-EXTRACT_UNPARSEABLE_ONLY="${EXTRACT_UNPARSEABLE_ONLY:-0}"
-ALLOW_SMOKE_RAW_OUTPUT_FALLBACK="${ALLOW_SMOKE_RAW_OUTPUT_FALLBACK:-0}"
+ANSWER_EXTRACTOR_MODEL="${ANSWER_EXTRACTOR_MODEL:-Qwen/Qwen3-8B}"
+ANSWER_EXTRACTOR_REVISION="${ANSWER_EXTRACTOR_REVISION:-b968826d9c46dd6066d109eabc6255188de91218}"
+ANSWER_EXTRACTOR_ENDPOINTS="${ANSWER_EXTRACTOR_ENDPOINTS:-}"
+ANSWER_EXTRACTOR_CHAT_TEMPLATE_KWARGS="${ANSWER_EXTRACTOR_CHAT_TEMPLATE_KWARGS:-{\"enable_thinking\":false}}"
+ANSWER_EXTRACTOR_GPU_IDS="${ANSWER_EXTRACTOR_GPU_IDS:-}"
+ANSWER_EXTRACTOR_PORT="${ANSWER_EXTRACTOR_PORT:-8035}"
+ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION="${ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION:-0.70}"
+ANSWER_EXTRACTOR_MAX_MODEL_LEN="${ANSWER_EXTRACTOR_MAX_MODEL_LEN:-32768}"
+EXTRACT_EXISTING_ONLY="${EXTRACT_EXISTING_ONLY:-0}"
 SAMPLING_TOP_K="${SAMPLING_TOP_K:--1}"
 SAMPLING_MIN_P="${SAMPLING_MIN_P:-0.0}"
 PRESENCE_PENALTY="${PRESENCE_PENALTY:-0.0}"
@@ -85,9 +91,9 @@ QWEN36_MAX_TOKENS="${QWEN36_MAX_TOKENS:-8192}"
 VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
 VLLM_PHI4MM_MASK_SUM_PATCH_ID="vllm-0.25.1-phi4mm-fp32-mask-sum-v1"
 VLLM_DEEPSEEK_VL2_CONFIG_OVERRIDE_ID="vllm-0.25.1-deepseek-vl2-config-defaults-v1"
-ANSWER_EXTRACTION_METHOD_ID="same-served-model-text-only-v1"
-UNPARSEABLE_ANSWER_POLICY_ID="deterministic-retries-text-extraction-then-exact-raw-output-v5"
-PIPELINE_REVISION_ID="unquantized-bf16-smoke-and-full-text-extraction-v10"
+ANSWER_EXTRACTION_METHOD_ID="mandatory-gold-blind-text-extractor-v2"
+UNPARSEABLE_ANSWER_POLICY_ID="mandatory-extractor-unresolved-token-v1"
+PIPELINE_REVISION_ID="unquantized-bf16-mandatory-extraction-v11"
 
 # slug|repository|revision|weight loading|max context
 MODEL_SPECS=(
@@ -110,6 +116,10 @@ SERVER_PID=""
 SERVER_OWNS_PROCESS_GROUP=0
 SERVER_LOG=""
 SERVER_ENDPOINTS=""
+EXTRACTOR_SERVER_PID=""
+EXTRACTOR_SERVER_LOG=""
+EXTRACTOR_SERVER_MANAGED=0
+EXTRACTOR_SERVER_OWNS_PROCESS_GROUP=0
 INDEPENDENT_SERVER_PIDS=()
 INDEPENDENT_SERVER_PORTS=()
 INDEPENDENT_SERVER_LOGS=()
@@ -147,14 +157,18 @@ Common overrides:
   DRY_RUN=1                          Validate and print the resolved plan
   INTERNVL35_MAX_TOKENS=8192         Bound InternVL3.5, GLM-4.6V, MiniCPM-V, Qwen2.5-VL, and Qwen3-VL completions
   QWEN36_MAX_TOKENS=8192             Bound Qwen3.6 completions
-  EXTRACT_UNPARSEABLE_ONLY=1         Judge only existing unparseable diagnostics
+  ANSWER_EXTRACTOR_MODEL=model-id    Dedicated extractor (default: Qwen/Qwen3-8B)
+  ANSWER_EXTRACTOR_REVISION=commit   Immutable dedicated extractor revision
+  ANSWER_EXTRACTOR_GPU_IDS=7         Launch the managed extractor on dedicated GPU(s)
+  ANSWER_EXTRACTOR_ENDPOINTS=url     Use an already-managed extractor instead
+  EXTRACT_EXISTING_ONLY=1            Extract every existing diagnostic; no images
 
 The runner uses the original checkpoint tensors with BF16 compute. It never
 loads 4-bit or 8-bit weights, resizes benchmark images, or creates a synthetic
-answer. After deterministic visual retries, the same served model may extract
-an answer from raw response text only. If strict recovery is exhausted, a
-complete nonempty model output is copied exactly into the submission answer;
-missing, empty, or inference-error records still fail.
+answer. Every visual response is followed by a gold-blind text-only LLM
+extraction request. Only that extractor decision is submitted. Missing,
+ambiguous, malformed, empty, or failed responses become the standardized token
+UNRESOLVED; there are no answer-format reruns or raw-output fallbacks.
 EOF
 }
 
@@ -193,6 +207,7 @@ PY
 }
 
 cleanup_runner() {
+  stop_extractor_server
   stop_server
   if [[ -n "$ACTIVE_RUN_MARKER" ]]; then
     rm -f -- "$ACTIVE_RUN_MARKER"
@@ -236,7 +251,7 @@ track_prompt_mode() {
 
 model_reasoning_profile() {
   case "$1" in
-    qwen35-9b|internvl35-8b) printf '%s\n' 'thinking' ;;
+    internvl35-8b) printf '%s\n' 'thinking' ;;
     qwen36-27b) printf '%s\n' 'nonthinking' ;;
     *) printf '%s\n' 'nonthinking' ;;
   esac
@@ -245,8 +260,7 @@ model_reasoning_profile() {
 model_max_tokens() {
   case "$1" in
     qwen36-27b) printf '%s\n' "$QWEN36_MAX_TOKENS" ;;
-    internvl35-8b|glm46v-flash|minicpm-v46|qwen25-vl-7b|qwen3-vl-8b) printf '%s\n' "$INTERNVL35_MAX_TOKENS" ;;
-    qwen35-9b) printf '\n' ;;
+    qwen35-9b|internvl35-8b|glm46v-flash|minicpm-v46|qwen25-vl-7b|qwen3-vl-8b) printf '%s\n' "$INTERNVL35_MAX_TOKENS" ;;
     *) printf '%s\n' "$FINAL_ANSWER_MAX_TOKENS" ;;
   esac
 }
@@ -254,8 +268,7 @@ model_max_tokens() {
 model_max_tokens_policy() {
   case "$1" in
     qwen36-27b) printf '%s\n' 'explicit-model-completion-cap' ;;
-    internvl35-8b|glm46v-flash|minicpm-v46|qwen25-vl-7b|qwen3-vl-8b) printf '%s\n' 'explicit-model-completion-cap' ;;
-    qwen35-9b) printf '%s\n' 'remaining-model-context' ;;
+    qwen35-9b|internvl35-8b|glm46v-flash|minicpm-v46|qwen25-vl-7b|qwen3-vl-8b) printf '%s\n' 'explicit-model-completion-cap' ;;
     *) printf '%s\n' 'explicit-total-completion-cap' ;;
   esac
 }
@@ -306,7 +319,7 @@ track_chat_kwargs() {
   local slug="$1"
   case "$slug" in
     glm46v-flash|qwen36-27b) printf '%s\n' '{"enable_thinking":false}' ;;
-    qwen35-9b) printf '%s\n' '{"enable_thinking":true}' ;;
+    qwen35-9b) printf '%s\n' '{"enable_thinking":false}' ;;
     *) printf '%s\n' '{}' ;;
   esac
 }
@@ -443,13 +456,13 @@ resolve_max_num_seqs_per_replica() {
 }
 
 validate_settings() {
-  local penalty_name penalty_value
+  local penalty_name penalty_value extractor_gpu visual_gpu
+  local -a extractor_gpu_list=()
   command -v awk >/dev/null || die "awk is required."
   initialize_gpu_topology
   [[ "$PORT" =~ ^[0-9]+$ ]] && (( PORT > 0 && PORT < 65536 )) \
     || die "PORT must be between 1 and 65535."
   validate_positive_integer "SMOKE_SAMPLES" "$SMOKE_SAMPLES"
-  validate_positive_integer "MAX_EVAL_ATTEMPTS" "$MAX_EVAL_ATTEMPTS"
   validate_positive_integer "CHECKPOINT_EVERY" "$CHECKPOINT_EVERY"
   validate_positive_integer "CONCURRENCY" "$CONCURRENCY"
   resolve_max_num_seqs_per_replica
@@ -462,7 +475,6 @@ validate_settings() {
   validate_positive_integer "MIN_FREE_GPU_MEMORY_MIB" "$MIN_FREE_GPU_MEMORY_MIB"
   validate_positive_integer "HF_HUB_DOWNLOAD_TIMEOUT" "$HF_HUB_DOWNLOAD_TIMEOUT"
   validate_flag "DISABLE_CUSTOM_ALL_REDUCE" "$DISABLE_CUSTOM_ALL_REDUCE"
-  validate_flag "ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" "$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK"
   [[ "$SERVING_REPLICA_MODE" == "builtin" || "$SERVING_REPLICA_MODE" == "independent" ]] \
     || die "SERVING_REPLICA_MODE must be builtin or independent."
   if [[ "$SERVING_REPLICA_MODE" == "independent" ]]; then
@@ -498,6 +510,39 @@ validate_settings() {
   validate_positive_integer "INTERNVL35_MAX_TOKENS" "$INTERNVL35_MAX_TOKENS"
   validate_positive_integer "QWEN36_MAX_TOKENS" "$QWEN36_MAX_TOKENS"
   validate_positive_integer "ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_MAX_TOKENS"
+  validate_positive_integer "ANSWER_EXTRACTOR_PORT" "$ANSWER_EXTRACTOR_PORT"
+  (( ANSWER_EXTRACTOR_PORT < 65536 )) \
+    || die "ANSWER_EXTRACTOR_PORT must be below 65536."
+  validate_positive_integer "ANSWER_EXTRACTOR_MAX_MODEL_LEN" "$ANSWER_EXTRACTOR_MAX_MODEL_LEN"
+  [[ "$ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION" =~ ^0([.][0-9]+)?$ ]] \
+    && awk -v value="$ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION" \
+      'BEGIN { exit !(value > 0 && value < 1) }' \
+    || die "ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION must be greater than 0 and less than 1."
+  [[ -n "$ANSWER_EXTRACTOR_MODEL" ]] || die "ANSWER_EXTRACTOR_MODEL must not be empty."
+  [[ "$ANSWER_EXTRACTOR_REVISION" =~ ^[0-9a-f]{40}$ ]] \
+    || die "ANSWER_EXTRACTOR_REVISION must be a full 40-character commit hash."
+  if [[ -n "$ANSWER_EXTRACTOR_GPU_IDS" ]]; then
+    [[ -z "$ANSWER_EXTRACTOR_ENDPOINTS" ]] \
+      || die "Set either ANSWER_EXTRACTOR_GPU_IDS or ANSWER_EXTRACTOR_ENDPOINTS, not both."
+    IFS=',' read -r -a extractor_gpu_list <<<"$ANSWER_EXTRACTOR_GPU_IDS"
+    (( ${#extractor_gpu_list[@]} > 0 )) || die "ANSWER_EXTRACTOR_GPU_IDS is empty."
+    for extractor_gpu in "${extractor_gpu_list[@]}"; do
+      [[ "$extractor_gpu" =~ ^[0-9]+$ ]] \
+        || die "ANSWER_EXTRACTOR_GPU_IDS must be comma-separated GPU indices."
+      if [[ "$EXTRACT_EXISTING_ONLY" != "1" ]]; then
+        for visual_gpu in "${GPU_ID_LIST[@]}"; do
+          [[ "$extractor_gpu" != "$visual_gpu" ]] \
+            || die "Extractor GPU $extractor_gpu overlaps visual GPU_IDS; use a dedicated GPU."
+        done
+      fi
+    done
+    ANSWER_EXTRACTOR_ENDPOINTS="http://127.0.0.1:$ANSWER_EXTRACTOR_PORT/v1"
+    EXTRACTOR_SERVER_MANAGED=1
+  else
+    ANSWER_EXTRACTOR_ENDPOINTS="${ANSWER_EXTRACTOR_ENDPOINTS:-http://127.0.0.1:$ANSWER_EXTRACTOR_PORT/v1}"
+  fi
+  [[ "$ANSWER_EXTRACTOR_ENDPOINTS" =~ ^https?:// ]] \
+    || die "ANSWER_EXTRACTOR_ENDPOINTS must contain absolute HTTP(S) URL(s)."
   [[ "$DYS_TEMPERATURE" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "DYS_TEMPERATURE must be non-negative."
   [[ "$MINDS_EYE_TEMPERATURE" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "MINDS_EYE_TEMPERATURE must be non-negative."
   validate_probability "DYS_TOP_P" "$DYS_TOP_P"
@@ -526,10 +571,10 @@ validate_settings() {
   validate_flag "KEEP_MODEL_CACHE" "$KEEP_MODEL_CACHE"
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
   validate_flag "HF_HUB_DISABLE_XET" "$HF_HUB_DISABLE_XET"
-  validate_flag "EXTRACT_UNPARSEABLE_ONLY" "$EXTRACT_UNPARSEABLE_ONLY"
-  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
-    [[ "$FORCE" != "1" ]] || die "EXTRACT_UNPARSEABLE_ONLY cannot be combined with FORCE=1."
-    [[ "$SMOKE_ONLY" != "1" ]] || die "EXTRACT_UNPARSEABLE_ONLY cannot be combined with SMOKE_ONLY=1."
+  validate_flag "EXTRACT_EXISTING_ONLY" "$EXTRACT_EXISTING_ONLY"
+  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+    [[ "$FORCE" != "1" ]] || die "EXTRACT_EXISTING_ONLY cannot be combined with FORCE=1."
+    [[ "$SMOKE_ONLY" != "1" ]] || die "EXTRACT_EXISTING_ONLY cannot be combined with SMOKE_ONLY=1."
   fi
   [[ -n "$(selected_tracks)" ]] || die "TRACKS must select do_you_see_me, minds_eye, or all."
   (( $(selected_model_count) > 0 )) || die "MODELS did not match any configured model slug."
@@ -553,11 +598,13 @@ print_plan() {
     "$VLLM_DTYPE" "$VLLM_KV_CACHE_DTYPE"
   printf '  Serving engine: vLLM %s\n' "$VLLM_VERSION"
   printf '  Image preprocessing: original image bytes, no runner resize or recompression\n'
-  printf '  Answer recovery: same served model, text only, temperature=0, max_tokens=%s, seed=%s\n' \
+  printf '  Mandatory answer extraction: model=%s, endpoints=%s, text only, temperature=0, max_tokens=%s, seed=%s\n' \
+    "${ANSWER_EXTRACTOR_MODEL:-same-as-inference}" \
+    "${ANSWER_EXTRACTOR_ENDPOINTS:-same-as-inference}" \
     "$ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_SEED"
-  printf '  Exhausted recovery: preserve exact nonempty diagnostics.output in submission\n'
-  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
-    printf '  Mode: extract existing unparseable diagnostics; no visual requests\n'
+  printf '  Missing/ambiguous response token: UNRESOLVED; extractor transport failures stop finalization\n'
+  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+    printf '  Mode: extract every existing diagnostic response; no visual requests\n'
   fi
   printf '  Shared sampling: top_k=%s, min_p=%s, presence=%s, frequency=%s, repetition=%s\n' \
     "$SAMPLING_TOP_K" "$SAMPLING_MIN_P" "$PRESENCE_PENALTY" "$FREQUENCY_PENALTY" "$REPETITION_PENALTY"
@@ -592,6 +639,7 @@ print_plan() {
       fi
       printf '    Reasoning profile: %s; API max_tokens=%s; final_answer_max_tokens=%s\n' \
         "$reasoning_profile" "$max_tokens" "$FINAL_ANSWER_MAX_TOKENS"
+      printf '    Chat template kwargs: %s\n' "$(track_chat_kwargs "$slug")"
       printf '    Engine mode: %s; server KV cache argument: %s\n' \
         "$(model_vllm_engine_mode "$slug")" "$(model_server_kv_cache_dtype "$slug")"
       adapter_name="$(model_adapter_name "$slug")"
@@ -1021,6 +1069,139 @@ stop_server() {
   SERVER_OWNS_PROCESS_GROUP=0
 }
 
+stop_extractor_server() {
+  [[ -n "$EXTRACTOR_SERVER_PID" ]] || return 0
+  local pid="$EXTRACTOR_SERVER_PID" waited=0
+  log "Stopping dedicated extractor server PID $pid"
+  if [[ "$EXTRACTOR_SERVER_OWNS_PROCESS_GROUP" == "1" ]]; then
+    kill -TERM -- "-$pid" 2>/dev/null || true
+  else
+    kill -TERM "$pid" 2>/dev/null || true
+  fi
+  while kill -0 "$pid" 2>/dev/null && (( waited < 60 )); do
+    sleep 2
+    waited=$((waited + 2))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    if [[ "$EXTRACTOR_SERVER_OWNS_PROCESS_GROUP" == "1" ]]; then
+      kill -KILL -- "-$pid" 2>/dev/null || true
+    else
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  fi
+  wait "$pid" 2>/dev/null || true
+  wait_for_port_release 60 "$ANSWER_EXTRACTOR_PORT" \
+    || printf 'Extractor port %s was not released.\n' "$ANSWER_EXTRACTOR_PORT" >&2
+  EXTRACTOR_SERVER_PID=""
+  EXTRACTOR_SERVER_OWNS_PROCESS_GROUP=0
+}
+
+verify_extractor_endpoints() {
+  EXTRACTOR_ENDPOINTS="$ANSWER_EXTRACTOR_ENDPOINTS" \
+  EXTRACTOR_MODEL="$ANSWER_EXTRACTOR_MODEL" "$PYTHON_BIN" - <<'PY'
+import json
+import os
+from urllib.request import urlopen
+
+expected = os.environ["EXTRACTOR_MODEL"]
+for endpoint in os.environ["EXTRACTOR_ENDPOINTS"].split(","):
+    endpoint = endpoint.strip().rstrip("/")
+    with urlopen(f"{endpoint}/models", timeout=10) as response:
+        payload = json.load(response)
+    models = {
+        str(item.get("id") or "")
+        for item in payload.get("data", [])
+        if isinstance(item, dict)
+    }
+    if expected not in models:
+        raise SystemExit(
+            f"Extractor endpoint {endpoint} serves {sorted(models)}, not {expected}."
+        )
+PY
+}
+
+start_extractor_server() {
+  if [[ "$EXTRACTOR_SERVER_MANAGED" != "1" ]]; then
+    log "Verifying externally managed extractor endpoint(s) for $ANSWER_EXTRACTOR_MODEL"
+    verify_extractor_endpoints
+    return
+  fi
+  port_is_available "$ANSWER_EXTRACTOR_PORT" \
+    || die "Extractor port $ANSWER_EXTRACTOR_PORT is already in use."
+  local model_cache="$CACHE_ROOT/models/qwen3-8b-extractor"
+  local extractor_tp
+  local -a extractor_gpu_list=()
+  IFS=',' read -r -a extractor_gpu_list <<<"$ANSWER_EXTRACTOR_GPU_IDS"
+  extractor_tp="${#extractor_gpu_list[@]}"
+  mkdir -p "$model_cache" "$OUTPUT_ROOT"
+  EXTRACTOR_SERVER_LOG="$OUTPUT_ROOT/qwen3-8b-extractor.vllm.log"
+  local -a command=(
+    "$VLLM_BIN" serve "$ANSWER_EXTRACTOR_MODEL"
+    --host 127.0.0.1
+    --port "$ANSWER_EXTRACTOR_PORT"
+    --served-model-name "$ANSWER_EXTRACTOR_MODEL"
+    --revision "$ANSWER_EXTRACTOR_REVISION"
+    --dtype bfloat16
+    --kv-cache-dtype bfloat16
+    --tensor-parallel-size "$extractor_tp"
+    --data-parallel-size 1
+    --gpu-memory-utilization "$ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION"
+    --max-model-len "$ANSWER_EXTRACTOR_MAX_MODEL_LEN"
+    --max-num-seqs "$CONCURRENCY"
+    --generation-config vllm
+    --default-chat-template-kwargs "$ANSWER_EXTRACTOR_CHAT_TEMPLATE_KWARGS"
+    --trust-remote-code
+  )
+  log "Starting dedicated $ANSWER_EXTRACTOR_MODEL extractor at revision ${ANSWER_EXTRACTOR_REVISION:0:12} on GPU(s) $ANSWER_EXTRACTOR_GPU_IDS"
+  log "Extractor startup log: $EXTRACTOR_SERVER_LOG"
+  if command -v setsid >/dev/null; then
+    setsid env \
+      HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+      HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+      HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
+      HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" TOKENIZERS_PARALLELISM=false \
+      CUDA_VISIBLE_DEVICES="$ANSWER_EXTRACTOR_GPU_IDS" \
+      PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" PYTHONUNBUFFERED=1 \
+      "${command[@]}" >"$EXTRACTOR_SERVER_LOG" 2>&1 &
+    EXTRACTOR_SERVER_OWNS_PROCESS_GROUP=1
+  else
+    env \
+      HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+      HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+      HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
+      HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" TOKENIZERS_PARALLELISM=false \
+      CUDA_VISIBLE_DEVICES="$ANSWER_EXTRACTOR_GPU_IDS" \
+      PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" PYTHONUNBUFFERED=1 \
+      "${command[@]}" >"$EXTRACTOR_SERVER_LOG" 2>&1 &
+    EXTRACTOR_SERVER_OWNS_PROCESS_GROUP=0
+  fi
+  EXTRACTOR_SERVER_PID=$!
+  local elapsed=0
+  while (( elapsed < MODEL_START_TIMEOUT_SECONDS )); do
+    if ! kill -0 "$EXTRACTOR_SERVER_PID" 2>/dev/null; then
+      printf 'Dedicated extractor exited during startup. Last log lines:\n' >&2
+      tail -n 80 "$EXTRACTOR_SERVER_LOG" >&2 || true
+      stop_extractor_server
+      return 1
+    fi
+    if server_serves_model "$ANSWER_EXTRACTOR_MODEL" "$ANSWER_EXTRACTOR_PORT"; then
+      log "Dedicated extractor is ready and serves $ANSWER_EXTRACTOR_MODEL"
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+    if (( elapsed % 60 == 0 )); then
+      log "Waiting for dedicated extractor startup (${elapsed}s elapsed)"
+    fi
+  done
+  printf 'Dedicated extractor did not become ready within %s seconds.\n' \
+    "$MODEL_START_TIMEOUT_SECONDS" >&2
+  stop_extractor_server
+  return 1
+}
+
 report_startup_progress() {
   local elapsed="$1" latest=""
   if [[ -s "$SERVER_LOG" ]]; then
@@ -1317,12 +1498,16 @@ PY
 runner_base_args() {
   local slug="$1" model_id="$2" track="$3" seed="$4"
   local prompt_mode max_tokens stop_sequence temperature top_p chat_kwargs
+  local extractor_model extractor_endpoints extractor_chat_kwargs
   prompt_mode="$(track_prompt_mode "$track")"
   max_tokens="$(track_max_tokens "$slug" "$track")"
   stop_sequence="$(track_stop_sequence "$track")"
   temperature="$(track_temperature "$track")"
   top_p="$(track_top_p "$track")"
   chat_kwargs="$(track_chat_kwargs "$slug" "$track")"
+  extractor_model="${ANSWER_EXTRACTOR_MODEL:-$model_id}"
+  extractor_endpoints="${ANSWER_EXTRACTOR_ENDPOINTS:-${SERVER_ENDPOINTS:-http://127.0.0.1:$PORT/v1}}"
+  extractor_chat_kwargs="${ANSWER_EXTRACTOR_CHAT_TEMPLATE_KWARGS:-$chat_kwargs}"
   RUNNER_ARGS=(
     --model "$model_id"
     --endpoints "${SERVER_ENDPOINTS:-http://127.0.0.1:$PORT/v1}"
@@ -1340,6 +1525,11 @@ runner_base_args() {
     --request-timeout "$REQUEST_TIMEOUT_SECONDS"
     --max-retries 3
     --seed "$seed"
+    --extractor-model "$extractor_model"
+    --extractor-revision "$ANSWER_EXTRACTOR_REVISION"
+    --extractor-endpoints "$extractor_endpoints"
+    --extractor-seed "$ANSWER_EXTRACTOR_SEED"
+    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS"
     --checkpoint-every "$CHECKPOINT_EVERY"
     --max-final-answer-tokens "$FINAL_ANSWER_MAX_TOKENS"
   )
@@ -1352,111 +1542,14 @@ runner_base_args() {
   if [[ "$chat_kwargs" != "{}" ]]; then
     RUNNER_ARGS+=(--chat-template-kwargs "$chat_kwargs")
   fi
-}
-
-run_answer_extraction() {
-  local slug="$1" model_id="$2" track="$3" questions="$4" output="$5" diagnostics="$6"
-  local module source
-  local -a source_args=()
-  module="$(track_module "$track")"
-  [[ -f "$diagnostics" ]] || {
-    printf 'Evaluation failed: %s/%s has no diagnostics to extract from: %s\n' \
-      "$slug" "$track" "$diagnostics" >&2
-    return 1
-  }
-  for source in "${diagnostics%/*}/${track}.attempt-"*.diagnostics.jsonl; do
-    if [[ -f "$source" ]]; then
-      source_args+=(--extraction-source-diagnostics "$source")
-    fi
-  done
-  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
-  log "Extracting existing unparseable $slug/$track answers with the same served model (text only, seed=$ANSWER_EXTRACTOR_SEED)"
-  "$PYTHON_BIN" -m "$module" \
-    "${RUNNER_ARGS[@]}" \
-    --questions "$questions" \
-    --resume \
-    --extract-unparseable-only \
-    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
-    "${source_args[@]}" \
-    --out "$output" \
-    --diagnostics "$diagnostics" \
-    && validate_submission "$output" "$questions"
-}
-
-finalize_raw_outputs() {
-  local slug="$1" model_id="$2" track="$3" questions="$4" output="$5" diagnostics="$6"
-  local module
-  module="$(track_module "$track")"
-  [[ -f "$diagnostics" ]] || return 1
-  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
-  log "Finalizing $slug/$track with exact faulty model outputs after strict recovery was exhausted"
-  "$PYTHON_BIN" -m "$module" \
-    "${RUNNER_ARGS[@]}" \
-    --questions "$questions" \
-    --finalize-existing-diagnostics \
-    --raw-output-fallback \
-    --out "$output" \
-    --diagnostics "$diagnostics" \
-    && validate_submission "$output" "$questions"
-}
-
-run_smoke_answer_extraction() {
-  local slug="$1" model_id="$2" track="$3" questions="$4" diagnostics="$5"
-  local module source
-  local -a source_args=()
-  module="$(track_module "$track")"
-  [[ -f "$diagnostics" ]] || return 1
-  for source in "${diagnostics%/*}/${track}.smoke.attempt-"*.diagnostics.jsonl; do
-    if [[ -f "$source" ]]; then
-      source_args+=(--extraction-source-diagnostics "$source")
-    fi
-  done
-  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
-  log "Extracting unparseable $slug/$track smoke answers with the same served model (text only, seed=$ANSWER_EXTRACTOR_SEED)"
-  "$PYTHON_BIN" -m "$module" \
-    "${RUNNER_ARGS[@]}" \
-    --questions "$questions" \
-    --limit "$SMOKE_SAMPLES" \
-    --strict-partial \
-    --resume \
-    --extract-unparseable-only \
-    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
-    "${source_args[@]}" \
-    --diagnostics "$diagnostics"
-}
-
-smoke_outputs_are_complete() {
-  local questions="$1" diagnostics="$2"
-  "$PYTHON_BIN" - "$questions" "$diagnostics" "$SMOKE_SAMPLES" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-questions_path = Path(sys.argv[1])
-diagnostics_path = Path(sys.argv[2])
-limit = int(sys.argv[3])
-expected = [
-    str(json.loads(line)["question_id"])
-    for line in questions_path.read_text(encoding="utf-8").splitlines()
-    if line.strip()
-][:limit]
-rows = [
-    json.loads(line)
-    for line in diagnostics_path.read_text(encoding="utf-8").splitlines()
-    if line.strip()
-]
-ids = [str(row.get("question_id") or "") for row in rows]
-if ids != expected or len(ids) != len(set(ids)):
-    raise SystemExit(1)
-if any(row.get("error") or not str(row.get("output") or "").strip() for row in rows):
-    raise SystemExit(1)
-PY
+  if [[ "$extractor_chat_kwargs" != "{}" ]]; then
+    RUNNER_ARGS+=(--extractor-chat-template-kwargs "$extractor_chat_kwargs")
+  fi
 }
 
 run_track() {
   local slug="$1" model_id="$2" track="$3"
-  local module questions model_dir output diagnostics smoke_diagnostics attempt seed smoke_passed
-  local -a smoke_args
+  local module questions model_dir output diagnostics smoke_diagnostics
   module="$(track_module "$track")"
   questions="$(track_questions "$track")"
   model_dir="$OUTPUT_ROOT/$slug"
@@ -1465,111 +1558,67 @@ run_track() {
   smoke_diagnostics="$model_dir/${track}.smoke.diagnostics.jsonl"
   mkdir -p "$model_dir"
 
-  if [[ "$FORCE" != "1" ]] && validate_submission "$output" "$questions" >/dev/null 2>&1; then
+  if [[ "$EXTRACT_EXISTING_ONLY" != "1" && "$FORCE" != "1" ]] \
+    && validate_submission "$output" "$questions" >/dev/null 2>&1; then
     log "$slug/$track already has a complete canonical output; skipping"
     return 0
   fi
   if [[ "$FORCE" == "1" ]]; then
     rm -f -- "$output" "$diagnostics" "$smoke_diagnostics"
+    rm -f -- "$model_dir/${track}.attempt-"*.diagnostics.jsonl
+    rm -f -- "$model_dir/${track}.smoke.attempt-"*.diagnostics.jsonl
   elif [[ -f "$output" ]]; then
     mv -- "$output" "$output.invalid.$(date -u '+%Y%m%dT%H%M%SZ')"
   fi
-  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
-    run_answer_extraction "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"
+  runner_base_args "$slug" "$model_id" "$track" "$BASE_SEED"
+  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+    [[ -f "$diagnostics" ]] || {
+      printf 'Evaluation failed: %s/%s has no existing diagnostics at %s\n' \
+        "$slug" "$track" "$diagnostics" >&2
+      return 1
+    }
+    log "Running mandatory gold-blind extraction for every existing $slug/$track response"
+    "$PYTHON_BIN" -m "$module" \
+      "${RUNNER_ARGS[@]}" \
+      --questions "$questions" \
+      --resume \
+      --extract-existing-diagnostics \
+      --out "$output" \
+      --diagnostics "$diagnostics" \
+      && validate_submission "$output" "$questions"
     return
   fi
 
-  runner_base_args "$slug" "$model_id" "$track" "$BASE_SEED"
-  smoke_passed=0
-  if [[ "$FORCE" != "1" && -f "$smoke_diagnostics" ]]; then
-    log "Resuming the saved $slug/$track smoke checkpoint with text-only answer extraction"
-    if run_smoke_answer_extraction \
-      "$slug" "$model_id" "$track" "$questions" "$smoke_diagnostics"; then
-      smoke_passed=1
-    fi
-  fi
-  if [[ "$smoke_passed" != "1" ]]; then
-    rm -f -- "$smoke_diagnostics"
-    for ((attempt = 1; attempt <= MAX_EVAL_ATTEMPTS; attempt++)); do
-      seed=$((BASE_SEED + attempt - 1))
-      runner_base_args "$slug" "$model_id" "$track" "$seed"
-      log "Running strict $SMOKE_SAMPLES-sample smoke test for $slug/$track, pass $attempt/$MAX_EVAL_ATTEMPTS (seed=$seed)"
-      smoke_args=(
-        "${RUNNER_ARGS[@]}"
-        --questions "$questions"
-        --limit "$SMOKE_SAMPLES"
-        --strict-partial
-        --diagnostics "$smoke_diagnostics"
-      )
-      if (( attempt > 1 )); then
-        smoke_args+=(--resume)
-      fi
-      if "$PYTHON_BIN" -m "$module" "${smoke_args[@]}"; then
-        smoke_passed=1
-        break
-      fi
-      if [[ -f "$smoke_diagnostics" ]]; then
-        cp -- "$smoke_diagnostics" "$model_dir/${track}.smoke.attempt-${attempt}.diagnostics.jsonl"
-      fi
-      if (( attempt < MAX_EVAL_ATTEMPTS )); then
-        log "Smoke pass $attempt left failed or unparseable samples; retrying only those samples with seed $((seed + 1))"
-        sleep 15
-      fi
-    done
-  fi
-  if [[ "$smoke_passed" != "1" ]] && run_smoke_answer_extraction \
-    "$slug" "$model_id" "$track" "$questions" "$smoke_diagnostics"; then
-    smoke_passed=1
-  fi
-  if [[ "$smoke_passed" != "1" && "$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" == "1" ]] \
-    && smoke_outputs_are_complete "$questions" "$smoke_diagnostics"; then
-    log "Accepting $slug/$track smoke with complete nonempty raw outputs after strict recovery was exhausted"
-    smoke_passed=1
-  fi
-  if [[ "$smoke_passed" != "1" ]]; then
-    printf 'Evaluation failed: %s/%s smoke test still has failed or unparseable outputs after %s passes. Raw responses remain in %s. The full evaluation was not started.\n' \
-      "$slug" "$track" "$MAX_EVAL_ATTEMPTS" "$smoke_diagnostics" >&2
+  rm -f -- "$smoke_diagnostics"
+  log "Running strict $SMOKE_SAMPLES-sample smoke test with mandatory extraction for $slug/$track"
+  if ! "$PYTHON_BIN" -m "$module" \
+    "${RUNNER_ARGS[@]}" \
+    --questions "$questions" \
+    --limit "$SMOKE_SAMPLES" \
+    --strict-partial \
+    --diagnostics "$smoke_diagnostics"; then
+    printf 'Evaluation failed: %s/%s mandatory-extractor smoke test failed. Diagnostics remain in %s.\n' \
+      "$slug" "$track" "$smoke_diagnostics" >&2
     return 1
   fi
   if [[ "$SMOKE_ONLY" == "1" ]]; then
     return 0
   fi
 
-  for ((attempt = 1; attempt <= MAX_EVAL_ATTEMPTS; attempt++)); do
-    seed=$((BASE_SEED + attempt - 1))
-    runner_base_args "$slug" "$model_id" "$track" "$seed"
-    log "Running $slug/$track full evaluation, pass $attempt/$MAX_EVAL_ATTEMPTS (seed=$seed)"
-    if "$PYTHON_BIN" -m "$module" \
-      "${RUNNER_ARGS[@]}" \
-      --questions "$questions" \
-      --resume \
-      --out "$output" \
-      --diagnostics "$diagnostics" \
-      && validate_submission "$output" "$questions"; then
-      rm -f -- "$smoke_diagnostics"
-      return 0
-    fi
-    if [[ -f "$diagnostics" ]]; then
-      cp -- "$diagnostics" "$model_dir/${track}.attempt-${attempt}.diagnostics.jsonl"
-    fi
-    if (( attempt < MAX_EVAL_ATTEMPTS )); then
-      log "Pass $attempt left failed or unparseable samples; retrying only those samples with seed $((seed + 1))"
-      sleep 15
-    fi
-  done
-
-  if run_answer_extraction "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"; then
+  log "Running $slug/$track full evaluation with mandatory extraction"
+  if "$PYTHON_BIN" -m "$module" \
+    "${RUNNER_ARGS[@]}" \
+    --questions "$questions" \
+    --resume \
+    --out "$output" \
+    --diagnostics "$diagnostics" \
+    && validate_submission "$output" "$questions"; then
     rm -f -- "$smoke_diagnostics"
     return 0
   fi
 
-  if finalize_raw_outputs "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"; then
-    rm -f -- "$smoke_diagnostics"
-    return 0
-  fi
-
-  printf 'Evaluation failed: %s/%s still has missing, failed, or empty outputs after %s visual passes, same-model text extraction, and exact raw-output finalization. Raw responses remain in %s. No submission file was finalized.\n' \
-    "$slug" "$track" "$MAX_EVAL_ATTEMPTS" "$diagnostics" >&2
+  printf 'Evaluation failed: %s/%s did not complete its single inference-plus-extraction pass. Diagnostics remain in %s. No submission file was finalized.\n' \
+    "$slug" "$track" "$diagnostics" >&2
   return 1
 }
 
@@ -1601,6 +1650,10 @@ ensure_run_config() {
   RUN_CONFIG_REASONING_PROFILE="$(model_reasoning_profile "$slug")" \
   RUN_CONFIG_FINAL_ANSWER_MAX_TOKENS="$FINAL_ANSWER_MAX_TOKENS" \
   RUN_CONFIG_ANSWER_EXTRACTION_METHOD="$ANSWER_EXTRACTION_METHOD_ID" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_MODEL="$ANSWER_EXTRACTOR_MODEL" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_REVISION="$ANSWER_EXTRACTOR_REVISION" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_ENDPOINTS="$ANSWER_EXTRACTOR_ENDPOINTS" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_CHAT_KWARGS="$ANSWER_EXTRACTOR_CHAT_TEMPLATE_KWARGS" \
   RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS="$ANSWER_EXTRACTOR_MAX_TOKENS" \
   RUN_CONFIG_ANSWER_EXTRACTOR_SEED="$ANSWER_EXTRACTOR_SEED" \
   RUN_CONFIG_REQUEST_MODEL="$(model_request_name "$slug" "$model_id")" \
@@ -1618,8 +1671,8 @@ ensure_run_config() {
   RUN_CONFIG_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
   RUN_CONFIG_HF_OVERRIDES="$(model_hf_overrides "$slug")" \
   RUN_CONFIG_UNPARSEABLE_POLICY="$UNPARSEABLE_ANSWER_POLICY_ID" \
-  RUN_CONFIG_ALLOW_SMOKE_RAW_OUTPUT_FALLBACK="$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" \
-  RUN_CONFIG_PIPELINE_REVISION="$PIPELINE_REVISION_ID" RUN_CONFIG_MAX_ATTEMPTS="$MAX_EVAL_ATTEMPTS" \
+  RUN_CONFIG_PIPELINE_REVISION="$PIPELINE_REVISION_ID" \
+  RUN_CONFIG_EXTRACT_EXISTING_ONLY="$EXTRACT_EXISTING_ONLY" \
   RUN_CONFIG_BASE_SEED="$BASE_SEED" RUN_CONFIG_FORCE="$FORCE" \
   RUN_CONFIG_TOP_K="$SAMPLING_TOP_K" RUN_CONFIG_MIN_P="$SAMPLING_MIN_P" \
   RUN_CONFIG_PRESENCE_PENALTY="$PRESENCE_PENALTY" RUN_CONFIG_FREQUENCY_PENALTY="$FREQUENCY_PENALTY" \
@@ -1685,7 +1738,7 @@ def protocol(prefix: str, track: str) -> dict:
     }
 
 desired = {
-  "schema_version": 10,
+  "schema_version": 11,
     "model_id": os.environ["RUN_CONFIG_MODEL_ID"],
     "model_revision": os.environ["RUN_CONFIG_REVISION"],
     "reasoning_profile": os.environ["RUN_CONFIG_REASONING_PROFILE"],
@@ -1737,15 +1790,24 @@ desired = {
         "do_you_see_me": protocol("DYS", "do_you_see_me"),
         "minds_eye": protocol("ME", "minds_eye"),
         "base_seed": int(os.environ["RUN_CONFIG_BASE_SEED"]),
-        "format_retry_attempts": int(os.environ["RUN_CONFIG_MAX_ATTEMPTS"]),
     },
     "image_preprocessing": "original-bytes-no-runner-resize-or-recompression",
     "answer_extraction": {
-      "local_parser": "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
-      "fallback": {
+      "mode": "mandatory-after-every-model-response",
+      "authoritative_answer_field": "diagnostics.extracted_answer",
+      "extractor": {
         "method": os.environ["RUN_CONFIG_ANSWER_EXTRACTION_METHOD"],
-        "model": os.environ["RUN_CONFIG_REQUEST_MODEL"],
-        "input_fields": ["question", "answer_type", "candidate_response"],
+        "model": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MODEL"],
+        "revision": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_REVISION"],
+        "endpoints": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_ENDPOINTS"].split(","),
+        "input_fields": [
+          "question",
+          "answer_type",
+          "answer_domain",
+          "required_output_format",
+          "response_metadata",
+          "candidate_response",
+        ],
         "image_supplied": False,
         "ground_truth_supplied": False,
         "temperature": 0.0,
@@ -1754,33 +1816,24 @@ desired = {
         "max_tokens": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS"]),
         "stop_sequences": ["</answer>"],
         "include_stop_str_in_output": True,
+        "chat_template_kwargs": json.loads(
+          os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_CHAT_KWARGS"]
+        ),
         "support_validation": "answer-must-be-stated-in-candidate-response",
-        "source_order": "current-then-archived-attempts-in-ascending-attempt-number",
-        "source_deduplication": "candidate-response-utf8-sha256",
-        "source_provenance": ["diagnostics_filename", "candidate-response-utf8-sha256"],
-        "judge_attempt_history": "preserved",
-        "applies_after": ["smoke_visual_retries", "full_visual_retries"],
+        "source_provenance": [
+          "diagnostics_filename",
+          "candidate-response-utf8-sha256",
+        ],
+        "output_contract": "exactly-one-answer-block",
+        "unresolved_token": "UNRESOLVED",
       },
     },
     "unparseable_answers": {
       "policy": os.environ["RUN_CONFIG_UNPARSEABLE_POLICY"],
-      "final_fallback": {
-        "applies_after": ["full_visual_retries", "same_model_text_extraction"],
-        "eligible_records": "complete-nonerror-nonempty-output",
-        "source_field": "diagnostics.output",
-        "transformation": "none",
-      },
-      **(
-        {
-          "smoke_admission": {
-            "applies_after": ["smoke_visual_retries", "same_model_text_extraction"],
-            "eligible_records": "complete-nonerror-nonempty-output",
-            "canonical_output_effect": "none",
-          }
-        }
-        if os.environ["RUN_CONFIG_ALLOW_SMOKE_RAW_OUTPUT_FALLBACK"] == "1"
-        else {}
-      ),
+      "standardized_token": "UNRESOLVED",
+      "visual_answer_retries": 0,
+      "local_parser_answer_selection": False,
+      "raw_output_fallback": False,
     },
     "pipeline_revision": os.environ["RUN_CONFIG_PIPELINE_REVISION"],
     "source_hashes": {
@@ -1816,6 +1869,7 @@ def extraction_upgrade_invariants(config: dict) -> dict:
   ):
     invariant.pop(key, None)
   invariant.get("source_hashes", {}).pop("runner", None)
+  invariant.get("generation", {}).pop("format_retry_attempts", None)
   serving_engine = invariant.get("serving_engine", {})
   serving_engine.pop("max_num_seqs_per_replica", None)
   serving_engine.pop("gpu_memory_utilization", None)
@@ -1824,17 +1878,13 @@ def extraction_upgrade_invariants(config: dict) -> dict:
 
 def is_supported_extraction_upgrade(existing: dict) -> bool:
   return (
-    (
-      (existing.get("schema_version"), existing.get("pipeline_revision"))
-      in {
-        (7, "unquantized-bf16-model-generation-final-answer-caps-v7"),
-        (8, "unquantized-bf16-same-model-text-extraction-v8"),
-        (9, "unquantized-bf16-archived-text-extraction-v9"),
-      }
-    )
-    and desired.get("schema_version") == 10
+    os.environ["RUN_CONFIG_EXTRACT_EXISTING_ONLY"] == "1"
+    and (
+      existing.get("schema_version"), existing.get("pipeline_revision")
+    ) == (10, "unquantized-bf16-smoke-and-full-text-extraction-v10")
+    and desired.get("schema_version") == 11
     and desired.get("pipeline_revision")
-    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    == "unquantized-bf16-mandatory-extraction-v11"
     and extraction_upgrade_invariants(existing)
     == extraction_upgrade_invariants(desired)
   )
@@ -2754,7 +2804,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from evaluation.common.visual_pipeline import record_answer
+from evaluation.common.visual_pipeline import MISSING_ANSWER_TOKEN
 
 path = Path(os.environ["MANIFEST_PATH"])
 root = Path(os.environ["MANIFEST_PROJECT_ROOT"])
@@ -2777,19 +2827,11 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
       for line in diagnostics.read_text(encoding="utf-8").splitlines()
       if line
     ]
-    diagnostics_by_id = {
-      str(row["question_id"]): row for row in diagnostic_rows
-    }
-    exact_raw_output_fallback_question_ids = []
-    for row in rows:
-      question_id = str(row["question_id"])
-      diagnostic = diagnostics_by_id[question_id]
-      answer_type = str(diagnostic.get("answer_type") or "text")
-      if (
-        not record_answer(diagnostic, answer_type)
-        and row["answer"] == diagnostic.get("output")
-      ):
-        exact_raw_output_fallback_question_ids.append(question_id)
+    unresolved_answer_question_ids = [
+      str(row["question_id"])
+      for row in rows
+      if str(row["answer"]).strip().upper() == MISSING_ANSWER_TOKEN
+    ]
     attempt_files = sorted(path.parent.glob(f"{track}.attempt-*.diagnostics.jsonl"))
     smoke_attempt_files = sorted(path.parent.glob(f"{track}.smoke.attempt-*.diagnostics.jsonl"))
     tracks[track] = {
@@ -2798,9 +2840,10 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
         "row_count": len(rows),
         "submission_sha256": sha256(output),
         "diagnostics_sha256": sha256(diagnostics),
-        "exact_raw_output_fallback_question_ids": (
-          exact_raw_output_fallback_question_ids
-        ),
+        "resolved_answer_count": len(rows) - len(unresolved_answer_question_ids),
+        "unresolved_answer_count": len(unresolved_answer_question_ids),
+        "unresolved_answer_question_ids": unresolved_answer_question_ids,
+        "exact_raw_output_fallback_question_ids": [],
         "failed_attempt_diagnostics": [
             {
                 "file": attempt.name,
@@ -2826,7 +2869,7 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     }
 
 manifest = {
-  "schema_version": 10,
+  "schema_version": 11,
     "created_at": datetime.now(timezone.utc).isoformat(),
     "model_id": os.environ["MANIFEST_MODEL_ID"],
     "model_revision": os.environ["MANIFEST_REVISION"],
@@ -2908,7 +2951,8 @@ run_model() {
   fi
 
   ensure_run_config "$slug" "$model_id" "$revision" "$loading" "$model_max_len" || return 1
-  if [[ "$SMOKE_ONLY" != "1" && "$FORCE" != "1" ]] && model_outputs_complete "$slug"; then
+  if [[ "$EXTRACT_EXISTING_ONLY" != "1" && "$SMOKE_ONLY" != "1" && "$FORCE" != "1" ]] \
+    && model_outputs_complete "$slug"; then
     log "$slug is already complete; skipping model startup"
     write_manifest "$slug" "$model_id" "$revision" "$loading" "$model_max_len"
     delete_model_cache "$model_cache"
@@ -2916,17 +2960,41 @@ run_model() {
     return 0
   fi
 
+  request_model="$(model_request_name "$slug" "$model_id")"
+  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+    if ! start_extractor_server; then
+      return 1
+    fi
+    while IFS= read -r track; do
+      if ! run_track "$slug" "$request_model" "$track"; then
+        track_failed=1
+        log "$slug/$track extraction failed; continuing with remaining selected tracks"
+      fi
+    done < <(selected_tracks)
+    stop_extractor_server
+    if [[ "$track_failed" == "1" ]]; then
+      return 1
+    fi
+    write_manifest "$slug" "$model_id" "$revision" "$loading" "$model_max_len"
+    return 0
+  fi
+
   if ! start_server "$slug" "$model_id" "$revision" "$loading" "$model_cache" "$model_max_len"; then
     delete_model_cache "$model_cache"
     return 1
   fi
-  request_model="$(model_request_name "$slug" "$model_id")"
+  if ! start_extractor_server; then
+    stop_server
+    delete_model_cache "$model_cache"
+    return 1
+  fi
   while IFS= read -r track; do
     if ! run_track "$slug" "$request_model" "$track"; then
       track_failed=1
       log "$slug/$track failed; continuing with remaining selected tracks"
     fi
   done < <(selected_tracks)
+  stop_extractor_server
   stop_server
   if [[ "$track_failed" == "1" ]]; then
     delete_model_cache "$model_cache"
@@ -2957,7 +3025,11 @@ main() {
   setup_environment
   apply_model_compatibility_patches
   verify_vllm_cli
-  prepare_dataset
+  if [[ "$EXTRACT_EXISTING_ONLY" == "1" ]]; then
+    log "Extraction-only mode uses public question files and existing diagnostics; image dataset preparation is skipped"
+  else
+    prepare_dataset
+  fi
   if [[ "$SETUP_ONLY" == "1" ]]; then
     log "Shared environment and pinned dataset are ready; no model worker was started"
     return 0

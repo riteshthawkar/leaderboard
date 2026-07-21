@@ -1,4 +1,4 @@
-"""Audit non-format visual responses with a gold-aware commitment verifier."""
+"""Audit non-format visual responses with a gold-blind commitment extractor."""
 
 from __future__ import annotations
 
@@ -18,17 +18,17 @@ from evaluation.common.vllm_runner import _answer_is_supported_by_output
 
 
 TRACKS = ("do_you_see_me", "minds_eye")
-METHOD = "qwen3.6-gold-aware-commitment-verifier-v6"
-VERDICTS = {"GOLD_COMMITTED", "OTHER_COMMITTED", "UNRESOLVED"}
+METHOD = "qwen3.6-gold-blind-commitment-extractor-v3"
+VERDICTS = {"COMMITTED", "UNRESOLVED"}
 SYSTEM_PROMPT = """You are a forensic response auditor, not a problem solver.
-You receive an original question, its gold answer, and an untrusted candidate
+You receive an original question, its answer type, and an untrusted candidate
 model response. Determine only whether the candidate response explicitly commits
-to the gold answer, explicitly commits to another answer, or has no single final
-commitment. Never solve the question, infer from an image, use outside knowledge,
-or treat merely mentioning the gold answer among candidates as a commitment.
+to one final answer or has no single final commitment. Never solve the question,
+infer from an image, use outside knowledge, or choose an answer merely because it
+is mentioned among candidates.
 
 Return exactly one JSON object with three string fields:
-{"verdict":"GOLD_COMMITTED|OTHER_COMMITTED|UNRESOLVED","answer":"...","evidence":"..."}
+{"verdict":"COMMITTED|UNRESOLVED","answer":"...","evidence":"..."}
 
 The evidence must be a short exact quote copied verbatim from the candidate
 response that expresses its commitment. For UNRESOLVED, answer and evidence must
@@ -37,8 +37,28 @@ both be empty strings. Answer rules by answer_type:
 - mcq_index_1_4: exactly one of 1, 2, 3, 4, only when selected by the response.
 - mcq_letter: exactly one uppercase letter A-F, only when selected by the response.
 - text: the shortest answer phrase committed to by the response.
-Reasoning that merely discusses candidates is not a final selection. The gold
-answer is a comparison value, not permission to assume the response selected it."""
+Reasoning that merely discusses candidates is not a final selection. You are not
+given the reference answer and must not infer correctness."""
+EXTRACTOR_RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "commitment_extraction",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "verdict": {
+                    "type": "string",
+                    "enum": ["COMMITTED", "UNRESOLVED"],
+                },
+                "answer": {"type": "string", "maxLength": 200},
+                "evidence": {"type": "string", "maxLength": 800},
+            },
+            "required": ["verdict", "answer", "evidence"],
+            "additionalProperties": False,
+        },
+    },
+}
 
 
 class GroundTruthError(ValueError):
@@ -486,14 +506,13 @@ def classify_extractor_output(
     candidate: dict[str, Any], extractor_output: str, error: str | None = None
 ) -> dict[str, Any]:
     parsed = parse_extractor_output(extractor_output)
-    reported_verdict = verdict = answer = evidence = ""
+    extractor_verdict = answer = evidence = ""
     status = "request_error" if error else "invalid_extractor_output"
     if parsed is not None:
-        reported_verdict, answer, evidence = parsed
-        verdict = reported_verdict
-        if reported_verdict not in VERDICTS:
+        extractor_verdict, answer, evidence = parsed
+        if extractor_verdict not in VERDICTS:
             status = "invalid_verdict"
-        elif reported_verdict == "UNRESOLVED":
+        elif extractor_verdict == "UNRESOLVED":
             status = (
                 "unresolved"
                 if not answer and not evidence
@@ -507,18 +526,25 @@ def classify_extractor_output(
             status = "unsupported_by_evidence"
         else:
             answer = final_answer(answer, candidate["answer_type"])
-            verdict = commitment_verdict(
-                answer, candidate["gold_answer"], candidate["answer_type"]
-            )
-            status = verdict.casefold()
+            if "gold_answer" in candidate:
+                verdict = commitment_verdict(
+                    answer, candidate["gold_answer"], candidate["answer_type"]
+                )
+                status = verdict.casefold()
+            else:
+                status = "committed"
 
     result = {
-        "verdict": verdict,
+        "extractor_verdict": extractor_verdict,
         "answer": answer,
         "evidence": evidence,
         "status": status,
     }
-    if status in {"gold_committed", "other_committed"}:
+    if status in {"committed", "gold_committed", "other_committed"}:
+        if "gold_answer" in candidate:
+            result["verdict"] = commitment_verdict(
+                answer, candidate["gold_answer"], candidate["answer_type"]
+            )
         result["submission_comparison"] = (
             "confirmed"
             if answers_equal(
@@ -528,8 +554,6 @@ def classify_extractor_output(
             )
             else "recovered"
         )
-        if reported_verdict != verdict:
-            result["extractor_reported_verdict"] = reported_verdict
     return result
 
 
@@ -537,7 +561,7 @@ def load_candidates(
     project_root: Path,
     canonical_root: Path,
     policy: str,
-    gold_answers: dict[str, str],
+    gold_answers: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     questions = {
         track: {
@@ -589,22 +613,24 @@ def load_candidates(
                 if not selected:
                     continue
                 response = str(record.get("output") or "")
-                candidates.append(
-                    {
-                        "model_slug": model_dir.name,
-                        "track": track,
-                        "question_id": question_id,
-                        "answer_type": answer_type,
-                        "category": category,
-                        "question": str(question.get("question") or ""),
-                        "gold_answer": gold_answers[question_id],
-                        "response": response,
-                        "response_sha256": hashlib.sha256(response.encode("utf-8")).hexdigest(),
-                        "current_submission_answer": str(
-                            submissions[question_id].get("answer") or ""
-                        ),
-                    }
-                )
+                candidate = {
+                    "model_slug": model_dir.name,
+                    "track": track,
+                    "question_id": question_id,
+                    "answer_type": answer_type,
+                    "category": category,
+                    "question": str(question.get("question") or ""),
+                    "response": response,
+                    "response_sha256": hashlib.sha256(
+                        response.encode("utf-8")
+                    ).hexdigest(),
+                    "current_submission_answer": str(
+                        submissions[question_id].get("answer") or ""
+                    ),
+                }
+                if gold_answers is not None:
+                    candidate["gold_answer"] = gold_answers[question_id]
+                candidates.append(candidate)
     return candidates
 
 
@@ -616,13 +642,41 @@ def candidate_key(candidate: dict[str, Any]) -> tuple[str, str, str]:
     )
 
 
+def extractor_payload(candidate: dict[str, Any]) -> dict[str, str]:
+    return {
+        "question": str(candidate["question"]),
+        "answer_type": str(candidate["answer_type"]),
+        "candidate_response": str(candidate["response"]),
+    }
+
+
+def extractor_contract_sha256(model: str, max_tokens: int) -> str:
+    contract = {
+        "method": METHOD,
+        "model": model,
+        "system_prompt": SYSTEM_PROMPT,
+        "request_payload_fields": [
+            "answer_type",
+            "candidate_response",
+            "question",
+        ],
+        "response_format": EXTRACTOR_RESPONSE_FORMAT,
+        "temperature": 0,
+        "top_p": 1,
+        "max_tokens": max_tokens,
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+    canonical = json.dumps(
+        contract, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 async def run(args: argparse.Namespace) -> None:
-    gold_answers, ground_truth_sha256 = load_gold_answers(
-        args.project_root, args.ground_truth_paths
-    )
     candidates = load_candidates(
-        args.project_root, args.canonical_root, args.policy, gold_answers
+        args.project_root, args.canonical_root, args.policy
     )
+    extractor_contract = extractor_contract_sha256(args.model, args.max_tokens)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     existing = {}
     candidates_by_key = {candidate_key(item): item for item in candidates}
@@ -639,10 +693,17 @@ async def run(args: argparse.Namespace) -> None:
                 if row.get("method") != METHOD:
                     raise RuntimeError(
                         "Audit checkpoint uses an incompatible extraction method. "
-                        "Use a new output path for the gold-aware audit."
+                        "Use a new output path for the gold-blind audit."
                     )
-                if row.get("ground_truth_sha256") != ground_truth_sha256:
-                    raise RuntimeError("Audit checkpoint uses different ground truth.")
+                if row.get("extractor_contract_sha256") != extractor_contract:
+                    raise RuntimeError(
+                        "Audit checkpoint uses an incompatible extractor contract. "
+                        "Use a new output path."
+                    )
+                if row.get("ground_truth_loaded") is not False:
+                    raise RuntimeError(
+                        "Audit checkpoint is not from a ground-truth-isolated process."
+                    )
                 if row.get("response_sha256") != candidate["response_sha256"]:
                     raise RuntimeError(f"Candidate response changed for {key}.")
                 existing[key] = row
@@ -662,12 +723,7 @@ async def run(args: argparse.Namespace) -> None:
     completed = 0
 
     async def extract(client: AsyncOpenAI, candidate: dict[str, Any]) -> dict[str, Any]:
-        payload = {
-            "question": candidate["question"],
-            "answer_type": candidate["answer_type"],
-            "gold_answer": candidate["gold_answer"],
-            "candidate_response": candidate["response"],
-        }
+        payload = extractor_payload(candidate)
         error = None
         extractor_output = ""
         finish_reason = None
@@ -679,6 +735,7 @@ async def run(args: argparse.Namespace) -> None:
                     temperature=0,
                     top_p=1,
                     max_tokens=args.max_tokens,
+                    response_format=EXTRACTOR_RESPONSE_FORMAT,
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
@@ -711,8 +768,9 @@ async def run(args: argparse.Namespace) -> None:
             )
         } | {
             "method": METHOD,
-            "ground_truth_sha256": ground_truth_sha256,
-            "ground_truth_supplied": True,
+            "extractor_contract_sha256": extractor_contract,
+            "ground_truth_loaded": False,
+            "ground_truth_supplied_to_extractor": False,
             "extractor_model": args.model,
             **classification,
             "extractor_output": extractor_output,
@@ -753,7 +811,9 @@ async def run(args: argparse.Namespace) -> None:
                 "candidates": len(candidates),
                 "resumed": len(candidates) - len(pending),
                 "new": len(pending),
-                "ground_truth_sha256": ground_truth_sha256,
+                "ground_truth_loaded": False,
+                "ground_truth_supplied_to_extractor": False,
+                "extractor_contract_sha256": extractor_contract,
                 "output": str(args.output),
             },
             indent=2,
@@ -770,17 +830,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--endpoint", action="append", dest="endpoints", required=True)
     parser.add_argument("--model", required=True)
-    parser.add_argument(
-        "--ground-truth",
-        action="append",
-        dest="ground_truth_paths",
-        type=Path,
-        required=True,
-        help=(
-            "JSON/JSONL answer map; repeat as needed. Combined files must exactly "
-            "cover all 4,500 DYS and 799 Mind's Eye canonical question IDs."
-        ),
-    )
     parser.add_argument("--api-key", default="EMPTY")
     parser.add_argument(
         "--policy",

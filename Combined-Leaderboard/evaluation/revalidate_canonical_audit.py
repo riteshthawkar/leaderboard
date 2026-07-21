@@ -61,13 +61,29 @@ def revalidate_row(
         raise RevalidationError(
             f"Response hash changed for {candidate_key(candidate)}."
         )
-    if source.get("ground_truth_sha256") != ground_truth_sha256:
+    source_ground_truth_sha256 = source.get("ground_truth_sha256")
+    if (
+        source_ground_truth_sha256 is not None
+        and source_ground_truth_sha256 != ground_truth_sha256
+    ):
         raise RevalidationError(
             f"Ground truth changed for {candidate_key(candidate)}."
         )
-    if source.get("ground_truth_supplied") is not True:
+    if source.get("ground_truth_loaded") is not False:
         raise RevalidationError(
-            f"Source audit lacks gold-aware provenance for {candidate_key(candidate)}."
+            f"Source audit process loaded ground truth for {candidate_key(candidate)}."
+        )
+    if source.get("ground_truth_supplied_to_extractor") is not False:
+        raise RevalidationError(
+            f"Source audit is not gold-blind for {candidate_key(candidate)}."
+        )
+    extractor_contract_sha256 = str(
+        source.get("extractor_contract_sha256") or ""
+    )
+    if len(extractor_contract_sha256) != 64:
+        raise RevalidationError(
+            f"Source audit lacks an extractor contract hash for "
+            f"{candidate_key(candidate)}."
         )
 
     extractor_output = str(source.get("extractor_output") or "")
@@ -85,8 +101,11 @@ def revalidate_row(
         )
     } | {
         "method": METHOD,
+        "extractor_contract_sha256": extractor_contract_sha256,
         "ground_truth_sha256": ground_truth_sha256,
-        "ground_truth_supplied": True,
+        "ground_truth_available_to_validator": True,
+        "ground_truth_loaded_by_extractor_process": False,
+        "ground_truth_supplied_to_extractor": False,
         "extractor_model": str(source.get("extractor_model") or ""),
         **classification,
         "extractor_output": extractor_output,

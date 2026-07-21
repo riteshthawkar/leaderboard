@@ -18,6 +18,7 @@ from urllib.request import Request, urlopen
 
 
 STANDARD_CONDITION = "standard"
+MISSING_ANSWER_TOKEN = "UNRESOLVED"
 MAX_REMOTE_IMAGE_BYTES = 50 * 1024 * 1024
 SUPPORTED_ANSWER_TYPES = {"integer", "mcq_index_1_4", "mcq_letter", "text"}
 INTEGER_WORDS = {
@@ -368,10 +369,22 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
 def record_answer(record: dict[str, Any], answer_type: str) -> str:
     extracted = record.get("extracted_answer")
     if extracted is not None:
+        if str(extracted).strip().upper() == MISSING_ANSWER_TOKEN:
+            return MISSING_ANSWER_TOKEN
         normalized = final_answer(extracted, answer_type)
         if normalized:
             return normalized
     return final_answer(record.get("output"), answer_type)
+
+
+def extracted_record_answer(record: dict[str, Any], answer_type: str) -> str:
+    """Return only the mandatory extractor decision for a new evaluation row."""
+    if "extracted_answer" not in record:
+        return ""
+    extracted = record.get("extracted_answer")
+    if str(extracted).strip().upper() == MISSING_ANSWER_TOKEN:
+        return MISSING_ANSWER_TOKEN
+    return final_answer(extracted, answer_type)
 
 
 def stated_integer_values(raw_output: Any) -> set[int]:
@@ -409,17 +422,27 @@ def _atomic_write(path: Path, content: str) -> None:
         raise
 
 
-def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
+def write_diagnostics(
+    path: Path,
+    records: Sequence[dict[str, Any]],
+    *,
+    preserve_extra_fields: bool = False,
+) -> None:
     rows = []
     for item in records:
-        row = {
-            "question_id": str(item.get("question_id") or ""),
-            "source_subset": str(item.get("source_subset") or ""),
-            "answer_type": str(item.get("answer_type") or "text"),
-            "output": item.get("output"),
-        }
+        row = dict(item) if preserve_extra_fields else {}
+        row.update(
+            {
+                "question_id": str(item.get("question_id") or ""),
+                "source_subset": str(item.get("source_subset") or ""),
+                "answer_type": str(item.get("answer_type") or "text"),
+                "output": item.get("output"),
+            }
+        )
         if item.get("error"):
             row["error"] = str(item["error"])
+        if item.get("inference_error"):
+            row["inference_error"] = str(item["inference_error"])
         if item.get("finish_reason"):
             row["finish_reason"] = str(item["finish_reason"])
         if item.get("completion_tokens") is not None:
@@ -430,6 +453,8 @@ def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
             row["answer_extraction_method"] = str(item["answer_extraction_method"])
         if item.get("extractor_model"):
             row["extractor_model"] = str(item["extractor_model"])
+        if item.get("extractor_revision"):
+            row["extractor_revision"] = str(item["extractor_revision"])
         if item.get("extractor_output") is not None:
             row["extractor_output"] = item["extractor_output"]
         if item.get("extractor_finish_reason"):
@@ -438,6 +463,8 @@ def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
             row["extractor_completion_tokens"] = int(
                 item["extractor_completion_tokens"]
             )
+        if item.get("extractor_status"):
+            row["extractor_status"] = str(item["extractor_status"])
         if item.get("extractor_error"):
             row["extractor_error"] = str(item["extractor_error"])
         if item.get("extractor_source_diagnostics"):
@@ -461,7 +488,7 @@ def export_submission(
     expected_questions: Sequence[dict[str, Any]],
     output_path: Path,
     *,
-    raw_output_fallback: bool = False,
+    require_extracted_answers: bool = False,
 ) -> dict[str, Any]:
     """Validate complete coverage and write backend-ready three-field JSONL."""
     expected_ids = [str(item["question_id"]) for item in expected_questions]
@@ -493,25 +520,32 @@ def export_submission(
         )
 
     rows: list[dict[str, str]] = []
-    raw_output_fallback_question_ids: list[str] = []
+    unresolved_answer_question_ids: list[str] = []
     invalid: list[str] = []
     for expected in expected_questions:
         question_id = str(expected["question_id"])
         record = records_by_id[question_id]
-        if record.get("error"):
+        if record.get("error") and not (
+            require_extracted_answers and "extracted_answer" in record
+        ):
             invalid.append(f"{question_id} (inference error)")
             continue
-        answer = record_answer(record, str(expected.get("answer_type") or "text"))
-        if not answer and raw_output_fallback:
-            raw_output = record.get("output")
-            if not isinstance(raw_output, (dict, list)) and raw_output is not None:
-                raw_answer = str(raw_output)
-                if raw_answer.strip():
-                    answer = raw_answer
-                    raw_output_fallback_question_ids.append(question_id)
+        answer_type = str(expected.get("answer_type") or "text")
+        answer = (
+            extracted_record_answer(record, answer_type)
+            if require_extracted_answers
+            else record_answer(record, answer_type)
+        )
         if not answer:
-            invalid.append(f"{question_id} (empty or unparseable output)")
+            reason = (
+                "missing mandatory extractor decision"
+                if require_extracted_answers
+                else "empty or unparseable output"
+            )
+            invalid.append(f"{question_id} ({reason})")
             continue
+        if answer == MISSING_ANSWER_TOKEN:
+            unresolved_answer_question_ids.append(question_id)
         rows.append(
             {
                 "question_id": question_id,
@@ -539,7 +573,7 @@ def export_submission(
         "row_count": len(rows),
         "schema": ["question_id", "condition", "answer"],
         "condition": STANDARD_CONDITION,
-        "raw_output_fallback_question_ids": raw_output_fallback_question_ids,
+        "unresolved_answer_question_ids": unresolved_answer_question_ids,
     }
 
 

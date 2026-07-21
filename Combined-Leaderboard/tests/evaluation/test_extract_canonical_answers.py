@@ -8,6 +8,9 @@ from evaluation.extract_canonical_answers import (
     commitment_verdict,
     contract_exact,
     evidence_supports,
+    EXTRACTOR_RESPONSE_FORMAT,
+    extractor_contract_sha256,
+    extractor_payload,
     GroundTruthError,
     load_gold_answers,
     parse_extractor_output,
@@ -49,9 +52,9 @@ def test_candidate_category_separates_deterministic_and_high_risk_cases():
 
 def test_extractor_json_and_answer_domains_are_strict():
     assert parse_extractor_output(
-        '{"verdict":"GOLD_COMMITTED","answer":"B","evidence":"Answer B"}'
+        '{"verdict":"COMMITTED","answer":"B","evidence":"Answer B"}'
     ) == (
-        "GOLD_COMMITTED",
+        "COMMITTED",
         "B",
         "Answer B",
     )
@@ -233,7 +236,7 @@ def test_bounded_visual_conclusions_are_supported():
     )
 
 
-def test_classifier_recomputes_verdict_from_gold():
+def test_classifier_compares_blind_commitment_to_gold_after_extraction():
     candidate = {
         "answer_type": "mcq_letter",
         "response": "The final answer is B.",
@@ -242,12 +245,64 @@ def test_classifier_recomputes_verdict_from_gold():
     }
     result = classify_extractor_output(
         candidate,
-        '{"verdict":"OTHER_COMMITTED","answer":"B",'
+        '{"verdict":"COMMITTED","answer":"B",'
         '"evidence":"The final answer is B"}',
     )
     assert result["status"] == "gold_committed"
     assert result["verdict"] == "GOLD_COMMITTED"
-    assert result["extractor_reported_verdict"] == "OTHER_COMMITTED"
+    assert result["extractor_verdict"] == "COMMITTED"
+
+
+def test_raw_extractor_classification_contains_no_correctness_verdict():
+    candidate = {
+        "answer_type": "mcq_letter",
+        "response": "The final answer is B.",
+        "current_submission_answer": "A",
+    }
+    result = classify_extractor_output(
+        candidate,
+        '{"verdict":"COMMITTED","answer":"B",'
+        '"evidence":"The final answer is B"}',
+    )
+    assert result["status"] == "committed"
+    assert result["extractor_verdict"] == "COMMITTED"
+    assert "verdict" not in result
+
+
+def test_blind_extractor_prompt_contains_no_gold_contract():
+    from evaluation.extract_canonical_answers import SYSTEM_PROMPT
+
+    normalized = " ".join(SYSTEM_PROMPT.casefold().split())
+    assert "gold answer" not in normalized
+    assert "reference answer" in normalized
+    assert "not given" in normalized
+
+
+def test_extractor_payload_and_schema_are_strictly_gold_blind():
+    payload = extractor_payload(
+        {
+            "question": "Question text",
+            "answer_type": "mcq_letter",
+            "response": "The final answer is B.",
+            "gold_answer": "B",
+        }
+    )
+    assert payload == {
+        "question": "Question text",
+        "answer_type": "mcq_letter",
+        "candidate_response": "The final answer is B.",
+    }
+    schema = EXTRACTOR_RESPONSE_FORMAT["json_schema"]["schema"]
+    assert schema["properties"]["verdict"]["enum"] == [
+        "COMMITTED",
+        "UNRESOLVED",
+    ]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["answer"]["maxLength"] == 200
+    assert schema["properties"]["evidence"]["maxLength"] == 800
+    assert extractor_contract_sha256("model", 128) != extractor_contract_sha256(
+        "model", 256
+    )
 
 
 def test_commitment_verdict_is_deterministic():
