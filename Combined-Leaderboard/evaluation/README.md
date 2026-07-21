@@ -245,40 +245,54 @@ The canonical root is `evaluation/results/final/`:
 
 Retain the canonical diagnostics and manifests with the experimental record. Only the two submission JSONL files are uploaded as benchmark responses. Staging roots and `.cache` are disposable after finalization and after all active runs have stopped.
 
-## Gold-blind malformed-response audit
+## Gold-blind canonical response audit
 
-Post-hoc recovery of a long or malformed response is a response-commitment audit, not a second attempt to solve the image. The extraction process receives only the public questions, canonical responses, and serving endpoint. It has no ground-truth CLI argument and does not load answer-key files. The LLM receives only the question, answer type, and original response; it receives neither the image nor the ground-truth answer. It must return `COMMITTED` with an answer and literal source quote, or `UNRESOLVED`. Code independently validates the quote, answer domain, and commitment language but does not score correctness. Only after extraction has finished does the separate offline revalidation process load the held-out key and assign `GOLD_COMMITTED` or `OTHER_COMMITTED`. This process boundary prevents label leakage from influencing which answer the extractor selects.
+Every stored visual response receives one authoritative response-commitment audit, including responses that already match the output contract. This is not a second attempt to solve the image. The extraction process receives only public question text, the task-specific answer contract, response metadata, and the stored model response. It has no ground-truth CLI argument and receives neither images nor answer keys.
 
-Ground truth may be supplied as one or more JSON or JSONL files. Their union must cover exactly the 4,500 DYS and 799 Mind's Eye IDs in `tasks/<track>/questions.jsonl`. JSON maps may use either `"question_id": "answer"` or `"question_id": {"answer": "..."}`. JSONL rows use `question_id` and `answer`. The 175-entry files in `tasks/<track>/ground_truth.json` belong to a different private leaderboard subset; the audit rejects them because their IDs do not match the canonical visual set. Keep full answer keys outside Git.
+Pinned `Qwen/Qwen3-8B` must return `COMMITTED` with the selected answer and a literal source quote, or `UNRESOLVED` with empty answer and evidence fields. Deterministic code independently validates the quote, commitment language, truncation state, and task-specific answer domain. Unsupported or ambiguous responses become `UNRESOLVED`; explicit out-of-domain commitments become `__INVALID_FORMAT__`. Request and schema failures block production packaging.
 
 ```bash
 python -m evaluation.extract_canonical_answers \
-  --endpoint http://127.0.0.1:8031/v1 \
-  --model Qwen/Qwen3.6-27B \
-  --policy high_risk \
-  --output /share/data/visual-answer-extraction/gold-blind-v3/raw-audit.jsonl
+  --canonical-root evaluation/results/final-extracted-v11 \
+  --endpoint http://127.0.0.1:8035/v1 \
+  --endpoint http://127.0.0.1:8036/v1 \
+  --model Qwen/Qwen3-8B \
+  --revision b968826d9c46dd6066d109eabc6255188de91218 \
+  --policy all \
+  --concurrency 64 \
+  --max-tokens 256 \
+  --output /share/data/visual-answer-extraction/qwen3-8b-evidence-v4/audit.jsonl
 ```
 
-Resume is append-only and requires the same method, full-ground-truth digest, candidate set, and response hashes. Earlier text-only and verifier checkpoints are intentionally incompatible. Once every selected candidate has an audit row, apply it only to a separate canonical copy:
-
-If deterministic evidence rules are refined after a complete audit, reuse the immutable extractor transcript without making new LLM requests. The revalidator requires exact candidate coverage, response hashes, and the same normalized ground-truth digest, then atomically writes a newly versioned audit:
+Resume is append-only and requires the same method, extractor contract, candidate set, and response hashes. Earlier extraction checkpoints are intentionally incompatible. If repeated extractor attempts leave schema failures, an offline finalization pass may classify only literal terminal source commitments; it fails closed on every other blocker and preserves all extractor attempts:
 
 ```bash
-python -m evaluation.revalidate_canonical_audit \
-  --ground-truth /secure/path/dysm-full.json \
-  --ground-truth /secure/path/minds-eye-full.json \
-  --source-audit /share/data/visual-answer-extraction/gold-blind-v3/raw-audit.jsonl \
-  --policy high_risk \
-  --output /share/data/visual-answer-extraction/gold-blind-v3/validated-audit.jsonl
+python -m evaluation.extract_canonical_answers \
+  --canonical-root evaluation/results/final-extracted-v11 \
+  --policy all \
+  --max-tokens 256 \
+  --output /share/data/visual-answer-extraction/qwen3-8b-evidence-v4/audit.jsonl \
+  --finalize-checkpoint
 ```
+
+After all rows are complete, build a separate production tree; the v11 source remains unchanged:
 
 ```bash
-python -m evaluation.apply_canonical_extractions \
-  --ground-truth /secure/path/dysm-full.json \
-  --ground-truth /secure/path/minds-eye-full.json \
-  --audit /share/data/visual-answer-extraction/gold-blind-v3/validated-audit.jsonl \
-  --policy high_risk \
-  --output-root evaluation/results/final-extracted
+python -m evaluation.build_production_visual_results \
+  --source-root evaluation/results/final-extracted-v11 \
+  --audit /share/data/visual-answer-extraction/qwen3-8b-evidence-v4/audit.jsonl \
+  --output-root evaluation/results/final-extracted-v12
 ```
 
-Offline revalidation refuses a source audit unless it records that the extractor process loaded no ground truth and the LLM received no ground truth. Application accepts only the resulting validated audit, rechecks full coverage, the normalized post-validation ground-truth digest, extractor-contract and response hashes, literal evidence, and deterministic verdicts before changing an answer. Both explicit correct and explicit incorrect commitments are preserved; unresolved rows remain unchanged. The source `evaluation/results/final/` tree is never modified.
+The builder hash-checks every source artifact, requires exact audit coverage, reruns the deterministic classifier, excludes the two Qwen3.5 mode ablations, and publishes atomically only after canonical verification. Verify and score the resulting 12-model tree before import:
+
+```bash
+python -m evaluation.finalize_visual_results \
+  --verify-only \
+  --output-root evaluation/results/final-extracted-v12
+
+python scripts/import_canonical_visual_results.py \
+  --result-root evaluation/results/final-extracted-v12
+```
+
+The importer is dry-run only unless `--apply` is supplied. It is the first step in this flow that loads private ground truth, and it requires production scorer invalid-format counts to match each retained manifest exactly.

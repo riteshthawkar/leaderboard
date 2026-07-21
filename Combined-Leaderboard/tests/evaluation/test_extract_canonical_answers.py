@@ -1,4 +1,7 @@
+import asyncio
+import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,11 +14,215 @@ from evaluation.extract_canonical_answers import (
     EXTRACTOR_RESPONSE_FORMAT,
     extractor_contract_sha256,
     extractor_payload,
+    finalize_audit_checkpoint,
     GroundTruthError,
     load_gold_answers,
+    load_audit_checkpoint,
     parse_extractor_output,
+    run,
+    terminal_source_classification,
+    finalize_persistent_extractor_failure,
     valid_answer,
+    wait_for_extractor_clients,
 )
+
+
+def test_checkpoint_retries_only_blocking_rows_and_preserves_attempts(tmp_path):
+    contract = "c" * 64
+    response = "The final answer is B."
+    candidates = {
+        ("model", "minds_eye", "q1"): {
+            "model_slug": "model",
+            "track": "minds_eye",
+            "question_id": "q1",
+            "response_sha256": hashlib.sha256(response.encode()).hexdigest(),
+        },
+        ("model", "minds_eye", "q2"): {
+            "model_slug": "model",
+            "track": "minds_eye",
+            "question_id": "q2",
+            "response_sha256": hashlib.sha256(response.encode()).hexdigest(),
+        },
+    }
+    common = {
+        "method": "qwen3-8b-gold-blind-evidence-extractor-v4",
+        "extractor_contract_sha256": contract,
+        "ground_truth_loaded": False,
+        "response_sha256": hashlib.sha256(response.encode()).hexdigest(),
+    }
+    completed = {
+        **common,
+        "model_slug": "model",
+        "track": "minds_eye",
+        "question_id": "q1",
+        "status": "committed",
+        "answer": "B",
+    }
+    blocking = {
+        **common,
+        "model_slug": "model",
+        "track": "minds_eye",
+        "question_id": "q2",
+        "status": "invalid_extractor_output",
+        "extractor_output": "not json",
+        "extractor_attempts": [{"status": "request_error"}],
+    }
+    checkpoint = tmp_path / "audit.jsonl"
+    checkpoint.write_text(
+        json.dumps(completed) + "\n" + json.dumps(blocking) + "\n",
+        encoding="utf-8",
+    )
+
+    existing, retry_history = load_audit_checkpoint(
+        checkpoint,
+        candidates,
+        contract,
+    )
+
+    assert set(existing) == {("model", "minds_eye", "q1")}
+    assert retry_history[("model", "minds_eye", "q2")] == [
+        {"status": "request_error"},
+        {
+            "status": "invalid_extractor_output",
+            "extractor_output": "not json",
+        },
+    ]
+    retained = [json.loads(line) for line in checkpoint.read_text().splitlines()]
+    assert retained == [completed]
+
+
+def test_checkpoint_finalizer_atomically_terminalizes_persistent_failure(tmp_path):
+    contract = "c" * 64
+    response = "Reasoning. **Final Answer**\n\n\\boxed{4}"
+    response_hash = hashlib.sha256(response.encode()).hexdigest()
+    candidate = {
+        "model_slug": "model",
+        "track": "do_you_see_me",
+        "question_id": "q1",
+        "answer_type": "mcq_index_1_4",
+        "task": "visual_closure",
+        "response": response,
+        "response_sha256": response_hash,
+    }
+    row = {
+        "method": "qwen3-8b-gold-blind-evidence-extractor-v4",
+        "extractor_contract_sha256": contract,
+        "ground_truth_loaded": False,
+        "ground_truth_supplied_to_extractor": False,
+        "response_sha256": response_hash,
+        "model_slug": "model",
+        "track": "do_you_see_me",
+        "question_id": "q1",
+        "status": "invalid_extractor_output",
+        "extractor_output": "{",
+        "extractor_attempts": [{"status": "invalid_extractor_output"}],
+    }
+    checkpoint = tmp_path / "audit.jsonl"
+    checkpoint.write_text(json.dumps(row) + "\n", encoding="utf-8")
+
+    result = finalize_audit_checkpoint(
+        checkpoint,
+        {("model", "do_you_see_me", "q1"): candidate},
+        contract,
+    )
+
+    assert result["rows"] == 1
+    assert result["terminalized"] == 1
+    finalized = json.loads(checkpoint.read_text(encoding="utf-8"))
+    assert finalized["status"] == "committed"
+    assert finalized["answer"] == "4"
+    assert len(finalized["extractor_attempts"]) == 2
+
+
+def test_wait_for_extractor_clients_retries_until_identity_matches():
+    class Models:
+        def __init__(self):
+            self.calls = 0
+
+        async def list(self):
+            self.calls += 1
+            if self.calls == 1:
+                raise ConnectionError("starting")
+            if self.calls == 2:
+                return SimpleNamespace(data=[SimpleNamespace(id="wrong/model")])
+            return SimpleNamespace(data=[SimpleNamespace(id="Qwen/Qwen3-8B")])
+
+    models = Models()
+    client = SimpleNamespace(models=models)
+    asyncio.run(
+        wait_for_extractor_clients(
+            [client],
+            ["http://127.0.0.1:8035/v1"],
+            "Qwen/Qwen3-8B",
+            1,
+            poll_interval=0,
+        )
+    )
+    assert models.calls == 3
+
+
+def test_wait_for_extractor_clients_rejects_wrong_identity():
+    class Models:
+        async def list(self):
+            return SimpleNamespace(data=[SimpleNamespace(id="wrong/model")])
+
+    with pytest.raises(RuntimeError, match="wrong/model"):
+        asyncio.run(
+            wait_for_extractor_clients(
+                [SimpleNamespace(models=Models())],
+                ["http://127.0.0.1:8035/v1"],
+                "Qwen/Qwen3-8B",
+                0.001,
+                poll_interval=0,
+            )
+        )
+
+
+def test_complete_checkpoint_exits_without_contacting_endpoints(tmp_path, monkeypatch):
+    contract = extractor_contract_sha256("Qwen/Qwen3-8B", 128)
+    response = "The final answer is B."
+    response_hash = hashlib.sha256(response.encode()).hexdigest()
+    candidate = {
+        "model_slug": "model",
+        "track": "minds_eye",
+        "question_id": "q1",
+        "response_sha256": response_hash,
+    }
+    checkpoint = tmp_path / "audit.jsonl"
+    checkpoint.write_text(
+        json.dumps(
+            {
+                **candidate,
+                "method": "qwen3-8b-gold-blind-evidence-extractor-v4",
+                "extractor_contract_sha256": contract,
+                "ground_truth_loaded": False,
+                "status": "committed",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "evaluation.extract_canonical_answers.load_candidates",
+        lambda *_args, **_kwargs: [candidate],
+    )
+    monkeypatch.setattr(
+        "evaluation.extract_canonical_answers.AsyncOpenAI",
+        lambda **_kwargs: pytest.fail("complete checkpoint contacted an endpoint"),
+    )
+    args = SimpleNamespace(
+        project_root=tmp_path,
+        canonical_root=tmp_path,
+        policy="all",
+        exclude_variants=[],
+        model="Qwen/Qwen3-8B",
+        revision="b968826d9c46dd6066d109eabc6255188de91218",
+        max_tokens=128,
+        output=checkpoint,
+        endpoints=["http://127.0.0.1:8035/v1"],
+    )
+
+    asyncio.run(run(args))
 
 
 def test_contract_exact_distinguishes_literal_track_formats():
@@ -267,6 +474,161 @@ def test_raw_extractor_classification_contains_no_correctness_verdict():
     assert result["status"] == "committed"
     assert result["extractor_verdict"] == "COMMITTED"
     assert "verdict" not in result
+
+
+def test_classifier_canonicalizes_task_specific_letter_sequences():
+    candidate = {
+        "answer_type": "text",
+        "task": "letter_disambiguation",
+        "response": "The letters visible are E T O N.",
+        "current_submission_answer": "E T O N",
+    }
+    result = classify_extractor_output(
+        candidate,
+        '{"verdict":"COMMITTED","answer":"E T O N",'
+        '"evidence":"The letters visible are E T O N"}',
+    )
+    assert result["status"] == "committed"
+    assert result["answer"] == "ETON"
+    assert result["proposed_answer"] == "E T O N"
+
+
+def test_classifier_preserves_explicit_out_of_domain_commitment():
+    candidate = {
+        "answer_type": "mcq_index_1_4",
+        "task": "visual_closure",
+        "response": "The final answer is 7.",
+        "current_submission_answer": "7",
+    }
+    result = classify_extractor_output(
+        candidate,
+        '{"verdict":"COMMITTED","answer":"7",'
+        '"evidence":"The final answer is 7"}',
+    )
+    assert result["status"] == "invalid_format_committed"
+    assert result["answer"] == "__INVALID_FORMAT__"
+    assert result["proposed_answer"] == "7"
+
+
+def test_classifier_downgrades_unclosed_truncated_commitments():
+    candidate = {
+        "answer_type": "mcq_letter",
+        "task": "mental_rotation",
+        "response": "The final answer is B. However, checking the next relation",
+        "response_finish_reason": "length",
+        "current_submission_answer": "B",
+    }
+    result = classify_extractor_output(
+        candidate,
+        '{"verdict":"COMMITTED","answer":"B",'
+        '"evidence":"The final answer is B"}',
+    )
+    assert result["status"] == "unresolved_truncated_response"
+    assert result["answer"] == ""
+
+
+def test_classifier_accepts_closed_answer_from_length_limited_response():
+    candidate = {
+        "answer_type": "mcq_letter",
+        "task": "mental_rotation",
+        "response": "Reasoning. <answer>B</answer> trailing text was cut",
+        "response_finish_reason": "length",
+        "current_submission_answer": "B",
+    }
+    result = classify_extractor_output(
+        candidate,
+        '{"verdict":"COMMITTED","answer":"B",'
+        '"evidence":"<answer>B</answer>"}',
+    )
+    assert result["status"] == "committed"
+    assert result["answer"] == "B"
+
+
+@pytest.mark.parametrize(
+    ("candidate", "status", "answer"),
+    [
+        (
+            {
+                "answer_type": "mcq_letter",
+                "task": "paper_folding",
+                "response": "None of the options match. Therefore, there is no correct answer among the given options.",
+            },
+            "invalid_format_committed",
+            "__INVALID_FORMAT__",
+        ),
+        (
+            {
+                "answer_type": "text",
+                "task": "letter_disambiguation",
+                "response": "There are no letters visible in the image.",
+            },
+            "invalid_format_committed",
+            "__INVALID_FORMAT__",
+        ),
+        (
+            {
+                "answer_type": "text",
+                "task": "letter_disambiguation",
+                "response": 'On the left, the letters "H-R-E" are visible. In the middle, the letters "PHILIPS" are shown.',
+            },
+            "invalid_format_committed",
+            "__INVALID_FORMAT__",
+        ),
+        (
+            {
+                "answer_type": "mcq_index_1_4",
+                "task": "visual_closure",
+                "response": "Reasoning. **Final Answer**\n\n\\boxed{4}",
+            },
+            "committed",
+            "4",
+        ),
+    ],
+)
+def test_terminal_source_classification_is_literal_and_domain_aware(
+    candidate, status, answer
+):
+    result = terminal_source_classification(candidate)
+    assert result is not None
+    assert result["status"] == status
+    assert result["answer"] == answer
+    assert result["evidence"] in candidate["response"]
+
+
+def test_terminal_source_classification_refuses_ordinary_reasoning_mentions():
+    assert terminal_source_classification(
+        {
+            "answer_type": "mcq_letter",
+            "task": "mental_rotation",
+            "response": "Option A seems plausible, but I still need to inspect B and C.",
+        }
+    ) is None
+    assert terminal_source_classification(
+        {
+            "answer_type": "mcq_index_1_4",
+            "task": "visual_closure",
+            "response": "Maybe \\boxed{4}, but I still need to inspect option 3.",
+        }
+    ) is None
+
+
+def test_terminal_fallback_requires_prior_retry_history():
+    candidate = {
+        "answer_type": "mcq_index_1_4",
+        "task": "visual_closure",
+        "response": "\\boxed{4}",
+    }
+    row = {"status": "invalid_extractor_output"}
+    assert finalize_persistent_extractor_failure(candidate, row) is None
+    result = finalize_persistent_extractor_failure(
+        candidate,
+        {**row, "extractor_attempts": [{"status": "invalid_extractor_output"}]},
+    )
+    assert result is not None
+    assert result["status"] == "committed"
+    assert result["terminal_fallback_method"] == (
+        "deterministic-terminal-response-classifier-v1"
+    )
 
 
 def test_blind_extractor_prompt_contains_no_gold_contract():

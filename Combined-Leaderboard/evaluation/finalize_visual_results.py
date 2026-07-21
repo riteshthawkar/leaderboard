@@ -14,15 +14,21 @@ from typing import Any
 from evaluation.common.vllm_runner import ANSWER_EXTRACTION_METHOD
 from evaluation.common.visual_pipeline import (
     MISSING_ANSWER_TOKEN,
-    extracted_record_answer,
     record_answer,
+)
+from visual_answer_contract import (
+    INVALID_FORMAT_TOKEN,
+    PRODUCTION_EXTRACTION_METHOD,
+    is_canonical_visual_answer,
+    task_from_question_id,
 )
 
 
 TRACKS = ("do_you_see_me", "minds_eye")
-CURRENT_PIPELINE_REVISION = "unquantized-bf16-mandatory-extraction-v11"
+CURRENT_PIPELINE_REVISION = "unquantized-bf16-evidence-extraction-v12"
 SUPPORTED_PIPELINE_REVISIONS = {
     "unquantized-bf16-smoke-and-full-text-extraction-v10",
+    "unquantized-bf16-mandatory-extraction-v11",
     CURRENT_PIPELINE_REVISION,
 }
 SUBMISSION_FIELDS = {"question_id", "condition", "answer"}
@@ -159,22 +165,24 @@ def validate_diagnostics(
 
 def answer_provenance_counts(
     submission_rows: list[dict[str, Any]], diagnostics_by_id: dict[str, dict[str, Any]]
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, int]:
     strict_count = 0
     unresolved_count = 0
+    invalid_commitment_count = 0
     exact_raw_count = 0
     for submission in submission_rows:
         question_id = str(submission["question_id"])
         diagnostic = diagnostics_by_id[question_id]
         answer_type = str(diagnostic.get("answer_type") or "text")
         mandatory = (
-            diagnostic.get("answer_extraction_method") == ANSWER_EXTRACTION_METHOD
+            diagnostic.get("answer_extraction_method")
+            in {ANSWER_EXTRACTION_METHOD, PRODUCTION_EXTRACTION_METHOD}
         )
-        parsed = (
-            extracted_record_answer(diagnostic, answer_type)
-            if mandatory
-            else record_answer(diagnostic, answer_type)
-        )
+        parsed = ""
+        if mandatory and "extracted_answer" in diagnostic:
+            parsed = str(diagnostic.get("extracted_answer") or "").strip()
+        elif not mandatory:
+            parsed = record_answer(diagnostic, answer_type)
         if parsed:
             if submission["answer"] != parsed:
                 raise FinalizationError(
@@ -182,8 +190,16 @@ def answer_provenance_counts(
                 )
             if parsed == MISSING_ANSWER_TOKEN:
                 unresolved_count += 1
-            else:
+            elif parsed == INVALID_FORMAT_TOKEN:
+                invalid_commitment_count += 1
+            elif is_canonical_visual_answer(
+                parsed,
+                answer_type=answer_type,
+                task=task_from_question_id(question_id),
+            ):
                 strict_count += 1
+            else:
+                invalid_commitment_count += 1
         elif (
             not diagnostic.get("error")
             and diagnostic.get("output")
@@ -194,7 +210,7 @@ def answer_provenance_counts(
             raise FinalizationError(
                 f"Submission answer for {question_id} has no verified diagnostic source."
             )
-    return strict_count, unresolved_count, exact_raw_count
+    return strict_count, unresolved_count, invalid_commitment_count, exact_raw_count
 
 
 def discover_candidates(
@@ -348,7 +364,12 @@ def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> d
         candidate.diagnostics,
         [str(row["question_id"]) for row in submission_rows],
     )
-    strict_count, unresolved_count, exact_raw_count = answer_provenance_counts(
+    (
+        strict_count,
+        unresolved_count,
+        invalid_commitment_count,
+        exact_raw_count,
+    ) = answer_provenance_counts(
         submission_rows, diagnostics_by_id
     )
 
@@ -376,6 +397,8 @@ def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> d
         "row_count": len(submission_rows),
         "strict_answer_count": strict_count,
         "unresolved_answer_count": unresolved_count,
+        "invalid_commitment_count": invalid_commitment_count,
+        "invalid_format_count": unresolved_count + invalid_commitment_count,
         "exact_raw_output_fallback_count": exact_raw_count,
         "source_run": candidate.source_run,
         "source_submission_modified_at": datetime.fromtimestamp(
@@ -442,7 +465,12 @@ def verify_canonical_results(output_root: Path, project_root: Path) -> dict[str,
             _diagnostic_rows, diagnostics_by_id = validate_diagnostics(
                 diagnostics, expected[track]
             )
-            strict_count, unresolved_count, exact_raw_count = answer_provenance_counts(
+            (
+                strict_count,
+                unresolved_count,
+                invalid_commitment_count,
+                exact_raw_count,
+            ) = answer_provenance_counts(
                 submission_rows, diagnostics_by_id
             )
             if (
@@ -450,6 +478,10 @@ def verify_canonical_results(output_root: Path, project_root: Path) -> dict[str,
                 or track_record.get("strict_answer_count") != strict_count
                 or track_record.get("unresolved_answer_count", 0)
                 != unresolved_count
+                or track_record.get("invalid_commitment_count", 0)
+                != invalid_commitment_count
+                or track_record.get("invalid_format_count")
+                != unresolved_count + invalid_commitment_count
                 or track_record.get("exact_raw_output_fallback_count")
                 != exact_raw_count
             ):
@@ -531,6 +563,12 @@ def build_canonical_results(
                             "strict_answer_count": record["strict_answer_count"],
                             "unresolved_answer_count": record[
                                 "unresolved_answer_count"
+                            ],
+                            "invalid_commitment_count": record[
+                                "invalid_commitment_count"
+                            ],
+                            "invalid_format_count": record[
+                                "invalid_format_count"
                             ],
                             "exact_raw_output_fallback_count": record[
                                 "exact_raw_output_fallback_count"

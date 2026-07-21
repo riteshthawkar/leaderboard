@@ -40,6 +40,10 @@ from scoring.task_scorer import (  # noqa: E402
     TaskScorer,
     _strict_visual_match,
 )
+from visual_answer_contract import (  # noqa: E402
+    INVALID_FORMAT_TOKEN,
+    canonicalize_extracted_answer,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -147,6 +151,35 @@ def test_visual_answers_require_the_declared_final_answer_format(
         valid_format,
         correct,
     )
+
+
+@pytest.mark.parametrize(
+    ("prediction", "answer_type", "task", "expected", "valid"),
+    [
+        ("E T O N", "text", "letter_disambiguation", "ETON", True),
+        ("['P', 'A', 'R', 'K']", "text", "letter_disambiguation", "PARK", True),
+        ("B and I", "text", "letter_disambiguation", "BI", True),
+        ("B🍰Q", "text", "letter_disambiguation", INVALID_FORMAT_TOKEN, False),
+        ("ABCDEFGHIJ", "text", "letter_disambiguation", INVALID_FORMAT_TOKEN, False),
+        ("True", "text", "form_constancy", "Yes", True),
+        ("false", "text", "form_constancy", "No", True),
+        ("Option A", "mcq_letter", "analogies", INVALID_FORMAT_TOKEN, False),
+    ],
+)
+def test_visual_extractor_answers_are_canonicalized_without_solving(
+    prediction,
+    answer_type,
+    task,
+    expected,
+    valid,
+):
+    result = canonicalize_extracted_answer(
+        prediction,
+        answer_type=answer_type,
+        task=task,
+    )
+    assert result.value == expected
+    assert result.valid is valid
 
 
 def test_format_options():

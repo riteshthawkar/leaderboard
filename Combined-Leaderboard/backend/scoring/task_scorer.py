@@ -24,6 +24,11 @@ from urllib.parse import quote
 
 import requests
 
+from visual_answer_contract import (
+    canonical_answers_equal,
+    is_canonical_visual_answer,
+)
+
 from config import (
     TASKS,
     MINDS_EYE_ART_BY_CAPABILITY,
@@ -64,7 +69,6 @@ _ANSWER_FIELDS = ("answer", "prediction", "response", "output")
 _NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 _OPTION_RE = re.compile(r"\b([A-Ja-j])\b")
 _ID_FIELDS = ("sample_id", "question_id", "id")
-_LETTER_DISAMBIGUATION_MAX_LENGTH = 9
 
 
 class SubmissionValidationError(ValueError):
@@ -219,49 +223,17 @@ def _match(pred, gold) -> bool:
 
 def _strict_visual_match(pred, gold, answer_type: str, task: str) -> tuple[bool, bool]:
     """Return ``(has_valid_format, is_correct)`` for a final visual answer."""
-    if isinstance(pred, (dict, list)) or pred is None:
-        return False, False
-    answer = str(pred).strip()
-    expected = str(gold).strip()
-    if not answer:
-        return False, False
-
-    if answer_type == "integer":
-        if not re.fullmatch(r"-?\d+", answer):
-            return False, False
-        answer_number = _as_decimal(answer)
-        expected_number = _as_decimal(expected)
-        return True, (
-            answer_number is not None
-            and expected_number is not None
-            and answer_number == expected_number
-        )
-
-    if answer_type == "mcq_index_1_4":
-        if not re.fullmatch(r"[1-4]", answer):
-            return False, False
-        return True, answer == expected
-
-    if answer_type == "mcq_letter":
-        if not re.fullmatch(r"[A-Fa-f]", answer):
-            return False, False
-        return True, answer.upper() == expected.upper()
-
-    if answer_type == "text" and task == "form_constancy":
-        if answer.casefold() not in {"yes", "no"}:
-            return False, False
-        return True, answer.casefold() == expected.casefold()
-
-    if answer_type == "text" and task == "letter_disambiguation":
-        if not re.fullmatch(
-            rf"[A-Za-z]{{1,{_LETTER_DISAMBIGUATION_MAX_LENGTH}}}", answer
-        ):
-            return False, False
-        return True, answer.upper() == expected.upper()
-
-    # Unknown textual contracts remain exact and do not accept answer prefixes,
-    # explanations, punctuation wrappers, or embedded reasoning.
-    return True, answer.casefold() == expected.casefold()
+    valid_format = is_canonical_visual_answer(
+        pred,
+        answer_type=answer_type,
+        task=task,
+    )
+    return valid_format, valid_format and canonical_answers_equal(
+        pred,
+        gold,
+        answer_type=answer_type,
+        task=task,
+    )
 
 
 def _row_id(row: dict) -> str:

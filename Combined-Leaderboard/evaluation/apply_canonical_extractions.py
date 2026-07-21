@@ -289,11 +289,21 @@ def apply_completed_audit(
                 _rows, diagnostics_by_id = validate_diagnostics(
                     diagnostics_path, expected_ids[track]
                 )
-                strict_count, exact_raw_count = answer_provenance_counts(
+                (
+                    strict_count,
+                    unresolved_count,
+                    invalid_commitment_count,
+                    exact_raw_count,
+                ) = answer_provenance_counts(
                     submission_rows, diagnostics_by_id
                 )
                 track_record = manifest["tracks"][track]
                 track_record["strict_answer_count"] = strict_count
+                track_record["unresolved_answer_count"] = unresolved_count
+                track_record["invalid_commitment_count"] = invalid_commitment_count
+                track_record["invalid_format_count"] = (
+                    unresolved_count + invalid_commitment_count
+                )
                 track_record["exact_raw_output_fallback_count"] = exact_raw_count
                 for artifact in (diagnostics_path, submission_path, audit_copy):
                     track_record["artifacts"][artifact.name] = artifact_record(artifact)
@@ -350,6 +360,15 @@ def apply_completed_audit(
                         "row_count": manifest["tracks"][track]["row_count"],
                         "strict_answer_count": manifest["tracks"][track][
                             "strict_answer_count"
+                        ],
+                        "unresolved_answer_count": manifest["tracks"][track][
+                            "unresolved_answer_count"
+                        ],
+                        "invalid_commitment_count": manifest["tracks"][track][
+                            "invalid_commitment_count"
+                        ],
+                        "invalid_format_count": manifest["tracks"][track][
+                            "invalid_format_count"
                         ],
                         "exact_raw_output_fallback_count": manifest["tracks"][track][
                             "exact_raw_output_fallback_count"
