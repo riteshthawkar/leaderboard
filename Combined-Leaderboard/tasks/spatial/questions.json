@@ -6,10 +6,12 @@
   "version": "1.0",
   "total_samples": 39,
   "conditions": [
-    "standard",
-    "cot",
-    "no_image",
-    "no_image_plus"
+    "main_noncot",
+    "main_cot",
+    "no_image_noncot",
+    "no_image_cot",
+    "no_image_plus_noncot",
+    "no_image_plus_cot"
   ],
   "samples": [
     {

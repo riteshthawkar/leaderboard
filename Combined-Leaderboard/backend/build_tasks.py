@@ -1,24 +1,23 @@
 """
 Builds the three task bundles for the leaderboard.
 
-For each task it writes, under backend/tasks/<task_id>/:
+For each task it writes public questions/templates under ``tasks/<task_id>/``
+and the private answer key under the ignored ``Ground_truths/`` tree:
   * questions.json            - public; the samples handed to users (no answers)
-  * ground_truth.json         - private; sample_id -> {answer, group, ...}
-  * submission_template.json  - empty template (predictions per condition)
-  * submission_template.csv   - flat CSV template
+  * submission_template.jsonl - public empty final-answer template
+  * ground_truth.json         - private sample/question answer map
 
 Tasks:
   do_you_see_me  - drawn from the Do-You-See-Me benchmark (perception)
-  minds_eye      - drawn from the Mind's-Eye benchmark (imagery)
+  minds_eye      - drawn from the Mind's-Eye benchmark (cognition)
   spatial        - the 13 public spatial benchmarks (Task 3). We do NOT
                    redistribute those datasets; instead we write a manifest +
                    a small illustrative SAMPLE set so the pipeline is testable.
-                   Real ground truth is produced by running spatial_harness.
+                   Real ground truth is produced by evaluation/spatial_reasoning/build_server_bundle.py.
 
 Run:  python backend/build_tasks.py
 """
 
-import csv
 import json
 import random
 
@@ -30,6 +29,8 @@ from config import (
     NO_IMAGE_PLUS_OPTION,
     GOLDEN_SET_SEED,
     EVAL_CONDITIONS,
+    SPATIAL_BENCHMARK_SCHEMA_VERSION,
+    SPATIAL_DATASET_KEYS,
 )
 from build_golden_set import _rng, _load_do_you_see_me, _load_minds_eye
 
@@ -37,6 +38,7 @@ from build_golden_set import _rng, _load_do_you_see_me, _load_minds_eye
 def _write_task_bundle(task_id, questions, ground_truth, conditions):
     paths = TASKS[task_id]["paths"]
     paths["dir"].mkdir(parents=True, exist_ok=True)
+    paths["ground_truth"].parent.mkdir(parents=True, exist_ok=True)
 
     with open(paths["questions"], "w", encoding="utf-8") as f:
         json.dump({
@@ -53,25 +55,15 @@ def _write_task_bundle(task_id, questions, ground_truth, conditions):
     with open(paths["ground_truth"], "w", encoding="utf-8") as f:
         json.dump(ground_truth, f, indent=2)
 
-    template = {
-        "schema_version": "1.0",
-        "task_id": task_id,
-        "model_meta": {
-            "name": "YOUR_MODEL_NAME", "family": "", "params_b": None,
-            "type": "MLM", "is_reasoning": False,
-        },
-        "run": {"seed": 0, "decoding": "greedy", "temperature": 0},
-        "predictions": {c: {q["sample_id"]: "" for q in questions} for c in conditions},
-    }
-    with open(paths["template_json"], "w", encoding="utf-8") as f:
-        json.dump(template, f, indent=2)
-
-    with open(paths["template_csv"], "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["sample_id", "group", "condition", "question", "prediction"])
-        for q in questions:
-            writer.writerow([q["sample_id"], q.get("group", ""), "standard",
-                             q.get("question", ""), ""])
+    with open(paths["template_jsonl"], "w", encoding="utf-8") as f:
+        for condition in conditions:
+            for q in questions:
+                id_field = "question_id" if q.get("question_id") else "sample_id"
+                f.write(json.dumps({
+                    id_field: q.get(id_field) or q.get("sample_id"),
+                    "condition": condition,
+                    "answer": "",
+                }) + "\n")
 
     print(f"  [ok] {task_id}: {len(questions)} samples -> {paths['dir']}")
 
@@ -110,30 +102,36 @@ def build_visual_cognition_task(task_id, benchmark, loader):
 def build_spatial_task(sample_per_dataset=3):
     """Write the spatial manifest + a small illustrative SAMPLE bundle.
 
-    The real Task-3 ground truth is generated offline by spatial_harness from
+    The real Task-3 ground truth is generated offline by evaluation/spatial_reasoning from
     each dataset's official source; this sample only exercises the pipeline.
     """
     # Manifest (the public spec users run the harness against).
     SPATIAL_MANIFEST_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(SPATIAL_MANIFEST_FILE, "w", encoding="utf-8") as f:
         json.dump({
+            "schema_version": SPATIAL_BENCHMARK_SCHEMA_VERSION,
             "task_id": "spatial",
-            "version": "1.0",
-            "note": "We do not redistribute these datasets. The harness downloads "
-                    "each from its official source on your machine. Verify every "
-                    "hf_id/config (entries with verify=true) against VLMEvalKit.",
-            "conditions": EVAL_CONDITIONS,
+            "benchmark_version": "demo-only",
+            "demo": True,
+            "note": "This checked-in bundle only exercises local code paths. It cannot be used for leaderboard submissions.",
+            "datasets": SPATIAL_DATASET_KEYS,
+            "required_conditions": EVAL_CONDITIONS,
+            "primary_condition": "main_noncot",
             "no_image_plus_option": NO_IMAGE_PLUS_OPTION,
             "dataset_count": len(SPATIAL_DATASETS),
+            "condition_counts": {
+                condition: len(SPATIAL_DATASETS) * sample_per_dataset
+                for condition in EVAL_CONDITIONS
+            },
             "approx_total_samples": sum(d.get("approx_n", 0) for d in SPATIAL_DATASETS),
-            "datasets": SPATIAL_DATASETS,
+            "dataset_catalog": SPATIAL_DATASETS,
         }, f, indent=2)
     print(f"  [ok] spatial manifest -> {SPATIAL_MANIFEST_FILE}")
 
     rng = random.Random(GOLDEN_SET_SEED)
     letters = ["A", "B", "C", "D"]
     questions, ground_truth = [], {}
-    for ds in SPATIAL_DATASETS:
+    for dataset_index, ds in enumerate(SPATIAL_DATASETS):
         for i in range(sample_per_dataset):
             sid = f"{ds['id']}:{i:03d}"
             ans = rng.choice(letters)
@@ -148,8 +146,20 @@ def build_spatial_task(sample_per_dataset=3):
                 "options": {l: f"option {l}" for l in letters},
                 "sample": True,
             })
-            ground_truth[sid] = {"answer": ans, "group": ds["id"],
-                                 "dataset": ds["name"], "tags": ds["tags"]}
+            condition_answers = {
+                condition: ("E" if condition.startswith("no_image_plus_") else ans)
+                for condition in EVAL_CONDITIONS
+            }
+            ground_truth[sid] = {
+                "answer": ans,
+                "condition_answers": condition_answers,
+                "conditions": EVAL_CONDITIONS,
+                "group": ds["name"],
+                "dataset": ds["name"],
+                "dataset_key": SPATIAL_DATASET_KEYS[dataset_index],
+                "evaluation_group": sid,
+                "tags": ds["tags"],
+            }
     _write_task_bundle("spatial", questions, ground_truth, EVAL_CONDITIONS)
 
 

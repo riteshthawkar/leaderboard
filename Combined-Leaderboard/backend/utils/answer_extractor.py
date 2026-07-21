@@ -133,6 +133,15 @@ class AnswerComparator:
     """Compares ground truth and predictions."""
 
     @staticmethod
+    def _is_option_key(answer: str) -> bool:
+        """True for canonical option labels like C, (C), or Option C."""
+        value = (answer or "").strip()
+        return bool(re.fullmatch(
+            r"(?i)(?:\(?[a-f]\)?|(?:answer|option|choice|select|letter)\s*[:\-]?\s*[a-f])",
+            value,
+        ))
+
+    @staticmethod
     def normalize_answer(answer: str, answer_type: str = "auto") -> str:
         """Normalize answer based on type.
         
@@ -145,7 +154,9 @@ class AnswerComparator:
         """
         answer = answer.strip()
 
-        if answer_type == "option" or (answer_type == "auto" and OptionExtractor.extract_option(answer)):
+        if answer_type == "option" or (
+            answer_type == "auto" and AnswerComparator._is_option_key(answer)
+        ):
             extracted = OptionExtractor.extract_option(answer)
             return extracted if extracted else answer.upper()
 
@@ -167,7 +178,7 @@ class AnswerComparator:
         pred = prediction.strip()
 
         # First, try option extraction if applicable
-        if len(gt) <= 2 and len(pred) <= 500:  # Option-like answers tend to be short predictions
+        if AnswerComparator._is_option_key(gt) and len(pred) <= 500:
             gt_option = OptionExtractor.extract_option(gt)
             if gt_option:
                 if use_ollama:

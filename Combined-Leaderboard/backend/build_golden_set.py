@@ -2,16 +2,15 @@
 Golden Set builder for the unified Visual Cognition leaderboard.
 
 Draws a fixed, deterministic sample from every locally available task across
-Do-You-See-Me (perception) and Mind's-Eye (mental imagery) and writes:
+Do-You-See-Me (perception) and Mind's-Eye (visual cognition) and writes:
 
   * golden_set_questions.json      - public; the questions handed to users
   * golden_set_ground_truth.json   - private; sample_id -> answer + metadata
-  * submission_template.json/.csv  - empty templates users fill in
+  * submission_template.jsonl      - empty final-answer template users fill in
 
 Run:  python backend/build_golden_set.py
 """
 
-import csv
 import json
 import random
 from pathlib import Path
@@ -26,8 +25,7 @@ from config import (
     GOLDEN_SET_DIR,
     GOLDEN_SET_QUESTIONS_FILE,
     GOLDEN_SET_GROUND_TRUTH_FILE,
-    GOLDEN_SET_TEMPLATE_CSV,
-    GOLDEN_SET_TEMPLATE_JSON,
+    GOLDEN_SET_TEMPLATE_JSONL,
     GOLDEN_SET_SIZE_PER_TASK,
     GOLDEN_SET_SEED,
     PROJECT_ROOT,
@@ -188,30 +186,13 @@ def build_golden_set():
     with open(GOLDEN_SET_GROUND_TRUTH_FILE, "w", encoding="utf-8") as f:
         json.dump(ground_truth, f, indent=2)
 
-    # JSON submission template (predictions keyed by sample_id, per condition).
-    template = {
-        "schema_version": "1.0",
-        "model": {
-            "name": "YOUR_MODEL_NAME",
-            "family": "",
-            "params_b": None,
-            "type": "MLM",
-            "is_reasoning": False,
-        },
-        "run": {"seed": 0, "decoding": "greedy", "temperature": 0},
-        "predictions": {
-            "standard": {q["sample_id"]: "" for q in questions},
-        },
-    }
-    with open(GOLDEN_SET_TEMPLATE_JSON, "w", encoding="utf-8") as f:
-        json.dump(template, f, indent=2)
-
-    # CSV submission template.
-    with open(GOLDEN_SET_TEMPLATE_CSV, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["sample_id", "benchmark", "task", "question", "prediction"])
+    with open(GOLDEN_SET_TEMPLATE_JSONL, "w", encoding="utf-8") as f:
         for q in questions:
-            writer.writerow([q["sample_id"], q["benchmark"], q["task"], q["question"], ""])
+            f.write(json.dumps({
+                "sample_id": q["sample_id"],
+                "condition": "standard",
+                "answer": "",
+            }) + "\n")
 
     print(f"\nWrote {len(questions)} samples across {len(TASK_TAXONOMY)} tasks to {GOLDEN_SET_DIR}")
     return questions, ground_truth

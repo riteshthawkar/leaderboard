@@ -13,12 +13,20 @@ ENV/
 /uploads/
 Combined-Leaderboard/results/
 Combined-Leaderboard/uploads/
+/FInal_model_output_files/
+
+# --- Private benchmark answer keys (never commit) ---
+Combined-Leaderboard/Ground_truths/*
+!Combined-Leaderboard/Ground_truths/README.md
+Combined-Leaderboard/tasks/**/ground_truth*
+Combined-Leaderboard/golden_set/*ground_truth*
+Combined-Leaderboard/sample_submission_correct.json
 
 # --- Secrets ---
 .env
 *.env
+.env.*
 !.env.example
-/Combined-Leaderboard/evaluation/Ground_truths/
 
 # --- Logs ---
 logs/
@@ -35,30 +43,47 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+coverage/
+htmlcov/
+test-results/
+playwright-report/
 
 # --- Frontend dependencies & build artifacts ---
 node_modules/
 Combined-Leaderboard/frontend/node_modules/
-Combined-Leaderboard/frontend/static/react-app/
+Combined-Leaderboard/frontend/dist-static/
+Combined-Leaderboard/frontend/dist/
+.vite/
+*.tsbuildinfo
 
 # --- Harness scratch / generated test artifacts ---
 **/_gray_cache/
 **/_dryrun_*.json
+Combined-Leaderboard/evaluation/**/results/
+Combined-Leaderboard/evaluation/spatial_reasoning/LMUData/
+Combined-Leaderboard/evaluation/.runtime/
 
 # --- Database (contains user credentials — never commit) ---
 *.db
 *.db-shm
 *.db-wal
+backups/
+**/backups/
 
 # --- Atomic write temp files ---
 *.tmp
+*.lock
 
 # --- OS / editor ---
 .DS_Store
+._*
 Thumbs.db
 .idea/
 *.swp
 *.swo
+*.pid
+npm-debug.log*
 spatial_responses.json
 dysm_responses.json
 minds_eye_responses.json
