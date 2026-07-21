@@ -1,17 +1,17 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { ParentSize } from "@visx/responsive";
 import { scaleBand, scaleLinear } from "@visx/scale";
 import { prettyLabel } from "@/lib/utils";
 
 export const chartPalette = [
-  "#14b8a6",
-  "#6366f1",
-  "#f97316",
-  "#e11d48",
-  "#a855f7",
-  "#0ea5e9",
-  "#84cc16",
-  "#eab308",
+  "var(--dysm)",
+  "var(--me)",
+  "var(--spatial)",
+  "var(--chart-negative)",
+  "var(--chart-positive)",
+  "var(--chart-neutral)",
+  "var(--chart-accent)",
+  "var(--text-muted)",
 ];
 
 function niceMax(values) {
@@ -33,23 +33,96 @@ function bottomRoundedPath(x, y, width, height, radius) {
   return `M${x},${y} L${x + width},${y} L${x + width},${y + height - r} Q${x + width},${y + height} ${x + width - r},${y + height} L${x + r},${y + height} Q${x},${y + height} ${x},${y + height - r} Z`;
 }
 
+function BarGradient({ color, id }) {
+  return (
+    <linearGradient id={id} x1="0%" x2="0%" y1="0%" y2="100%">
+      <stop offset="0%" stopColor={color} stopOpacity={1} />
+      <stop offset="58%" stopColor={color} stopOpacity={0.68} />
+      <stop offset="100%" stopColor={color} stopOpacity={0.16} />
+    </linearGradient>
+  );
+}
+
 function formatPct(value, { scale = 100, suffix = "%", digits = 1 } = {}) {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return "N/A";
   return `${(value * scale).toFixed(digits)}${suffix}`;
+}
+
+export function layoutScatterPoints(points, { xScale, yScale, innerWidth, innerHeight }) {
+  const positioned = points
+    .map((point, index) => ({
+      ...point,
+      index,
+      rawX: xScale(point.x),
+      rawY: yScale(point.y),
+    }))
+    .filter((point) => Number.isFinite(point.rawX) && Number.isFinite(point.rawY));
+  const clusters = [];
+  positioned.forEach((point) => {
+    const cluster = clusters.find((candidate) => {
+      const anchor = candidate[0];
+      return Math.hypot(point.rawX - anchor.rawX, point.rawY - anchor.rawY) < 9;
+    });
+    if (cluster) cluster.push(point);
+    else clusters.push([point]);
+  });
+  clusters.forEach((cluster) => {
+    cluster.forEach((point, index) => {
+      const angle = cluster.length > 1 ? -Math.PI / 2 + (index * 2 * Math.PI) / cluster.length : 0;
+      const spread = cluster.length > 1 ? Math.min(7, 3 + cluster.length) : 0;
+      point.screenX = Math.max(0, Math.min(innerWidth, point.rawX + Math.cos(angle) * spread));
+      point.screenY = Math.max(0, Math.min(innerHeight, point.rawY + Math.sin(angle) * spread));
+    });
+  });
+
+  const placedBoxes = [];
+  const offsets = [0, -16, 16, -32, 32, -48, 48, -64, 64];
+  positioned
+    .slice()
+    .sort((left, right) => left.screenY - right.screenY || left.screenX - right.screenX)
+    .forEach((point) => {
+      point.alignRight = point.screenX > innerWidth * 0.76;
+      point.labelX = point.screenX + (point.alignRight ? -9 : 9);
+      const estimatedWidth = Math.max(42, String(point.label || "").length * 6.4);
+      const boxFor = (labelY) => ({
+        left: point.alignRight ? point.labelX - estimatedWidth : point.labelX,
+        right: point.alignRight ? point.labelX : point.labelX + estimatedWidth,
+        top: labelY - 7,
+        bottom: labelY + 7,
+      });
+      const overlaps = (box) => placedBoxes.some((placed) => !(
+        box.right + 4 < placed.left
+        || box.left - 4 > placed.right
+        || box.bottom + 3 < placed.top
+        || box.top - 3 > placed.bottom
+      ));
+      let labelY = Math.max(8, Math.min(innerHeight - 8, point.screenY));
+      for (const offset of offsets) {
+        const candidateY = Math.max(8, Math.min(innerHeight - 8, point.screenY + offset));
+        if (!overlaps(boxFor(candidateY))) {
+          labelY = candidateY;
+          break;
+        }
+      }
+      point.labelY = labelY;
+      placedBoxes.push(boxFor(labelY));
+    });
+
+  return positioned.sort((left, right) => left.index - right.index);
 }
 
 function ChartTip({ tip }) {
   if (!tip) return null;
   return (
-    <div className="viz-tooltip" style={{ left: tip.left, top: tip.top }}>
-      <div className="viz-tooltip-title">{tip.title}</div>
+    <div className="pointer-events-none absolute z-[6] mt-[-6px] min-w-32 -translate-x-1/2 -translate-y-full border border-border bg-surface px-2.5 py-2 shadow-lg" style={{ left: tip.left, top: tip.top }}>
+      <div className="mb-1 text-xs font-bold text-foreground">{tip.title}</div>
       {tip.rows.map((row) => (
-        <div className="viz-tooltip-row" key={row.label}>
-          <span className="viz-tooltip-key">
-            <span className="viz-tooltip-dot" style={{ background: row.color }} />
+        <div className="flex items-center justify-between gap-4 text-xs leading-relaxed" key={row.label}>
+          <span className="inline-flex items-center gap-1.5 text-muted">
+            <span className="inline-block size-2 shrink-0" style={{ background: row.color }} />
             {row.label}
           </span>
-          <span className="viz-tooltip-val">{row.value}</span>
+          <span className="font-semibold tabular-nums text-foreground">{row.value}</span>
         </div>
       ))}
     </div>
@@ -58,10 +131,10 @@ function ChartTip({ tip }) {
 
 function ChartLegend({ series }) {
   return (
-    <div className="radar-legend">
+    <div className="mt-3.5 flex flex-wrap gap-3">
       {series.map((entry) => (
-        <span className="legend-item" key={entry.key}>
-          <span className="legend-dot" style={{ background: entry.color }} />
+        <span className="inline-flex items-center gap-1.5 text-sm text-muted" key={entry.key}>
+          <span className="size-2.5" style={{ background: entry.color }} />
           {entry.label}
         </span>
       ))}
@@ -73,8 +146,8 @@ const EMPTY_BARS = [0.42, 0.6, 0.34, 0.7, 0.5, 0.58, 0.46];
 
 export function EmptyChart({ message, aspectRatio = "16 / 9" }) {
   return (
-    <div className="bklit-chart-wrap is-empty">
-      <div className="viz-chart" style={{ aspectRatio }}>
+    <div className="relative mt-3.5 w-full opacity-95 [&_svg]:overflow-visible">
+      <div className="relative w-full [&_svg]:block [&_svg]:overflow-visible" style={{ aspectRatio }}>
         <ParentSize debounceTime={10}>
           {({ width, height }) => {
             if (width < 10 || height < 10) return null;
@@ -93,19 +166,19 @@ export function EmptyChart({ message, aspectRatio = "16 / 9" }) {
                     const barY = yScale(value);
                     return (
                       <path
-                        className="viz-bar-empty"
-                        d={topRoundedPath(xScale(String(index)), barY, xScale.bandwidth(), innerHeight - barY, 4)}
+                        className="fill-surface-subtle opacity-50"
+                        d={topRoundedPath(xScale(String(index)), barY, xScale.bandwidth(), innerHeight - barY, 0)}
                         key={index}
                       />
                     );
                   })}
-                  <line className="viz-axis-line" x1={0} x2={innerWidth} y1={innerHeight} y2={innerHeight} />
+                  <line className="stroke-[var(--border)] [shape-rendering:crispEdges]" x1={0} x2={innerWidth} y1={innerHeight} y2={innerHeight} />
                 </g>
               </svg>
             );
           }}
         </ParentSize>
-        <div className="chart-empty-overlay">{message}</div>
+        <div className="pointer-events-none absolute inset-0 grid place-items-center p-5 text-center text-sm text-muted">{message}</div>
       </div>
     </div>
   );
@@ -122,10 +195,13 @@ export function BarChart({
   categories,
   series,
   aspectRatio = "16 / 9",
+  bottomMargin,
+  compactXLabels = false,
   valueScale = 100,
   valueSuffix = "%",
   valueDigits = 0,
   emptyMessage = "No data available yet.",
+  forceHorizontalLabels = false,
   showLegend = true,
 }) {
   const [tip, setTip] = useState(null);
@@ -166,12 +242,15 @@ export function BarChart({
   const grouped = series.length > 1;
 
   return (
-    <div className="bklit-chart-wrap">
-      <div className="viz-chart" onMouseLeave={clearTip} style={{ aspectRatio }}>
+    <div className="relative mt-3.5 w-full [&_svg]:overflow-visible">
+      <div className="relative w-full [&_svg]:block [&_svg]:overflow-visible" onMouseLeave={clearTip} style={{ aspectRatio }}>
         <ParentSize debounceTime={10}>
           {({ width, height }) => (
             <BarChartSvg
               categories={categories}
+              bottomMargin={bottomMargin}
+              compactXLabels={compactXLabels}
+              forceHorizontalLabels={forceHorizontalLabels}
               grouped={grouped}
               height={height}
               maxValue={maxValue}
@@ -192,7 +271,117 @@ export function BarChart({
   );
 }
 
-function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, series, setTip, valueScale, valueSuffix, valueDigits = 0, width }) {
+/**
+ * Compact two-variable comparison with a diagonal parity reference.
+ * Points are directly labelled so the primary values do not depend on hover.
+ */
+export function ScatterChart({
+  points,
+  xLabel,
+  yLabel,
+  aspectRatio = "4 / 3",
+  emptyMessage = "No data available yet.",
+}) {
+  const [tip, setTip] = useState(null);
+  const clearTip = useCallback(() => setTip(null), []);
+  const ready = points?.some(
+    (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+  );
+
+  if (!ready) {
+    return <EmptyChart aspectRatio={aspectRatio} message={emptyMessage} />;
+  }
+
+  return (
+    <div className="relative mt-3.5 w-full [&_svg]:overflow-visible">
+      <div className="relative w-full [&_svg]:block [&_svg]:overflow-visible" onMouseLeave={clearTip} style={{ aspectRatio }}>
+        <ParentSize debounceTime={10}>
+          {({ width, height }) => (
+            <ScatterChartSvg
+              height={height}
+              points={points}
+              setTip={setTip}
+              width={width}
+              xLabel={xLabel}
+              yLabel={yLabel}
+            />
+          )}
+        </ParentSize>
+        <ChartTip tip={tip} />
+      </div>
+    </div>
+  );
+}
+
+function ScatterChartSvg({ height, points, setTip, width, xLabel, yLabel }) {
+  if (width < 10 || height < 10) return null;
+  const left = 48;
+  const right = 22;
+  const top = 18;
+  const bottom = 44;
+  const innerWidth = width - left - right;
+  const innerHeight = height - top - bottom;
+  if (innerWidth < 40 || innerHeight < 40) return null;
+
+  const xScale = scaleLinear({ domain: [0, 1], range: [0, innerWidth] });
+  const yScale = scaleLinear({ domain: [0, 1], range: [innerHeight, 0] });
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+  const positionedPoints = layoutScatterPoints(points, {
+    xScale,
+    yScale,
+    innerWidth,
+    innerHeight,
+  });
+
+  return (
+    <svg height={height} role="img" width={width}>
+      <g transform={`translate(${left},${top})`}>
+        {ticks.map((tick) => (
+          <g key={tick}>
+            <line className="stroke-[var(--border)] opacity-50 [shape-rendering:crispEdges]" x1={xScale(tick)} x2={xScale(tick)} y1={0} y2={innerHeight} />
+            <line className="stroke-[var(--border)] opacity-50 [shape-rendering:crispEdges]" x1={0} x2={innerWidth} y1={yScale(tick)} y2={yScale(tick)} />
+            <text className="fill-muted text-xs tabular-nums" textAnchor="middle" x={xScale(tick)} y={innerHeight + 18}>{Math.round(tick * 100)}%</text>
+            <text className="fill-muted text-xs tabular-nums" dy="0.32em" textAnchor="end" x={-9} y={yScale(tick)}>{Math.round(tick * 100)}%</text>
+          </g>
+        ))}
+        <line className="stroke-[var(--text-faint)] opacity-70" strokeDasharray="5 5" x1={0} x2={innerWidth} y1={innerHeight} y2={0} />
+        {positionedPoints.map((point) => {
+          const x = point.screenX;
+          const y = point.screenY;
+          const tipRows = [
+            { color: point.color, label: xLabel, value: formatPct(point.x) },
+            { color: point.color, label: yLabel, value: formatPct(point.y) },
+          ];
+          const onHover = () => setTip({ left: left + x, top: top + y - 10, title: point.label, rows: tipRows });
+          return (
+            <g key={point.key || point.label}>
+              {Math.abs(point.labelY - y) > 4 && (
+                <line className="stroke-[var(--text-faint)] opacity-60" x1={x} x2={point.labelX} y1={y} y2={point.labelY} />
+              )}
+              <circle
+                className="cursor-default stroke-background stroke-2"
+                cx={x}
+                cy={y}
+                fill={point.color}
+                onMouseEnter={onHover}
+                onMouseMove={onHover}
+                r={5}
+              />
+              <text className="fill-foreground text-xs font-medium" dominantBaseline="middle" textAnchor={point.alignRight ? "end" : "start"} x={point.labelX} y={point.labelY}>
+                {point.label}
+              </text>
+            </g>
+          );
+        })}
+        <text className="fill-muted text-xs font-medium" textAnchor="middle" x={innerWidth / 2} y={innerHeight + 38}>{xLabel}</text>
+        <text className="fill-muted text-xs font-medium" textAnchor="middle" transform={`translate(${-38},${innerHeight / 2}) rotate(-90)`}>{yLabel}</text>
+      </g>
+    </svg>
+  );
+}
+
+function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontalLabels, grouped, height, maxValue, minValue = 0, series, setTip, valueScale, valueSuffix, valueDigits = 0, width }) {
+  const gradientPrefix = useId().replace(/[^A-Za-z0-9_-]/g, "");
   if (width < 10 || height < 10) return null;
   const labels = categories.map((category) => String(category.label ?? ""));
   const left = 46;
@@ -202,8 +391,8 @@ function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, seri
   const bandPer = innerWidthBase / Math.max(1, categories.length);
   const longest = labels.reduce((max, label) => Math.max(max, label.length), 0);
   const estLabelPx = longest * 6.6;
-  const rotate = estLabelPx > bandPer - 10;
-  const bottom = rotate ? Math.min(104, 30 + Math.round(Math.sin(Math.PI / 5) * estLabelPx)) : 34;
+  const rotate = !forceHorizontalLabels && estLabelPx > bandPer - 10;
+  const bottom = bottomMargin ?? (rotate ? Math.min(104, 30 + Math.round(Math.sin(Math.PI / 5) * estLabelPx)) : 34);
   const innerWidth = width - left - right;
   const innerHeight = height - top - bottom;
   if (innerWidth < 20 || innerHeight < 20) return null;
@@ -217,6 +406,7 @@ function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, seri
   const yTicks = yScale.ticks(minValue < 0 ? 6 : 4);
   const totalBars = categories.length * series.length;
   const showValueLabels = totalBars <= 9;
+  const xLabelClassName = compactXLabels ? "fill-muted text-[0.68rem]" : "fill-muted text-xs";
   const tickFmt = (value) => `${+(value * valueScale).toFixed(1)}${valueSuffix}`;
   const tooltipRows = (category, index) =>
     series.map((entry) => ({
@@ -230,18 +420,18 @@ function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, seri
       <g transform={`translate(${left},${top})`}>
         {yTicks.map((tick) => (
           <g key={tick} transform={`translate(0,${yScale(tick)})`}>
-            <line className="viz-grid-line" x1={0} x2={innerWidth} />
-            <text className="viz-axis-text" dy="0.32em" textAnchor="end" x={-10} y={0}>
+            <line className="stroke-[var(--border)] opacity-50 [shape-rendering:crispEdges]" x1={0} x2={innerWidth} />
+            <text className="fill-muted text-xs tabular-nums" dy="0.32em" textAnchor="end" x={-10} y={0}>
               {tickFmt(tick)}
             </text>
           </g>
         ))}
-        <line className="viz-axis-line" x1={0} x2={innerWidth} y1={zeroY} y2={zeroY} />
+        <line className="stroke-[var(--border)] [shape-rendering:crispEdges]" x1={0} x2={innerWidth} y1={zeroY} y2={zeroY} />
         {categories.map((category, index) => {
           const groupX = xScale(String(index)) ?? 0;
           return (
             <g key={index} transform={`translate(${groupX},0)`}>
-              {series.map((entry) => {
+              {series.map((entry, seriesIndex) => {
                 const value = entry.valueFor(category, index);
                 const has = value != null && Number.isFinite(value);
                 if (!has) return null;
@@ -253,24 +443,30 @@ function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, seri
                 const barBottom = yScale(Math.min(0, clamped));
                 const barHeight = barBottom - barTop;
                 const fill = entry.colorFor ? entry.colorFor(category, index) : entry.color;
+                const gradientId = `${gradientPrefix}-bar-${index}-${seriesIndex}`;
                 const centerX = left + groupX + barX + barWidth / 2;
                 const rows = tooltipRows(category, index);
                 const onHover = () => setTip({ left: centerX, top: top + barTop - 10, title: category.label, rows });
                 return (
                   <g key={entry.key}>
                     {barHeight > 0 && (
-                      <path
-                        className="viz-bar"
-                        d={negative
-                          ? bottomRoundedPath(barX, barTop, barWidth, barHeight, Math.min(5, barWidth / 2))
-                          : topRoundedPath(barX, barTop, barWidth, barHeight, Math.min(5, barWidth / 2))}
-                        fill={fill}
-                        onMouseEnter={onHover}
-                        onMouseMove={onHover}
-                      />
+                      <>
+                        <defs>
+                          <BarGradient color={fill} id={gradientId} />
+                        </defs>
+                        <path
+                          className="transition-opacity hover:opacity-80"
+                          d={negative
+                            ? bottomRoundedPath(barX, barTop, barWidth, barHeight, 0)
+                            : topRoundedPath(barX, barTop, barWidth, barHeight, 0)}
+                          fill={`url(#${gradientId})`}
+                          onMouseEnter={onHover}
+                          onMouseMove={onHover}
+                        />
+                      </>
                     )}
                     {showValueLabels && (
-                      <text className="viz-bar-label" textAnchor="middle" x={barX + barWidth / 2} y={negative ? barBottom + 13 : barTop - 6}>
+                      <text className="fill-foreground text-[0.68rem] font-semibold tabular-nums" textAnchor="middle" x={barX + barWidth / 2} y={negative ? barBottom + 13 : barTop - 6}>
                         {formatPct(value, { scale: valueScale, suffix: valueSuffix, digits: valueDigits })}
                       </text>
                     )}
@@ -285,7 +481,7 @@ function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, seri
           if (rotate) {
             return (
               <text
-                className="viz-axis-text"
+                className={xLabelClassName}
                 key={index}
                 textAnchor="end"
                 transform={`translate(${centerX},${innerHeight + 12}) rotate(-32)`}
@@ -295,7 +491,7 @@ function BarChartSvg({ categories, grouped, height, maxValue, minValue = 0, seri
             );
           }
           return (
-            <text className="viz-axis-text" key={index} textAnchor="middle" x={centerX} y={innerHeight + 18}>
+            <text className={xLabelClassName} key={index} textAnchor="middle" x={centerX} y={innerHeight + 18}>
               {category.label}
             </text>
           );
@@ -315,6 +511,8 @@ export function RadarChart({
   categories,
   series,
   aspectRatio = "1 / 1",
+  className = "",
+  padding = 72,
   valueScale = 100,
   valueSuffix = "%",
   levels = 4,
@@ -337,8 +535,8 @@ export function RadarChart({
   if (!ready) return <EmptyChart aspectRatio={aspectRatio} message={emptyMessage} />;
 
   return (
-    <div className="bklit-chart-wrap">
-      <div className="viz-chart" onMouseLeave={clearTip} style={{ aspectRatio }}>
+    <div className="relative mt-3.5 w-full [&_svg]:overflow-visible">
+      <div className={`relative w-full [&_svg]:block [&_svg]:overflow-visible ${className}`} onMouseLeave={clearTip} style={{ aspectRatio }}>
         <ParentSize debounceTime={10}>
           {({ width, height }) => (
             <RadarSvg
@@ -346,6 +544,7 @@ export function RadarChart({
               height={height}
               levels={levels}
               maxValue={maxValue}
+              padding={padding}
               series={series}
               setTip={setTip}
               valueScale={valueScale}
@@ -361,16 +560,57 @@ export function RadarChart({
   );
 }
 
-function RadarSvg({ categories, height, levels, maxValue, series, setTip, valueScale, valueSuffix, width }) {
+function RadarSvg({ categories, height, levels, maxValue, padding, series, setTip, valueScale, valueSuffix, width }) {
   if (width < 10 || height < 10) return null;
   const count = categories.length;
-  const padding = 72;
   const radius = Math.max(24, Math.min(width, height) / 2 - padding);
   const cx = width / 2;
   const cy = height / 2;
   const angleFor = (index) => -Math.PI / 2 + (index * 2 * Math.PI) / count;
   const pointAt = (index, r) => [cx + Math.cos(angleFor(index)) * r, cy + Math.sin(angleFor(index)) * r];
   const rings = Array.from({ length: levels }, (_, level) => (level + 1) / levels);
+  const compact = width < 520;
+  const maxLabelChars = compact ? 11 : width < 760 ? 14 : 18;
+  const labelOffset = compact ? 12 : 18;
+  const labels = categories.map((category, index) => {
+    const angle = angleFor(index);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const lines = wrapRadarLabel(category.label, maxLabelChars);
+    const labelHeight = lines.length * 13;
+    const [ex, ey] = pointAt(index, radius);
+    const centered = Math.abs(cos) < 0.08;
+    const position = centered ? (sin < 0 ? "top" : "bottom") : cos > 0 ? "right" : "left";
+    return {
+      anchor: centered ? "middle" : position === "right" ? "start" : "end",
+      ex,
+      ey,
+      height: labelHeight,
+      index,
+      lines,
+      position,
+      rawY: cy + sin * (radius + 20),
+      x: centered ? cx : ex + (position === "right" ? labelOffset : -labelOffset),
+    };
+  });
+  const topLabel = labels.find((label) => label.position === "top");
+  const bottomLabel = labels.find((label) => label.position === "bottom");
+  if (topLabel) topLabel.y = Math.max(18 + topLabel.height / 2, cy - radius - 20);
+  if (bottomLabel) bottomLabel.y = Math.min(height - 18 - bottomLabel.height / 2, cy + radius + 20);
+  const sideMinY = topLabel ? topLabel.y + topLabel.height / 2 + 12 : 18;
+  const sideMaxY = bottomLabel ? bottomLabel.y - bottomLabel.height / 2 - 12 : height - 18;
+  const sideLabels = ["left", "right"].flatMap((position) =>
+    distributeRadarLabels(
+      labels.filter((label) => label.position === position),
+      sideMinY,
+      sideMaxY,
+      compact ? 6 : 8,
+    ),
+  );
+  const positionedLabels = new Map(
+    [...labels.filter((label) => label.position === "top" || label.position === "bottom"), ...sideLabels]
+      .map((label) => [label.index, label]),
+  );
   const tooltipRows = (index) =>
     series.map((entry) => ({
       color: entry.color,
@@ -382,20 +622,26 @@ function RadarSvg({ categories, height, levels, maxValue, series, setTip, valueS
     <svg height={height} role="img" width={width}>
       {rings.map((ring, level) => (
         <polygon
-          className="viz-radar-ring"
+          className="fill-none stroke-[var(--border)] opacity-50"
           key={level}
           points={categories.map((_, index) => pointAt(index, radius * ring).join(",")).join(" ")}
         />
       ))}
       {categories.map((category, index) => {
         const [ex, ey] = pointAt(index, radius);
-        const [lx, ly] = pointAt(index, radius + 14);
-        const cos = Math.cos(angleFor(index));
-        const anchor = Math.abs(cos) < 0.3 ? "middle" : cos > 0 ? "start" : "end";
+        const label = positionedLabels.get(index);
+        const labelEdgeX = label.position === "right"
+          ? label.x - 6
+          : label.position === "left"
+            ? label.x + 6
+            : label.x;
         return (
           <g key={index}>
-            <line className="viz-radar-spoke" x1={cx} x2={ex} y1={cy} y2={ey} />
-            <RadarLabel anchor={anchor} label={category.label} x={lx} y={ly} />
+            <line className="stroke-[var(--border)] [opacity:.45]" x1={cx} x2={ex} y1={cy} y2={ey} />
+            {label.position === "left" || label.position === "right" ? (
+              <line className="stroke-[var(--border)] [opacity:.45]" x1={ex} x2={labelEdgeX} y1={ey} y2={label.y} />
+            ) : null}
+            <RadarLabel anchor={label.anchor} lines={label.lines} x={label.x} y={label.y} />
           </g>
         );
       })}
@@ -408,7 +654,7 @@ function RadarSvg({ categories, height, levels, maxValue, series, setTip, valueS
         return (
           <g key={entry.key}>
             <polygon
-              className="viz-radar-area"
+              className="transition-[fill-opacity] hover:[fill-opacity:.26]"
               fill={entry.color}
               fillOpacity={0.16}
               points={points.map((point) => point.join(",")).join(" ")}
@@ -420,7 +666,7 @@ function RadarSvg({ categories, height, levels, maxValue, series, setTip, valueS
               const onHover = () => setTip({ left: point[0], top: point[1] - 10, title: categories[index].label, rows });
               return (
                 <circle
-                  className="viz-radar-dot"
+                  className="cursor-default"
                   cx={point[0]}
                   cy={point[1]}
                   fill={entry.color}
@@ -438,18 +684,47 @@ function RadarSvg({ categories, height, levels, maxValue, series, setTip, valueS
   );
 }
 
-function RadarLabel({ anchor, label, x, y }) {
-  const text = String(label ?? "");
-  const words = text.split(" ");
-  let lines = [text];
-  if (text.length > 12 && words.length > 1) {
-    const mid = Math.ceil(words.length / 2);
-    lines = [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
-  }
+function wrapRadarLabel(label, maxChars) {
+  const words = String(label ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  return words.reduce((lines, word) => {
+    const current = lines[lines.length - 1];
+    if (!current || `${current} ${word}`.length > maxChars) lines.push(word);
+    else lines[lines.length - 1] = `${current} ${word}`;
+    return lines;
+  }, []);
+}
+
+function distributeRadarLabels(items, minY, maxY, requestedGap) {
+  if (!items.length) return [];
+  const sorted = [...items].sort((left, right) => left.rawY - right.rawY);
+  const totalHeight = sorted.reduce((sum, item) => sum + item.height, 0);
+  const availableGap = sorted.length > 1
+    ? (maxY - minY - totalHeight) / (sorted.length - 1)
+    : 0;
+  const gap = Math.max(2, Math.min(requestedGap, availableGap));
+  let cursor = minY;
+
+  sorted.forEach((item) => {
+    const halfHeight = item.height / 2;
+    item.y = Math.max(item.rawY, cursor + halfHeight);
+    cursor = item.y + halfHeight + gap;
+  });
+
+  const overflow = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height / 2 - maxY;
+  if (overflow > 0) sorted.forEach((item) => { item.y -= overflow; });
+
+  const underflow = minY - (sorted[0].y - sorted[0].height / 2);
+  if (underflow > 0) sorted.forEach((item) => { item.y += underflow; });
+
+  return sorted;
+}
+
+function RadarLabel({ anchor, lines, x, y }) {
   return (
-    <text className="viz-axis-text" dominantBaseline="middle" textAnchor={anchor} x={x} y={y}>
+    <text className="fill-muted text-xs" dominantBaseline="middle" textAnchor={anchor} x={x} y={y}>
       {lines.map((line, index) => (
-        <tspan dy={index === 0 ? (lines.length > 1 ? "-0.3em" : "0.32em") : "1.05em"} key={index} x={x}>
+        <tspan dy={index === 0 ? `${-0.5 * (lines.length - 1)}em` : "1em"} key={index} x={x}>
           {line}
         </tspan>
       ))}
@@ -489,12 +764,19 @@ export function BenchmarkModelChart({ rows, metricFor, metricLabel, color = char
   );
 }
 
-export function CapabilityRadar({ rows, selected }) {
+export function CapabilityRadar({ rows, scope = "all", selected }) {
   const { categories, series } = useMemo(() => {
     const capabilityOf = (row) => {
       const caps = {};
-      ["perception_groups", "imagery_groups"].forEach((key) => {
-        Object.entries(row[key] || {}).forEach(([name, group]) => {
+      const perceptionGroups = row.perception_groups || {};
+      const cognitionGroups = row.cognition_groups || row.imagery_groups || {};
+      const visibleGroups = scope === "perception"
+        ? [perceptionGroups]
+        : scope === "cognition"
+          ? [cognitionGroups]
+          : [perceptionGroups, cognitionGroups];
+      visibleGroups.forEach((groups) => {
+        Object.entries(groups).forEach(([name, group]) => {
           caps[name] = group.accuracy;
         });
       });
@@ -514,11 +796,19 @@ export function CapabilityRadar({ rows, selected }) {
         valueFor: (category) => capsByModel.get(row.model_name)?.[category.axis] ?? 0,
       })),
     };
-  }, [rows, selected]);
+  }, [rows, scope, selected]);
 
   if (categories.length < 3 || !series.length) {
-    return <EmptyChart aspectRatio="5 / 4" message="Ranked models will populate capability profiles." />;
+    return <EmptyChart aspectRatio="16 / 8" message="Ranked models will populate capability profiles." />;
   }
 
-  return <RadarChart aspectRatio="5 / 4" categories={categories} series={series} />;
+  return (
+    <RadarChart
+      aspectRatio="16 / 8"
+      categories={categories}
+      className="min-h-[28rem] sm:min-h-[32rem]"
+      padding={48}
+      series={series}
+    />
+  );
 }

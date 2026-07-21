@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import io
 import json
 import mimetypes
@@ -18,6 +19,25 @@ from urllib.request import Request, urlopen
 
 
 STANDARD_CONDITION = "standard"
+ANSWER_PARSER_POLICY_ID = "llm-extractor-output-contract-parser-v9"
+MANDATORY_ANSWER_EXTRACTION_METHOD_ID = (
+    "independent-qwen3.5-4b-text-only-all-responses-v1"
+)
+MANDATORY_EXTRACTOR_MODEL_ID = "Qwen/Qwen3.5-4B"
+MANDATORY_EXTRACTOR_MODEL_REVISION = (
+    "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
+)
+MANDATORY_EXTRACTOR_PROMPT_SHA256 = (
+    "45de07443140d20d9784646ae5f5343bd5d3a56b38bdec403c0bcfe126247888"
+)
+EXTRACTOR_RESOLVED_STATUS = "resolved"
+EXTRACTOR_INCORRECT_STATUSES = frozenset({"unresolved", "unsupported"})
+EXTRACTOR_TERMINAL_STATUSES = frozenset(
+    {EXTRACTOR_RESOLVED_STATUS, *EXTRACTOR_INCORRECT_STATUSES}
+)
+INVALID_FORMAT_ANSWER = "__INVALID_FORMAT__"
+INVALID_FORMAT_REASON = "unresolved_or_unsupported_after_independent_extraction"
+LETTER_DISAMBIGUATION_MAX_LENGTH = 9
 MAX_REMOTE_IMAGE_BYTES = 50 * 1024 * 1024
 SUPPORTED_ANSWER_TYPES = {"integer", "mcq_index_1_4", "mcq_letter", "text"}
 INTEGER_WORDS = {
@@ -43,6 +63,9 @@ INTEGER_WORDS = {
     "nineteen": 19,
     "twenty": 20,
 }
+INTEGER_TOKEN_PATTERN = (
+    r"-?\d(?:[\d,]*\d)?|" + "|".join(INTEGER_WORDS)
+)
 
 
 class EvaluationPipelineError(ValueError):
@@ -139,6 +162,7 @@ def load_questions(path: Path, track: VisualTrackConfig) -> list[dict[str, Any]]
                 "question_id": question_id,
                 "question": question,
                 "answer_type": answer_type,
+                "task": str(row.get("task") or "").strip(),
                 "source_subset": source_subset,
                 "image": image,
                 "image_url": image_url,
@@ -267,8 +291,8 @@ def image_for_hf(item: dict[str, Any], image_root: Path | None):
         raise EvaluationPipelineError("The downloaded image could not be decoded.") from exc
 
 
-def final_answer(raw_output: Any, answer_type: str) -> str:
-    """Extract the final response token while preserving free-form text answers."""
+def final_answer(raw_output: Any, answer_type: str, task: str = "") -> str:
+    """Extract one canonical answer under the benchmark task contract."""
     if isinstance(raw_output, (dict, list)) or raw_output is None:
         return ""
     text = str(raw_output).strip()
@@ -292,6 +316,14 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
         )
         if native_box_blocks:
             text = native_box_blocks[-1].strip()
+        else:
+            latex_box_blocks = re.findall(
+                r"\\(?:boxed|fbox)\s*\{\s*([^{}]+?)\s*\}",
+                text,
+                flags=re.I | re.S,
+            )
+            if latex_box_blocks:
+                text = latex_box_blocks[-1].strip()
     if re.search(r"<think>", text, flags=re.I) and not re.search(
         r"</think>", text, flags=re.I
     ):
@@ -301,16 +333,43 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
 
     text = text.strip().strip("`").strip()
     if answer_type == "integer":
-        values = re.findall(
-            r"(?<![A-Za-z0-9])-?\d(?:[\d,]*\d)?(?![A-Za-z0-9])", text
+        exact = re.fullmatch(
+            rf"\s*({INTEGER_TOKEN_PATTERN})\s*[.,:]?\s*", text, flags=re.I
         )
-        if values:
-            return values[-1].replace(",", "")
-        matches = re.findall(
-            rf"\b({'|'.join(INTEGER_WORDS)})\b", text, flags=re.I
+        if exact:
+            token = exact.group(1)
+            return (
+                str(INTEGER_WORDS[token.lower()])
+                if token.lower() in INTEGER_WORDS
+                else token.replace(",", "")
+            )
+        explicit = re.findall(
+            rf"(?i)(?:"
+            rf"(?:final\s+)?(?:answer|response|count)\s*(?:is|:|=|-)?"
+            rf"|there\s+(?:is|are|were)"
+            rf"|(?:the\s+)?total\s+(?:is|equals|:|=|-)?"
+            rf")\s*({INTEGER_TOKEN_PATTERN})(?=\W|$)",
+            text,
         )
-        normalized = {INTEGER_WORDS[word.lower()] for word in matches}
-        return str(normalized.pop()) if len(normalized) == 1 else ""
+        if explicit:
+            token = explicit[-1]
+            return (
+                str(INTEGER_WORDS[token.lower()])
+                if token.lower() in INTEGER_WORDS
+                else token.replace(",", "")
+            )
+        final_line = text.splitlines()[-1].strip() if text.splitlines() else ""
+        line_match = re.fullmatch(
+            rf"({INTEGER_TOKEN_PATTERN})[.,:]?", final_line, flags=re.I
+        )
+        if line_match:
+            token = line_match.group(1)
+            return (
+                str(INTEGER_WORDS[token.lower()])
+                if token.lower() in INTEGER_WORDS
+                else token.replace(",", "")
+            )
+        return ""
     if answer_type == "mcq_index_1_4":
         exact = re.fullmatch(r"[\[(]?([1-4])[\])]?[.,:]?", text, flags=re.I)
         if exact:
@@ -362,16 +421,59 @@ def final_answer(raw_output: Any, answer_type: str) -> str:
         text,
         flags=re.I,
     ).strip()
+    normalized_task = task.strip().casefold()
+    if normalized_task == "form_constancy":
+        match = re.fullmatch(r"(yes|no)[.!]?", text, flags=re.I)
+        return match.group(1).title() if match else ""
+    if normalized_task == "letter_disambiguation":
+        match = re.fullmatch(
+            rf"[A-Za-z]{{1,{LETTER_DISAMBIGUATION_MAX_LENGTH}}}", text
+        )
+        return match.group(0).upper() if match else ""
+    if normalized_task:
+        return ""
     return text.strip('"\' ').strip()
 
 
-def record_answer(record: dict[str, Any], answer_type: str) -> str:
+def record_answer(
+    record: dict[str, Any], answer_type: str, task: str = ""
+) -> str:
+    """Return only an answer produced by the mandatory independent extractor."""
+    if not has_valid_extractor_provenance(record):
+        return ""
+    if record.get("extractor_status") != EXTRACTOR_RESOLVED_STATUS:
+        return ""
+    resolved_task = task or str(record.get("task") or "")
     extracted = record.get("extracted_answer")
     if extracted is not None:
-        normalized = final_answer(extracted, answer_type)
+        normalized = final_answer(extracted, answer_type, resolved_task)
         if normalized:
             return normalized
-    return final_answer(record.get("output"), answer_type)
+    return ""
+
+
+def has_valid_extractor_provenance(record: dict[str, Any]) -> bool:
+    """Validate that extraction came from the pinned, image-blind extractor."""
+    raw_output = record.get("output")
+    if not isinstance(raw_output, str) or not raw_output.strip():
+        return False
+    source_digest = hashlib.sha256(raw_output.encode("utf-8")).hexdigest()
+    prompt_digest = str(record.get("extractor_prompt_sha256") or "")
+    return bool(
+        record.get("answer_extraction_method")
+        == MANDATORY_ANSWER_EXTRACTION_METHOD_ID
+        and record.get("extractor_model") == MANDATORY_EXTRACTOR_MODEL_ID
+        and record.get("extractor_model_revision")
+        == MANDATORY_EXTRACTOR_MODEL_REVISION
+        and record.get("extractor_quantization") == "unquantized"
+        and str(record.get("extractor_runtime") or "").startswith("vllm ")
+        and prompt_digest == MANDATORY_EXTRACTOR_PROMPT_SHA256
+        and record.get("extractor_ground_truth_access") is False
+        and record.get("extractor_image_access") is False
+        and bool(record.get("extractor_source_diagnostics"))
+        and record.get("extractor_source_output_sha256") == source_digest
+        and record.get("extractor_status") in EXTRACTOR_TERMINAL_STATUSES
+    )
 
 
 def stated_integer_values(raw_output: Any) -> set[int]:
@@ -418,6 +520,8 @@ def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
             "answer_type": str(item.get("answer_type") or "text"),
             "output": item.get("output"),
         }
+        if item.get("task"):
+            row["task"] = str(item["task"])
         if item.get("error"):
             row["error"] = str(item["error"])
         if item.get("finish_reason"):
@@ -428,6 +532,8 @@ def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
             row["final_answer_tokens"] = int(item["final_answer_tokens"])
         if item.get("answer_extraction_method"):
             row["answer_extraction_method"] = str(item["answer_extraction_method"])
+        if item.get("extractor_status"):
+            row["extractor_status"] = str(item["extractor_status"])
         if item.get("extractor_model"):
             row["extractor_model"] = str(item["extractor_model"])
         if item.get("extractor_output") is not None:
@@ -448,10 +554,34 @@ def write_diagnostics(path: Path, records: Sequence[dict[str, Any]]) -> None:
             row["extractor_source_output_sha256"] = str(
                 item["extractor_source_output_sha256"]
             )
+        for field in (
+            "extractor_model_revision",
+            "extractor_quantization",
+            "extractor_runtime",
+            "extractor_prompt_sha256",
+        ):
+            if item.get(field):
+                row[field] = str(item[field])
+        for field in (
+            "extractor_ground_truth_access",
+            "extractor_image_access",
+        ):
+            if field in item:
+                row[field] = bool(item[field])
         if item.get("extractor_attempts"):
             row["extractor_attempts"] = list(item["extractor_attempts"])
         if item.get("extracted_answer") is not None:
             row["extracted_answer"] = str(item["extracted_answer"])
+        if item.get("submission_status"):
+            row["submission_status"] = str(item["submission_status"])
+        if item.get("format_failure_reason"):
+            row["format_failure_reason"] = str(item["format_failure_reason"])
+        if item.get("raw_output_characters") is not None:
+            row["raw_output_characters"] = int(item["raw_output_characters"])
+        if item.get("raw_output_bytes") is not None:
+            row["raw_output_bytes"] = int(item["raw_output_bytes"])
+        if item.get("raw_output_sha256"):
+            row["raw_output_sha256"] = str(item["raw_output_sha256"])
         rows.append(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
     _atomic_write(path, "\n".join(rows) + ("\n" if rows else ""))
 
@@ -461,7 +591,7 @@ def export_submission(
     expected_questions: Sequence[dict[str, Any]],
     output_path: Path,
     *,
-    raw_output_fallback: bool = False,
+    mark_unparseable_incorrect: bool = False,
 ) -> dict[str, Any]:
     """Validate complete coverage and write backend-ready three-field JSONL."""
     expected_ids = [str(item["question_id"]) for item in expected_questions]
@@ -493,24 +623,46 @@ def export_submission(
         )
 
     rows: list[dict[str, str]] = []
-    raw_output_fallback_question_ids: list[str] = []
+    invalid_format_question_ids: list[str] = []
     invalid: list[str] = []
     for expected in expected_questions:
         question_id = str(expected["question_id"])
         record = records_by_id[question_id]
+        answer_type = str(expected.get("answer_type") or "text")
+        task = str(expected.get("task") or "")
+        record.setdefault("answer_type", answer_type)
+        record.setdefault("task", task)
         if record.get("error"):
             invalid.append(f"{question_id} (inference error)")
             continue
-        answer = record_answer(record, str(expected.get("answer_type") or "text"))
-        if not answer and raw_output_fallback:
+        if not has_valid_extractor_provenance(record):
+            extractor_status = str(record.get("extractor_status") or "not run")
+            invalid.append(
+                f"{question_id} (mandatory independent extraction {extractor_status})"
+            )
+            continue
+        answer = record_answer(record, answer_type, task)
+        if (
+            not answer
+            and mark_unparseable_incorrect
+            and record.get("extractor_status") in EXTRACTOR_INCORRECT_STATUSES
+        ):
             raw_output = record.get("output")
             if not isinstance(raw_output, (dict, list)) and raw_output is not None:
                 raw_answer = str(raw_output)
                 if raw_answer.strip():
-                    answer = raw_answer
-                    raw_output_fallback_question_ids.append(question_id)
+                    raw_bytes = raw_answer.encode("utf-8")
+                    answer = INVALID_FORMAT_ANSWER
+                    invalid_format_question_ids.append(question_id)
+                    record["submission_status"] = "invalid_format"
+                    record["format_failure_reason"] = INVALID_FORMAT_REASON
+                    record["raw_output_characters"] = len(raw_answer)
+                    record["raw_output_bytes"] = len(raw_bytes)
+                    record["raw_output_sha256"] = hashlib.sha256(raw_bytes).hexdigest()
         if not answer:
-            invalid.append(f"{question_id} (empty or unparseable output)")
+            invalid.append(
+                f"{question_id} (extractor did not produce a canonical answer)"
+            )
             continue
         rows.append(
             {
@@ -539,7 +691,8 @@ def export_submission(
         "row_count": len(rows),
         "schema": ["question_id", "condition", "answer"],
         "condition": STANDARD_CONDITION,
-        "raw_output_fallback_question_ids": raw_output_fallback_question_ids,
+        "invalid_format_count": len(invalid_format_question_ids),
+        "invalid_format_question_ids": invalid_format_question_ids,
     }
 
 

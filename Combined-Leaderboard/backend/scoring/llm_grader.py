@@ -1,28 +1,11 @@
 """
-LLM-based answer extraction and judging using a single shared judge model.
+Legacy LLM answer extraction and judging utilities.
 
-All three tasks are graded by the SAME model - GPT-4o - served through the
-OpenAI chat-completions API, so scores are uniform and directly comparable
-across tasks. Only the grading *method* differs by task, because the task
-formats differ:
-
-  * Do-You-See-Me (arXiv:2506.02022) - GPT-4o answer *extractor* parses the
-    model's verbose response into a concise final answer (a multiple-choice
-    label or a numeric value); the extracted value is then exact-matched
-    against the ground truth.
-  * Mind's-Eye   (arXiv:2604.16054) - GPT-4o answer *extractor* parses the
-    response into a concise MCQ label which is exact-matched against the
-    ground truth.
-  * Spatial      (arXiv:2604.16060) - GPT-4o LLM-*as-judge* decides whether the
-    response selected the correct option (greedy decoding, temperature 0).
-
-The judge is reached via the OpenAI ``/chat/completions`` endpoint. The only
-value read from the environment (.env) is the API key (``OPENAI_API_KEY``).
-If no key is configured, or a call fails, the grader falls back to the
-deterministic regex / string matching used previously so the leaderboard still
-works fully offline. The grading method actually used for each call is reported
-back to the caller so the UI can show whether scores are LLM-graded or fell
-back to deterministic matching.
+The production task submission path no longer uses this module. Public uploads
+must contain final answers in JSONL, and ``scoring.task_scorer`` matches those
+answers deterministically against private ground truth. This file is retained
+for legacy utilities and offline tests that exercise the older extractor/judge
+behavior.
 """
 
 from __future__ import annotations

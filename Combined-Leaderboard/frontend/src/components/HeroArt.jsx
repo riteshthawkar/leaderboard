@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // Each page modulates the same precise parametric language (nested / offset
 // forms) so they read as one designed family, and each encodes its dataset:
 //   dysm      -> visual perception: moiré interference of two concentric-ring fields
-//   minds_eye -> mental imagery: a flat net folding up into a 3D cube
+//   minds_eye -> cognition: a flat net folding up into a 3D cube
 //   spatial   -> spatial reasoning: nested rectangles in one-point perspective
 // Monochrome + theme-aware via currentColor.
 

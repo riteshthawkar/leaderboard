@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -11,12 +12,31 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from evaluation.common.visual_pipeline import record_answer
+from evaluation.common.visual_pipeline import (
+    ANSWER_PARSER_POLICY_ID,
+    INVALID_FORMAT_ANSWER,
+    INVALID_FORMAT_REASON,
+    INTEGER_TOKEN_PATTERN,
+    INTEGER_WORDS,
+    LETTER_DISAMBIGUATION_MAX_LENGTH,
+    MANDATORY_ANSWER_EXTRACTION_METHOD_ID,
+    MANDATORY_EXTRACTOR_MODEL_ID,
+    MANDATORY_EXTRACTOR_MODEL_REVISION,
+    has_valid_extractor_provenance,
+    record_answer,
+)
 
 
 TRACKS = ("do_you_see_me", "minds_eye")
-CURRENT_PIPELINE_REVISION = "unquantized-bf16-smoke-and-full-text-extraction-v10"
+CURRENT_PIPELINE_REVISION = "unquantized-bf16-mandatory-independent-extraction-v11"
 SUBMISSION_FIELDS = {"question_id", "condition", "answer"}
+INVALID_FORMAT_METADATA_FIELDS = (
+    "submission_status",
+    "format_failure_reason",
+    "raw_output_characters",
+    "raw_output_bytes",
+    "raw_output_sha256",
+)
 
 
 class FinalizationError(RuntimeError):
@@ -91,6 +111,12 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def expected_question_ids(project_root: Path, track: str) -> list[str]:
+    rows = expected_questions(project_root, track)
+    question_ids = [str(row.get("question_id") or "") for row in rows]
+    return question_ids
+
+
+def expected_questions(project_root: Path, track: str) -> list[dict[str, Any]]:
     questions = project_root / "tasks" / track / "questions.jsonl"
     rows = read_jsonl(questions)
     question_ids = [str(row.get("question_id") or "") for row in rows]
@@ -98,7 +124,7 @@ def expected_question_ids(project_root: Path, track: str) -> list[str]:
         raise FinalizationError(f"Question bundle {questions} has missing identifiers.")
     if len(set(question_ids)) != len(question_ids):
         raise FinalizationError(f"Question bundle {questions} has duplicate identifiers.")
-    return question_ids
+    return rows
 
 
 def validate_submission(path: Path, expected_ids: list[str]) -> list[dict[str, Any]]:
@@ -148,16 +174,221 @@ def validate_diagnostics(
     return rows, by_id
 
 
+def invalid_format_metadata(diagnostic: dict[str, Any]) -> dict[str, Any] | None:
+    raw_output = diagnostic.get("output")
+    if (
+        diagnostic.get("error")
+        or isinstance(raw_output, (dict, list))
+        or raw_output is None
+    ):
+        return None
+    raw_text = str(raw_output)
+    if not raw_text.strip():
+        return None
+    raw_bytes = raw_text.encode("utf-8")
+    return {
+        "submission_status": "invalid_format",
+        "format_failure_reason": INVALID_FORMAT_REASON,
+        "raw_output_characters": len(raw_text),
+        "raw_output_bytes": len(raw_bytes),
+        "raw_output_sha256": hashlib.sha256(raw_bytes).hexdigest(),
+    }
+
+
+def legacy_unwrapped_answer_text(raw_output: Any) -> str:
+    if isinstance(raw_output, (dict, list)) or raw_output is None:
+        return ""
+    text = str(raw_output).strip()
+    if not text:
+        return ""
+    answer_blocks = re.findall(
+        r"<answer>((?:(?!<answer>).)*?)</answer>", text, flags=re.I | re.S
+    )
+    if answer_blocks:
+        text = answer_blocks[-1].strip()
+    else:
+        native_box_blocks = re.findall(
+            r"<\|begin_of_box\|>"
+            r"((?:(?!<\|begin_of_box\|>).)*?)"
+            r"<\|end_of_box\|>",
+            text,
+            flags=re.I | re.S,
+        )
+        if native_box_blocks:
+            text = native_box_blocks[-1].strip()
+    if re.search(r"<think>", text, flags=re.I) and not re.search(
+        r"</think>", text, flags=re.I
+    ):
+        return ""
+    if "</think>" in text.lower():
+        text = re.split(r"</think>", text, flags=re.I)[-1].strip()
+    return text.strip().strip("`").strip()
+
+
+def legacy_integer_answer_v6(raw_output: Any) -> str:
+    """Reproduce the broad v6 integer parser only for provenance migration."""
+    text = legacy_unwrapped_answer_text(raw_output)
+    if not text:
+        return ""
+    values = re.findall(
+        r"(?<![A-Za-z0-9])-?\d(?:[\d,]*\d)?(?![A-Za-z0-9])", text
+    )
+    if values:
+        return values[-1].replace(",", "")
+    matches = re.findall(
+        rf"\b({'|'.join(INTEGER_WORDS)})\b", text, flags=re.I
+    )
+    normalized = {INTEGER_WORDS[word.lower()] for word in matches}
+    return str(normalized.pop()) if len(normalized) == 1 else ""
+
+
+def legacy_integer_answer_v7(raw_output: Any) -> str:
+    """Reproduce v7 explicit integer commitments before LaTeX-box support."""
+    text = legacy_unwrapped_answer_text(raw_output)
+    if not text:
+        return ""
+    exact = re.fullmatch(
+        rf"\s*({INTEGER_TOKEN_PATTERN})\s*[.,:]?\s*", text, flags=re.I
+    )
+    explicit = re.findall(
+        rf"(?i)(?:"
+        rf"(?:final\s+)?(?:answer|response|count)\s*(?:is|:|=|-)?"
+        rf"|there\s+(?:is|are|were)"
+        rf"|(?:the\s+)?total\s+(?:is|equals|:|=|-)?"
+        rf")\s*({INTEGER_TOKEN_PATTERN})(?=\W|$)",
+        text,
+    )
+    final_line = text.splitlines()[-1].strip() if text.splitlines() else ""
+    line_match = re.fullmatch(
+        rf"({INTEGER_TOKEN_PATTERN})[.,:]?", final_line, flags=re.I
+    )
+    match = exact or (None if explicit else line_match)
+    token = match.group(1) if match else (explicit[-1] if explicit else "")
+    if not token:
+        return ""
+    return (
+        str(INTEGER_WORDS[token.lower()])
+        if token.lower() in INTEGER_WORDS
+        else token.replace(",", "")
+    )
+
+
+def legacy_record_answers(source: dict[str, Any], answer_type: str) -> set[str]:
+    if answer_type != "integer":
+        answer = record_answer(source, answer_type)
+        return {answer} if answer else set()
+    answers: set[str] = set()
+    for field in ("extracted_answer", "output"):
+        if source.get(field) is None:
+            continue
+        answers.update(
+            answer
+            for answer in (
+                legacy_integer_answer_v6(source[field]),
+                legacy_integer_answer_v7(source[field]),
+            )
+            if answer
+        )
+        if answers and field == "extracted_answer":
+            return answers
+    return answers
+
+
+def canonicalize_track_rows(
+    submission_rows: list[dict[str, Any]],
+    diagnostic_rows: list[dict[str, Any]],
+    questions_by_id: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    source_diagnostics = {
+        str(row["question_id"]): dict(row) for row in diagnostic_rows
+    }
+    diagnostics: dict[str, dict[str, Any]] = {}
+    legacy_answers: dict[str, set[str]] = {}
+    for question_id, source in source_diagnostics.items():
+        question = questions_by_id[question_id]
+        answer_type = str(question.get("answer_type") or "text")
+        legacy_source = dict(source)
+        legacy_source.pop("task", None)
+        legacy_answer = legacy_record_answers(legacy_source, answer_type)
+        if (
+            str(question.get("task") or "") == "letter_disambiguation"
+        ):
+            legacy_answer = {
+                answer.upper() if re.fullmatch(r"[A-Za-z]+", answer) else answer
+                for answer in legacy_answer
+            }
+        legacy_answers[question_id] = legacy_answer
+        diagnostic = dict(source)
+        diagnostic["answer_type"] = answer_type
+        diagnostic["task"] = str(question.get("task") or "")
+        diagnostics[question_id] = diagnostic
+    canonical_submissions: list[dict[str, Any]] = []
+    for source_submission in submission_rows:
+        submission = dict(source_submission)
+        question_id = str(submission["question_id"])
+        diagnostic = diagnostics[question_id]
+        question = questions_by_id[question_id]
+        answer_type = str(question.get("answer_type") or "text")
+        task = str(question.get("task") or "")
+        if not has_valid_extractor_provenance(diagnostic):
+            raise FinalizationError(
+                f"Diagnostic for {question_id} lacks mandatory independent "
+                "extractor provenance."
+            )
+        parsed = record_answer(diagnostic, answer_type, task)
+        if parsed:
+            if submission["answer"] != parsed:
+                if submission["answer"] not in {
+                    INVALID_FORMAT_ANSWER,
+                } | legacy_answers[question_id]:
+                    raise FinalizationError(
+                        f"Submission answer for {question_id} differs from its parsed diagnostic."
+                    )
+                submission["answer"] = parsed
+            for field in INVALID_FORMAT_METADATA_FIELDS:
+                diagnostic.pop(field, None)
+        else:
+            metadata = invalid_format_metadata(diagnostic)
+            accepted_legacy_answers = {
+                str(diagnostic.get("output")),
+                INVALID_FORMAT_ANSWER,
+            } | legacy_answers[question_id]
+            accepted_legacy_answers.discard("")
+            if metadata is None or submission["answer"] not in accepted_legacy_answers:
+                raise FinalizationError(
+                    f"Submission answer for {question_id} has no verified diagnostic source."
+                )
+            submission["answer"] = INVALID_FORMAT_ANSWER
+            diagnostic.update(metadata)
+        canonical_submissions.append(submission)
+    canonical_diagnostics = [
+        diagnostics[str(row["question_id"])] for row in diagnostic_rows
+    ]
+    return canonical_submissions, canonical_diagnostics
+
+
 def answer_provenance_counts(
-    submission_rows: list[dict[str, Any]], diagnostics_by_id: dict[str, dict[str, Any]]
+    submission_rows: list[dict[str, Any]],
+    diagnostics_by_id: dict[str, dict[str, Any]],
+    questions_by_id: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[int, int]:
     strict_count = 0
-    exact_raw_count = 0
+    invalid_format_count = 0
     for submission in submission_rows:
         question_id = str(submission["question_id"])
         diagnostic = diagnostics_by_id[question_id]
+        question = (questions_by_id or {}).get(question_id, {})
+        answer_type = str(
+            question.get("answer_type") or diagnostic.get("answer_type") or "text"
+        )
+        task = str(question.get("task") or diagnostic.get("task") or "")
+        if not has_valid_extractor_provenance(diagnostic):
+            raise FinalizationError(
+                f"Diagnostic for {question_id} lacks mandatory independent "
+                "extractor provenance."
+            )
         parsed = record_answer(
-            diagnostic, str(diagnostic.get("answer_type") or "text")
+            diagnostic, answer_type, task
         )
         if parsed:
             if submission["answer"] != parsed:
@@ -165,17 +396,26 @@ def answer_provenance_counts(
                     f"Submission answer for {question_id} differs from its parsed diagnostic."
                 )
             strict_count += 1
-        elif (
-            not diagnostic.get("error")
-            and diagnostic.get("output")
-            and submission["answer"] == diagnostic["output"]
-        ):
-            exact_raw_count += 1
         else:
-            raise FinalizationError(
-                f"Submission answer for {question_id} has no verified diagnostic source."
-            )
-    return strict_count, exact_raw_count
+            metadata = invalid_format_metadata(diagnostic)
+            if metadata is None or submission["answer"] not in {
+                str(diagnostic.get("output")),
+                INVALID_FORMAT_ANSWER,
+            }:
+                raise FinalizationError(
+                    f"Submission answer for {question_id} has no verified diagnostic source."
+                )
+            if submission["answer"] == INVALID_FORMAT_ANSWER:
+                mismatched = [
+                    key for key, value in metadata.items() if diagnostic.get(key) != value
+                ]
+                if mismatched:
+                    raise FinalizationError(
+                        f"Invalid-format diagnostics for {question_id} have incorrect "
+                        f"or missing fields: {', '.join(mismatched)}."
+                    )
+            invalid_format_count += 1
+    return strict_count, invalid_format_count
 
 
 def discover_candidates(
@@ -241,7 +481,9 @@ def discover_canonical_candidates(
     output_root = output_root.resolve()
     if not (output_root / "index.json").is_file():
         return []
-    verify_canonical_results(output_root, project_root)
+    verify_canonical_results(
+        output_root, project_root, allow_canonical_migration=True
+    )
     index = read_json(output_root / "index.json")
     candidates: list[Candidate] = []
     for model_record in index["models"]:
@@ -323,20 +565,54 @@ def artifact_record(path: Path) -> dict[str, Any]:
     return {"bytes": path.stat().st_size, "sha256": sha256(path)}
 
 
-def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> dict[str, Any]:
-    submission_rows = read_jsonl(candidate.submission)
-    _diagnostic_rows, diagnostics_by_id = validate_diagnostics(
-        candidate.diagnostics,
-        [str(row["question_id"]) for row in submission_rows],
-    )
-    strict_count, exact_raw_count = answer_provenance_counts(
-        submission_rows, diagnostics_by_id
+def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.write_text(
+        "".join(
+            json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n"
+            for row in rows
+        ),
+        encoding="utf-8",
     )
 
-    source_files = [candidate.submission, candidate.diagnostics]
+
+def copy_track(
+    candidate: Candidate,
+    destination: Path,
+    results_root: Path,
+    project_root: Path,
+) -> dict[str, Any]:
+    source_submission_rows = read_jsonl(candidate.submission)
+    source_diagnostic_rows, _diagnostics_by_id = validate_diagnostics(
+        candidate.diagnostics,
+        [str(row["question_id"]) for row in source_submission_rows],
+    )
+    questions_by_id = {
+        str(row["question_id"]): row
+        for row in expected_questions(project_root, candidate.track)
+    }
+    submission_rows, diagnostic_rows = canonicalize_track_rows(
+        source_submission_rows,
+        source_diagnostic_rows,
+        questions_by_id,
+    )
+    diagnostics_by_id = {
+        str(row["question_id"]): row for row in diagnostic_rows
+    }
+    strict_count, invalid_format_count = answer_provenance_counts(
+        submission_rows, diagnostics_by_id, questions_by_id
+    )
+
+    copied: dict[str, dict[str, Any]] = {}
+    submission_target = destination / candidate.submission.name
+    diagnostics_target = destination / candidate.diagnostics.name
+    write_jsonl(submission_target, submission_rows)
+    write_jsonl(diagnostics_target, diagnostic_rows)
+    copied[submission_target.name] = artifact_record(submission_target)
+    copied[diagnostics_target.name] = artifact_record(diagnostics_target)
+
+    source_files: list[Path] = []
     source_files.extend(sorted(candidate.source_dir.glob(f"{candidate.track}.attempt-*.diagnostics.jsonl")))
     source_files.extend(sorted(candidate.source_dir.glob(f"{candidate.track}.smoke*.diagnostics.jsonl")))
-    copied: dict[str, dict[str, Any]] = {}
     for source in source_files:
         target = destination / source.name
         shutil.copy2(source, target)
@@ -356,7 +632,7 @@ def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> d
     return {
         "row_count": len(submission_rows),
         "strict_answer_count": strict_count,
-        "exact_raw_output_fallback_count": exact_raw_count,
+        "invalid_format_count": invalid_format_count,
         "source_run": candidate.source_run,
         "source_submission_modified_at": datetime.fromtimestamp(
             candidate.modified_at, timezone.utc
@@ -373,9 +649,19 @@ def copy_track(candidate: Candidate, destination: Path, results_root: Path) -> d
     }
 
 
-def verify_canonical_results(output_root: Path, project_root: Path) -> dict[str, Any]:
+def verify_canonical_results(
+    output_root: Path,
+    project_root: Path,
+    *,
+    allow_canonical_migration: bool = False,
+) -> dict[str, Any]:
     output_root = output_root.resolve()
     index = read_json(output_root / "index.json")
+    index_schema = int(index.get("schema_version") or 0)
+    if index_schema not in {1, 2}:
+        raise FinalizationError(
+            f"Unsupported canonical index schema_version: {index_schema}."
+        )
     models = index.get("models")
     if not isinstance(models, list) or index.get("model_count") != len(models):
         raise FinalizationError("Canonical index model_count does not match its model list.")
@@ -393,6 +679,11 @@ def verify_canonical_results(output_root: Path, project_root: Path) -> dict[str,
         if sha256(manifest_path) != model_record.get("manifest_sha256"):
             raise FinalizationError(f"Canonical manifest hash mismatch: {manifest_relative}.")
         manifest = read_json(manifest_path)
+        manifest_schema = int(manifest.get("schema_version") or 0)
+        if manifest_schema not in {1, 2}:
+            raise FinalizationError(
+                f"Unsupported canonical manifest schema_version: {manifest_schema}."
+            )
         if (
             manifest.get("model_id") != model_record.get("model_id")
             or manifest.get("model_revision") != model_record.get("model_revision")
@@ -419,18 +710,58 @@ def verify_canonical_results(output_root: Path, project_root: Path) -> dict[str,
             submission = model_dir / f"{track}_submission.jsonl"
             diagnostics = model_dir / f"{track}.diagnostics.jsonl"
             submission_rows = validate_submission(submission, expected[track])
-            _diagnostic_rows, diagnostics_by_id = validate_diagnostics(
+            diagnostic_rows, diagnostics_by_id = validate_diagnostics(
                 diagnostics, expected[track]
             )
-            strict_count, exact_raw_count = answer_provenance_counts(
-                submission_rows, diagnostics_by_id
+            questions_by_id = {
+                str(row["question_id"]): row
+                for row in expected_questions(project_root, track)
+            }
+            provenance_submission_rows = submission_rows
+            provenance_diagnostics_by_id = diagnostics_by_id
+            if allow_canonical_migration:
+                (
+                    provenance_submission_rows,
+                    provenance_diagnostic_rows,
+                ) = canonicalize_track_rows(
+                    submission_rows,
+                    diagnostic_rows,
+                    questions_by_id,
+                )
+                provenance_diagnostics_by_id = {
+                    str(row["question_id"]): row
+                    for row in provenance_diagnostic_rows
+                }
+            strict_count, invalid_format_count = answer_provenance_counts(
+                provenance_submission_rows,
+                provenance_diagnostics_by_id,
+                questions_by_id if manifest_schema >= 2 else None,
             )
-            if (
-                track_record.get("row_count") != len(submission_rows)
-                or track_record.get("strict_answer_count") != strict_count
-                or track_record.get("exact_raw_output_fallback_count")
-                != exact_raw_count
-            ):
+            recorded_invalid_count = (
+                track_record.get("invalid_format_count")
+                if manifest_schema >= 2
+                else track_record.get("exact_raw_output_fallback_count")
+            )
+            counts_match = (
+                track_record.get("row_count") == len(submission_rows)
+                and track_record.get("strict_answer_count") == strict_count
+                and recorded_invalid_count == invalid_format_count
+            )
+            if not counts_match and allow_canonical_migration:
+                recorded_strict_count = track_record.get("strict_answer_count")
+                if (
+                    track_record.get("row_count") != len(submission_rows)
+                    or not isinstance(recorded_strict_count, int)
+                    or not isinstance(recorded_invalid_count, int)
+                    or recorded_strict_count + recorded_invalid_count
+                    != len(submission_rows)
+                ):
+                    raise FinalizationError(
+                        f"Canonical legacy provenance counts are inconsistent for "
+                        f"{manifest.get('model_id')}/{track}."
+                    )
+                counts_match = True
+            if not counts_match:
                 raise FinalizationError(
                     f"Canonical answer provenance count mismatch for "
                     f"{manifest.get('model_id')}/{track}."
@@ -474,17 +805,33 @@ def build_canonical_results(
             destination = staging / representative.slug
             destination.mkdir(parents=True)
             track_records = {
-                track: copy_track(candidate, destination, results_root)
+                track: copy_track(
+                    candidate, destination, results_root, project_root
+                )
                 for track, candidate in sorted(tracks.items())
             }
             manifest = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "finalized_at": datetime.now(timezone.utc).isoformat(),
                 "selection_policy": {
                     "precision": "original-unquantized-bf16",
                     "pipeline_revision": CURRENT_PIPELINE_REVISION,
                     "track_selection": "newest-valid-submission-per-model-revision",
                     "required_tracks": list(TRACKS),
+                    "canonical_answer_parser": ANSWER_PARSER_POLICY_ID,
+                    "answer_acceptance": "mandatory-independent-llm-extraction",
+                    "answer_extraction_method": MANDATORY_ANSWER_EXTRACTION_METHOD_ID,
+                    "answer_extractor_model": MANDATORY_EXTRACTOR_MODEL_ID,
+                    "answer_extractor_revision": MANDATORY_EXTRACTOR_MODEL_REVISION,
+                    "answer_extractor_image_access": False,
+                    "answer_extractor_ground_truth_access": False,
+                    "invalid_format_submission_value": INVALID_FORMAT_ANSWER,
+                    "invalid_format_reason": INVALID_FORMAT_REASON,
+                    "invalid_format_score_effect": "always-incorrect",
+                    "letter_disambiguation_max_length": (
+                        LETTER_DISAMBIGUATION_MAX_LENGTH
+                    ),
+                    "raw_output_retention": "diagnostics-only",
                 },
                 "model_id": representative.model_id,
                 "model_revision": representative.model_revision,
@@ -507,9 +854,7 @@ def build_canonical_results(
                         track: {
                             "row_count": record["row_count"],
                             "strict_answer_count": record["strict_answer_count"],
-                            "exact_raw_output_fallback_count": record[
-                                "exact_raw_output_fallback_count"
-                            ],
+                            "invalid_format_count": record["invalid_format_count"],
                         }
                         for track, record in track_records.items()
                     },
@@ -517,7 +862,7 @@ def build_canonical_results(
             )
 
         index = {
-            "schema_version": 1,
+            "schema_version": 2,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "model_count": len(index_models),
             "models": sorted(index_models, key=lambda item: item["model_id"]),

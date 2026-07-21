@@ -33,7 +33,7 @@ class FileSecurityValidator:
     
     # Magic bytes for identifying file types
     MAGIC_BYTES = {
-        b'\xff\xfe': 'UTF-16 LE',  # CSV/JSON can be UTF-16
+        b'\xff\xfe': 'UTF-16 LE',
         b'\xef\xbb\xbf': 'UTF-8 BOM',  # UTF-8 with BOM
         # We mostly expect text files
     }
@@ -41,7 +41,7 @@ class FileSecurityValidator:
     # Dangerous patterns in filenames
     DANGEROUS_PATTERNS = [
         r'\.\.[\\/]',  # Path traversal: ../
-        r'[\x00]',      # Null bytes
+        r'[\x00-\x1f\x7f]',  # Control characters and log-breaking newlines
         r'[<>:"|?*]',   # Windows reserved chars
     ]
     
@@ -65,7 +65,7 @@ class FileSecurityValidator:
         # Check for dangerous patterns
         for pattern in FileSecurityValidator.DANGEROUS_PATTERNS:
             if re.search(pattern, filename):
-                logger.warning(f"Dangerous filename pattern detected: {filename}")
+                logger.warning("Dangerous filename pattern detected: %r", filename)
                 return False, "Filename contains invalid characters or patterns"
         
         # Check file extension
@@ -85,14 +85,19 @@ class FileSecurityValidator:
         return True, None
     
     @staticmethod
-    def validate_file_size(file_size: int) -> Tuple[bool, Optional[str]]:
+    def validate_file_size(
+        file_size: int,
+        max_size: int = MAX_FILE_SIZE_PER_SUBMISSION
+    ) -> Tuple[bool, Optional[str]]:
         """Validate file size."""
         if file_size <= 0:
             return False, "File is empty"
         
-        if file_size > MAX_FILE_SIZE_PER_SUBMISSION:
-            logger.warning(f"File exceeds size limit: {file_size} > {MAX_FILE_SIZE_PER_SUBMISSION}")
-            return False, ERROR_FILE_TOO_LARGE
+        if file_size > max_size:
+            logger.warning(f"File exceeds size limit: {file_size} > {max_size}")
+            if max_size == MAX_FILE_SIZE_PER_SUBMISSION:
+                return False, ERROR_FILE_TOO_LARGE
+            return False, f"File exceeds maximum size of {max_size} bytes"
         
         return True, None
     
@@ -152,7 +157,7 @@ class FileSecurityValidator:
             return False, "File is empty"
         
         # Check for binary content that shouldn't be there
-        # CSV and JSON should be mostly text
+        # JSONL should be text.
         null_byte_count = file_content.count(b'\x00')
         if null_byte_count > 0:
             logger.warning(f"File contains null bytes: {filename}")
@@ -229,7 +234,7 @@ class FileSecurityValidator:
             file_size = file_stream.tell()
             file_stream.seek(0)  # Seek to beginning
             
-            is_valid, error = FileSecurityValidator.validate_file_size(file_size)
+            is_valid, error = FileSecurityValidator.validate_file_size(file_size, max_size=max_size)
             if not is_valid:
                 return False, error, None
             

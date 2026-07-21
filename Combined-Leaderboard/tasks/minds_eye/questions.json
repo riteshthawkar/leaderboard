@@ -2,7 +2,7 @@
   "task_id": "minds_eye",
   "label": "Mind's-Eye",
   "section": "visual_cognition",
-  "layer": "imagery",
+  "layer": "cognition",
   "version": "1.0",
   "total_samples": 175,
   "conditions": [

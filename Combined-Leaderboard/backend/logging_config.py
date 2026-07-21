@@ -5,7 +5,7 @@ Comprehensive logging configuration for production deployment.
 import logging
 import logging.handlers
 from pathlib import Path
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger.json import JsonFormatter
 import os
 
 
@@ -62,7 +62,7 @@ def setup_logging(log_dir: str = "logs", log_level: str = "INFO") -> logging.Log
         backupCount=10
     )
     json_handler.setLevel(logging.DEBUG)
-    json_formatter = jsonlogger.JsonFormatter(
+    json_formatter = JsonFormatter(
         '%(timestamp)s %(level)s %(name)s %(message)s %(filename)s %(lineno)d'
     )
     json_handler.setFormatter(json_formatter)

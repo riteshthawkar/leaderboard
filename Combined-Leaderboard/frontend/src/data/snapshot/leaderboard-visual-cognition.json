@@ -1,0 +1,5746 @@
+{
+  "count": 14,
+  "leaderboard": [
+    {
+      "cognition_accuracy": 0.5498,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.535,
+          "correct_samples": 107,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.6395286195286195,
+          "correct_samples": 191,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.47000000000000003,
+          "correct_samples": 141,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.8585858585858586,
+          "correct_samples": 85,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.43,
+          "correct_samples": 43,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.79,
+          "correct_samples": 79,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.75,
+          "correct_samples": 75,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.4,
+          "correct_samples": 40,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.63,
+          "correct_samples": 63,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.5498,
+      "cognition_micro_accuracy": 0.5494,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "ac6b06d1-7b88-4190-8156-dcbb071cd533",
+      "cognition_task_spread": 0.237,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.5498,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.8585858585858586,
+          "correct_samples": 85,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.43,
+          "correct_samples": 43,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.79,
+          "correct_samples": 79,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.75,
+          "correct_samples": 75,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.4,
+          "correct_samples": 40,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.63,
+          "correct_samples": 63,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "ac6b06d1-7b88-4190-8156-dcbb071cd533",
+      "model_id": "mdl_b7784aabc4f7428d837b52f697f623ef",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Qwen",
+        "organization": "Qwen",
+        "parameter_count": "27B",
+        "type": "open_weights"
+      },
+      "model_name": "Qwen3.6-27B",
+      "perception_accuracy": 0.5144,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.6746666666666666,
+          "correct_samples": 1012,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.37266666666666665,
+          "correct_samples": 559,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.5086666666666667,
+          "correct_samples": 763,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.5275194289278796,
+          "correct_samples": 1582,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.5013333333333334,
+          "correct_samples": 752,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 201,
+          "jsonl_exact": 4299
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.700960219478738,
+          "correct_samples": 511,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.4382284382284382,
+          "correct_samples": 188,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.747599451303155,
+          "correct_samples": 545,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.13854595336076816,
+          "correct_samples": 101,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.6296296296296297,
+          "correct_samples": 459,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.3100137174211248,
+          "correct_samples": 226,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.7136150234741784,
+          "correct_samples": 304,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.5144,
+      "perception_micro_accuracy": 0.5187,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.5273333333333333,
+          "correct_samples": 1582,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.5013333333333333,
+          "correct_samples": 752,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "5ff2e903-34b8-44cf-b4ef-a47f10e64b14",
+      "perception_task_spread": 0.2589,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.6526806526806527,
+          "correct_samples": 280,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.4382284382284382,
+          "correct_samples": 188,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.9347319347319347,
+          "correct_samples": 401,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.1445221445221445,
+          "correct_samples": 62,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.5337995337995338,
+          "correct_samples": 229,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.27505827505827507,
+          "correct_samples": 118,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.7136150234741784,
+          "correct_samples": 304,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.77,
+          "correct_samples": 231,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.48,
+          "correct_samples": 144,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.13,
+          "correct_samples": 39,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.7666666666666667,
+          "correct_samples": 230,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.36,
+          "correct_samples": 108,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 1,
+      "task_spread": 0.24795,
+      "vci": 0.5321
+    },
+    {
+      "cognition_accuracy": 0.5461,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.55,
+          "correct_samples": 110,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.5895959595959596,
+          "correct_samples": 176,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.5,
+          "correct_samples": 150,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.8787878787878788,
+          "correct_samples": 87,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.82,
+          "correct_samples": 82,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.82,
+          "correct_samples": 82,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.39,
+          "correct_samples": 39,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.58,
+          "correct_samples": 58,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.5461,
+      "cognition_micro_accuracy": 0.5457,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "b3d51cdb-e5f9-4816-a81e-da22937a6458",
+      "cognition_task_spread": 0.2614,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.5461,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.8787878787878788,
+          "correct_samples": 87,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.82,
+          "correct_samples": 82,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.82,
+          "correct_samples": 82,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.39,
+          "correct_samples": 39,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.58,
+          "correct_samples": 58,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "b3d51cdb-e5f9-4816-a81e-da22937a6458",
+      "model_id": "mdl_f896b3a6cd8f41339635d6214f43173b",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Qwen",
+        "organization": "Qwen",
+        "parameter_count": "9B",
+        "type": "open_weights"
+      },
+      "model_name": "Qwen3.5-9B (Thinking)",
+      "perception_accuracy": 0.4345,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.558,
+          "correct_samples": 837,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.372,
+          "correct_samples": 558,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.47,
+          "correct_samples": 705,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.5309784112601014,
+          "correct_samples": 1593,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.33799999999999997,
+          "correct_samples": 507,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 944,
+          "jsonl_exact": 3556
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.757201646090535,
+          "correct_samples": 552,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.351981351981352,
+          "correct_samples": 151,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.49382716049382713,
+          "correct_samples": 360,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.05761316872427984,
+          "correct_samples": 42,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.6035665294924554,
+          "correct_samples": 440,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.46364883401920437,
+          "correct_samples": 338,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.5093896713615024,
+          "correct_samples": 217,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.4345,
+      "perception_micro_accuracy": 0.4667,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.531,
+          "correct_samples": 1593,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.338,
+          "correct_samples": 507,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "a85ce9f0-d371-4bc5-a0c2-f94552c395a9",
+      "perception_task_spread": 0.2997,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.8251748251748252,
+          "correct_samples": 354,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.351981351981352,
+          "correct_samples": 151,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.8391608391608392,
+          "correct_samples": 360,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.0979020979020979,
+          "correct_samples": 42,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.5244755244755245,
+          "correct_samples": 225,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.5687645687645687,
+          "correct_samples": 244,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.5093896713615024,
+          "correct_samples": 217,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.66,
+          "correct_samples": 198,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.7166666666666667,
+          "correct_samples": 215,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.31333333333333335,
+          "correct_samples": 94,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 2,
+      "task_spread": 0.28055,
+      "vci": 0.4903
+    },
+    {
+      "cognition_accuracy": 0.4285,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.44,
+          "correct_samples": 88,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.49592592592592594,
+          "correct_samples": 148,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.35333333333333333,
+          "correct_samples": 106,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 51,
+          "jsonl_exact": 748
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.7777777777777778,
+          "correct_samples": 77,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.25,
+          "correct_samples": 25,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.64,
+          "correct_samples": 64,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.55,
+          "correct_samples": 55,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.27,
+          "correct_samples": 27,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.46,
+          "correct_samples": 46,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.4285,
+      "cognition_micro_accuracy": 0.428,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "27e724f0-ead4-4170-ba52-4efd5a52b7fd",
+      "cognition_task_spread": 0.2106,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.4285,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 51,
+          "jsonl_exact": 748
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.7777777777777778,
+          "correct_samples": 77,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.25,
+          "correct_samples": 25,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.64,
+          "correct_samples": 64,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.55,
+          "correct_samples": 55,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.27,
+          "correct_samples": 27,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.46,
+          "correct_samples": 46,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "27e724f0-ead4-4170-ba52-4efd5a52b7fd",
+      "model_id": "mdl_133f5face4304037b3e0dccfa020de6b",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Qwen",
+        "organization": "Qwen",
+        "parameter_count": "8B",
+        "type": "open_weights"
+      },
+      "model_name": "Qwen3-VL-8B-Instruct",
+      "perception_accuracy": 0.4973,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.6093333333333333,
+          "correct_samples": 914,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.38066666666666665,
+          "correct_samples": 571,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.49133333333333334,
+          "correct_samples": 737,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.4871888674705576,
+          "correct_samples": 1461,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.5073333333333333,
+          "correct_samples": 761,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 383,
+          "jsonl_exact": 4117
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.6982167352537723,
+          "correct_samples": 509,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.3776223776223776,
+          "correct_samples": 162,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.7860082304526749,
+          "correct_samples": 573,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.14540466392318244,
+          "correct_samples": 106,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.50480109739369,
+          "correct_samples": 368,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.2962962962962963,
+          "correct_samples": 216,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.676056338028169,
+          "correct_samples": 288,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.4973,
+      "perception_micro_accuracy": 0.4938,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.487,
+          "correct_samples": 1461,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.5073333333333333,
+          "correct_samples": 761,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "ace6ae6c-c822-453e-8739-910086ec290d",
+      "perception_task_spread": 0.2605,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.627039627039627,
+          "correct_samples": 269,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.3776223776223776,
+          "correct_samples": 162,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.9230769230769231,
+          "correct_samples": 396,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.1888111888111888,
+          "correct_samples": 81,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.3706293706293706,
+          "correct_samples": 159,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.24708624708624707,
+          "correct_samples": 106,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.676056338028169,
+          "correct_samples": 288,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.8,
+          "correct_samples": 240,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.59,
+          "correct_samples": 177,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.08333333333333333,
+          "correct_samples": 25,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.6966666666666667,
+          "correct_samples": 209,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.36666666666666664,
+          "correct_samples": 110,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 3,
+      "task_spread": 0.23555,
+      "vci": 0.4629
+    },
+    {
+      "cognition_accuracy": 0.4043,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.47000000000000003,
+          "correct_samples": 94,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.35824915824915826,
+          "correct_samples": 107,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.4066666666666667,
+          "correct_samples": 122,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 1,
+          "jsonl_exact": 798
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.47474747474747475,
+          "correct_samples": 47,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.16,
+          "correct_samples": 16,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.77,
+          "correct_samples": 77,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.53,
+          "correct_samples": 53,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.38,
+          "correct_samples": 38,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.44,
+          "correct_samples": 44,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.4043,
+      "cognition_micro_accuracy": 0.4043,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "56bcc468-7d33-474d-894e-6b3cf016bea1",
+      "cognition_task_spread": 0.1999,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.4043,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 1,
+          "jsonl_exact": 798
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.47474747474747475,
+          "correct_samples": 47,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.16,
+          "correct_samples": 16,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.77,
+          "correct_samples": 77,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.53,
+          "correct_samples": 53,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.38,
+          "correct_samples": 38,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.44,
+          "correct_samples": 44,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "56bcc468-7d33-474d-894e-6b3cf016bea1",
+      "model_id": "mdl_890c3f3534964992863716d1042305f5",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Z.ai",
+        "organization": "Z.ai",
+        "parameter_count": "",
+        "type": "open_weights"
+      },
+      "model_name": "GLM-4.6V-Flash",
+      "perception_accuracy": 0.4939,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.658,
+          "correct_samples": 987,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.36533333333333334,
+          "correct_samples": 548,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.4706666666666667,
+          "correct_samples": 706,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.506526337512253,
+          "correct_samples": 1519,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.48133333333333334,
+          "correct_samples": 722,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 490,
+          "jsonl_exact": 4010
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.6872427983539094,
+          "correct_samples": 501,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.351981351981352,
+          "correct_samples": 151,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.6186556927297668,
+          "correct_samples": 451,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.2222222222222222,
+          "correct_samples": 162,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.5390946502057613,
+          "correct_samples": 393,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.39094650205761317,
+          "correct_samples": 285,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.6995305164319249,
+          "correct_samples": 298,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.4939,
+      "perception_micro_accuracy": 0.498,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.5063333333333333,
+          "correct_samples": 1519,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.48133333333333334,
+          "correct_samples": 722,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "8422f017-4991-44b2-ae56-acf6cdb6d87e",
+      "perception_task_spread": 0.2175,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.6130536130536131,
+          "correct_samples": 263,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.351981351981352,
+          "correct_samples": 151,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.7738927738927739,
+          "correct_samples": 332,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.3006993006993007,
+          "correct_samples": 129,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.41025641025641024,
+          "correct_samples": 176,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.3962703962703963,
+          "correct_samples": 170,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.6995305164319249,
+          "correct_samples": 298,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.7933333333333333,
+          "correct_samples": 238,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.39666666666666667,
+          "correct_samples": 119,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.11,
+          "correct_samples": 33,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.7233333333333334,
+          "correct_samples": 217,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.38333333333333336,
+          "correct_samples": 115,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 4,
+      "task_spread": 0.2087,
+      "vci": 0.4491
+    },
+    {
+      "cognition_accuracy": 0.3744,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.415,
+          "correct_samples": 83,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.34494949494949495,
+          "correct_samples": 103,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.37666666666666665,
+          "correct_samples": 113,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.48484848484848486,
+          "correct_samples": 48,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.57,
+          "correct_samples": 57,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.48,
+          "correct_samples": 48,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.3,
+          "correct_samples": 30,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.35,
+          "correct_samples": 35,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.3744,
+      "cognition_micro_accuracy": 0.3742,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "d42c7693-6063-4204-a87d-aae99a63eca9",
+      "cognition_task_spread": 0.1213,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.3744,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.48484848484848486,
+          "correct_samples": 48,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.57,
+          "correct_samples": 57,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.48,
+          "correct_samples": 48,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.3,
+          "correct_samples": 30,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.35,
+          "correct_samples": 35,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "d42c7693-6063-4204-a87d-aae99a63eca9",
+      "model_id": "mdl_927c5e102c4c496798ad3808bf186829",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Google",
+        "organization": "Google",
+        "parameter_count": "27B",
+        "type": "open_weights"
+      },
+      "model_name": "Gemma 3 27B IT",
+      "perception_accuracy": 0.4125,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.5566666666666666,
+          "correct_samples": 835,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.30133333333333334,
+          "correct_samples": 452,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.3893333333333333,
+          "correct_samples": 584,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.4222842884814716,
+          "correct_samples": 1267,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.4026666666666666,
+          "correct_samples": 604,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 212,
+          "jsonl_exact": 4288
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.6310013717421125,
+          "correct_samples": 460,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.3076923076923077,
+          "correct_samples": 132,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.7215363511659808,
+          "correct_samples": 526,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.10973936899862825,
+          "correct_samples": 80,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.3895747599451303,
+          "correct_samples": 284,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.31550068587105623,
+          "correct_samples": 230,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.3732394366197183,
+          "correct_samples": 159,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.4125,
+      "perception_micro_accuracy": 0.4158,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.42233333333333334,
+          "correct_samples": 1267,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.4026666666666667,
+          "correct_samples": 604,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "53e5e72a-bd49-479d-8f64-bd2c2936fb83",
+      "perception_task_spread": 0.221,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.6480186480186481,
+          "correct_samples": 278,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.3076923076923077,
+          "correct_samples": 132,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.8391608391608392,
+          "correct_samples": 360,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.16083916083916083,
+          "correct_samples": 69,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.36363636363636365,
+          "correct_samples": 156,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.2634032634032634,
+          "correct_samples": 113,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.3732394366197183,
+          "correct_samples": 159,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.6066666666666667,
+          "correct_samples": 182,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.5533333333333333,
+          "correct_samples": 166,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.03666666666666667,
+          "correct_samples": 11,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.4266666666666667,
+          "correct_samples": 128,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.39,
+          "correct_samples": 117,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 5,
+      "task_spread": 0.17115,
+      "vci": 0.3934
+    },
+    {
+      "cognition_accuracy": 0.4334,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.35,
+          "correct_samples": 70,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.5057912457912458,
+          "correct_samples": 151,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.4166666666666667,
+          "correct_samples": 125,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 6,
+          "jsonl_exact": 793
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.7373737373737373,
+          "correct_samples": 73,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.38,
+          "correct_samples": 38,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.48,
+          "correct_samples": 48,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.59,
+          "correct_samples": 59,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.34,
+          "correct_samples": 34,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.4,
+          "correct_samples": 40,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.4334,
+      "cognition_micro_accuracy": 0.433,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "f788679d-90ba-40f2-b9d1-270b438df825",
+      "cognition_task_spread": 0.1648,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.4334,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 6,
+          "jsonl_exact": 793
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.7373737373737373,
+          "correct_samples": 73,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.38,
+          "correct_samples": 38,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.48,
+          "correct_samples": 48,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.59,
+          "correct_samples": 59,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.34,
+          "correct_samples": 34,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.4,
+          "correct_samples": 40,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "f788679d-90ba-40f2-b9d1-270b438df825",
+      "model_id": "mdl_51e27b799b9843a29a6829cb383d00dd",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "OpenGVLab",
+        "organization": "OpenGVLab",
+        "parameter_count": "8B",
+        "type": "open_weights"
+      },
+      "model_name": "InternVL3.5-8B (Thinking)",
+      "perception_accuracy": 0.3495,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.43066666666666664,
+          "correct_samples": 646,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.25266666666666665,
+          "correct_samples": 379,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.31466666666666665,
+          "correct_samples": 472,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.2990389891798343,
+          "correct_samples": 897,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.4,
+          "correct_samples": 600,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 388,
+          "jsonl_exact": 4112
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.6035665294924554,
+          "correct_samples": 440,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.2540792540792541,
+          "correct_samples": 109,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.4403292181069959,
+          "correct_samples": 321,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.012345679012345678,
+          "correct_samples": 9,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.2839506172839506,
+          "correct_samples": 207,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.3662551440329218,
+          "correct_samples": 267,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.3380281690140845,
+          "correct_samples": 144,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.3495,
+      "perception_micro_accuracy": 0.3327,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.299,
+          "correct_samples": 897,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.4,
+          "correct_samples": 600,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "5f172b8d-4250-4e61-9cfa-d18a9e10f4e1",
+      "perception_task_spread": 0.2036,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.5757575757575758,
+          "correct_samples": 247,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.2540792540792541,
+          "correct_samples": 109,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.3682983682983683,
+          "correct_samples": 158,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.016317016317016316,
+          "correct_samples": 7,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.16783216783216784,
+          "correct_samples": 72,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.372960372960373,
+          "correct_samples": 160,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.3380281690140845,
+          "correct_samples": 144,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.6433333333333333,
+          "correct_samples": 193,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.5433333333333333,
+          "correct_samples": 163,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.006666666666666667,
+          "correct_samples": 2,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.45,
+          "correct_samples": 135,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.3566666666666667,
+          "correct_samples": 107,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 6,
+      "task_spread": 0.1842,
+      "vci": 0.3915
+    },
+    {
+      "cognition_accuracy": 0.382,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.425,
+          "correct_samples": 85,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.3418855218855219,
+          "correct_samples": 102,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.39333333333333337,
+          "correct_samples": 118,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 2,
+          "jsonl_exact": 797
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.5656565656565656,
+          "correct_samples": 56,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.61,
+          "correct_samples": 61,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.54,
+          "correct_samples": 54,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.382,
+      "cognition_micro_accuracy": 0.3817,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "0254dfee-0da9-44d2-b069-b2beb670ec91",
+      "cognition_task_spread": 0.1625,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.382,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 2,
+          "jsonl_exact": 797
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.5656565656565656,
+          "correct_samples": 56,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.61,
+          "correct_samples": 61,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.54,
+          "correct_samples": 54,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "0254dfee-0da9-44d2-b069-b2beb670ec91",
+      "model_id": "mdl_3691c6d21b2c40f4bf2f44066ea5bb54",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Google",
+        "organization": "Google",
+        "parameter_count": "12B",
+        "type": "open_weights"
+      },
+      "model_name": "Gemma 3 12B IT",
+      "perception_accuracy": 0.3843,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.49133333333333334,
+          "correct_samples": 737,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.31066666666666665,
+          "correct_samples": 466,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.36466666666666664,
+          "correct_samples": 547,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.39799636982735576,
+          "correct_samples": 1194,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.37066666666666664,
+          "correct_samples": 556,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 338,
+          "jsonl_exact": 4162
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.5939643347050755,
+          "correct_samples": 433,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.27972027972027974,
+          "correct_samples": 120,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.6680384087791496,
+          "correct_samples": 487,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.08641975308641975,
+          "correct_samples": 63,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.3401920438957476,
+          "correct_samples": 248,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.3168724279835391,
+          "correct_samples": 231,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.39436619718309857,
+          "correct_samples": 168,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.3843,
+      "perception_micro_accuracy": 0.3889,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.398,
+          "correct_samples": 1194,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.37066666666666664,
+          "correct_samples": 556,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "7e0e520a-50af-4c38-b9a8-6686e4aa9679",
+      "perception_task_spread": 0.2089,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.6363636363636364,
+          "correct_samples": 273,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.27972027972027974,
+          "correct_samples": 120,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.7692307692307693,
+          "correct_samples": 330,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.13286713286713286,
+          "correct_samples": 57,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.29603729603729606,
+          "correct_samples": 127,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.2773892773892774,
+          "correct_samples": 119,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.39436619718309857,
+          "correct_samples": 168,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.5333333333333333,
+          "correct_samples": 160,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.5233333333333333,
+          "correct_samples": 157,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.02,
+          "correct_samples": 6,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.4033333333333333,
+          "correct_samples": 121,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.37333333333333335,
+          "correct_samples": 112,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 7,
+      "task_spread": 0.1857,
+      "vci": 0.3831
+    },
+    {
+      "cognition_accuracy": 0.4108,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.475,
+          "correct_samples": 95,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.3688888888888889,
+          "correct_samples": 110,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.41,
+          "correct_samples": 123,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.6666666666666666,
+          "correct_samples": 66,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.14,
+          "correct_samples": 14,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.64,
+          "correct_samples": 64,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.71,
+          "correct_samples": 71,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.3,
+          "correct_samples": 30,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.4108,
+      "cognition_micro_accuracy": 0.4105,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "7987eb6b-937e-486a-bb01-69a176ef6327",
+      "cognition_task_spread": 0.2235,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.4108,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.6666666666666666,
+          "correct_samples": 66,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.14,
+          "correct_samples": 14,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.64,
+          "correct_samples": 64,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.71,
+          "correct_samples": 71,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.3,
+          "correct_samples": 30,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "7987eb6b-937e-486a-bb01-69a176ef6327",
+      "model_id": "mdl_d7b24a2dacf4497f85be09323c595caa",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "OpenBMB",
+        "organization": "OpenBMB",
+        "parameter_count": "",
+        "type": "open_weights"
+      },
+      "model_name": "MiniCPM-V 4.6",
+      "perception_accuracy": 0.3321,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.476,
+          "correct_samples": 714,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.276,
+          "correct_samples": 414,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.29533333333333334,
+          "correct_samples": 443,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.3835554117244258,
+          "correct_samples": 1150,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.2806666666666667,
+          "correct_samples": 421,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 766,
+          "jsonl_exact": 3734
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.5445816186556928,
+          "correct_samples": 397,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.2261072261072261,
+          "correct_samples": 97,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.32098765432098764,
+          "correct_samples": 234,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.1755829903978052,
+          "correct_samples": 128,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.25651577503429357,
+          "correct_samples": 187,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.37037037037037035,
+          "correct_samples": 270,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.6056338028169014,
+          "correct_samples": 258,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.3321,
+      "perception_micro_accuracy": 0.3491,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.38333333333333336,
+          "correct_samples": 1150,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.2806666666666667,
+          "correct_samples": 421,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "c7e6aae1-047a-4918-96c5-e3b0950af7e9",
+      "perception_task_spread": 0.2126,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.4801864801864802,
+          "correct_samples": 206,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.2261072261072261,
+          "correct_samples": 97,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.5454545454545454,
+          "correct_samples": 234,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.27972027972027974,
+          "correct_samples": 120,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.14685314685314685,
+          "correct_samples": 63,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.40093240093240096,
+          "correct_samples": 172,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.6056338028169014,
+          "correct_samples": 258,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.6366666666666667,
+          "correct_samples": 191,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.02666666666666667,
+          "correct_samples": 8,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.41333333333333333,
+          "correct_samples": 124,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.32666666666666666,
+          "correct_samples": 98,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 8,
+      "task_spread": 0.21805,
+      "vci": 0.3715
+    },
+    {
+      "cognition_accuracy": 0.382,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.52,
+          "correct_samples": 104,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.371952861952862,
+          "correct_samples": 111,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.3,
+          "correct_samples": 90,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 13,
+          "jsonl_exact": 786
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.5858585858585859,
+          "correct_samples": 58,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.72,
+          "correct_samples": 72,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.39,
+          "correct_samples": 39,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.27,
+          "correct_samples": 27,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.36,
+          "correct_samples": 36,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.382,
+      "cognition_micro_accuracy": 0.3817,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "edd2c945-1d73-4b0f-a8fe-52e10da6bdde",
+      "cognition_task_spread": 0.1843,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.382,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 13,
+          "jsonl_exact": 786
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.5858585858585859,
+          "correct_samples": 58,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.72,
+          "correct_samples": 72,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.39,
+          "correct_samples": 39,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.27,
+          "correct_samples": 27,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.36,
+          "correct_samples": 36,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "edd2c945-1d73-4b0f-a8fe-52e10da6bdde",
+      "model_id": "mdl_7b9f6c8b04d0480eafda1110d1109476",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "DeepSeek",
+        "organization": "DeepSeek",
+        "parameter_count": "",
+        "type": "open_weights"
+      },
+      "model_name": "DeepSeek-VL2",
+      "perception_accuracy": 0.3594,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.4093333333333333,
+          "correct_samples": 614,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.2813333333333333,
+          "correct_samples": 422,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.3546666666666667,
+          "correct_samples": 532,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.32676947465679856,
+          "correct_samples": 980,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.392,
+          "correct_samples": 588,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 551,
+          "jsonl_exact": 3949
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.6502057613168725,
+          "correct_samples": 474,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.23776223776223776,
+          "correct_samples": 102,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.49108367626886146,
+          "correct_samples": 358,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.0205761316872428,
+          "correct_samples": 15,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.34705075445816186,
+          "correct_samples": 253,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.25102880658436216,
+          "correct_samples": 183,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.4295774647887324,
+          "correct_samples": 183,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.3594,
+      "perception_micro_accuracy": 0.3484,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.32666666666666666,
+          "correct_samples": 980,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.392,
+          "correct_samples": 588,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "a11572de-dcea-450b-811b-bfff2cacc7af",
+      "perception_task_spread": 0.2164,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.6480186480186481,
+          "correct_samples": 278,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.23776223776223776,
+          "correct_samples": 102,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.4219114219114219,
+          "correct_samples": 181,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.03263403263403263,
+          "correct_samples": 14,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.28205128205128205,
+          "correct_samples": 121,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.23543123543123542,
+          "correct_samples": 101,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.4295774647887324,
+          "correct_samples": 183,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.6533333333333333,
+          "correct_samples": 196,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.59,
+          "correct_samples": 177,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.0033333333333333335,
+          "correct_samples": 1,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.44,
+          "correct_samples": 132,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.2733333333333333,
+          "correct_samples": 82,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 9,
+      "task_spread": 0.20035,
+      "vci": 0.3707
+    },
+    {
+      "cognition_accuracy": 0.3644,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.335,
+          "correct_samples": 67,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.3618181818181818,
+          "correct_samples": 108,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.3866666666666667,
+          "correct_samples": 116,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.5454545454545454,
+          "correct_samples": 54,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.5,
+          "correct_samples": 50,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.52,
+          "correct_samples": 52,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.4,
+          "correct_samples": 40,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.3644,
+      "cognition_micro_accuracy": 0.3642,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "996d3ddc-1612-4177-b810-1e64cb5e0ac0",
+      "cognition_task_spread": 0.1477,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.3644,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.5454545454545454,
+          "correct_samples": 54,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.5,
+          "correct_samples": 50,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.52,
+          "correct_samples": 52,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.4,
+          "correct_samples": 40,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "996d3ddc-1612-4177-b810-1e64cb5e0ac0",
+      "model_id": "mdl_02f065f783f244e4ab1ab81c29897ee7",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Qwen",
+        "organization": "Qwen",
+        "parameter_count": "7B",
+        "type": "open_weights"
+      },
+      "model_name": "Qwen2.5-VL-7B-Instruct",
+      "perception_accuracy": 0.3604,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.44133333333333336,
+          "correct_samples": 662,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.2713333333333333,
+          "correct_samples": 407,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.3466666666666667,
+          "correct_samples": 520,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.3387481063537402,
+          "correct_samples": 1016,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.382,
+          "correct_samples": 573,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 263,
+          "jsonl_exact": 4237
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.5349794238683128,
+          "correct_samples": 390,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.32400932400932403,
+          "correct_samples": 139,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.4897119341563786,
+          "correct_samples": 357,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.09327846364883402,
+          "correct_samples": 68,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.3017832647462277,
+          "correct_samples": 220,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.32373113854595337,
+          "correct_samples": 236,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.42018779342723006,
+          "correct_samples": 179,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.3604,
+      "perception_micro_accuracy": 0.3531,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.33866666666666667,
+          "correct_samples": 1016,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.382,
+          "correct_samples": 573,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "9aa53d4c-8cb4-43bd-9e9f-9c6e7df23457",
+      "perception_task_spread": 0.1728,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.44988344988344986,
+          "correct_samples": 193,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.32400932400932403,
+          "correct_samples": 139,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.4731934731934732,
+          "correct_samples": 203,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.1585081585081585,
+          "correct_samples": 68,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.23076923076923078,
+          "correct_samples": 99,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.3146853146853147,
+          "correct_samples": 135,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.42018779342723006,
+          "correct_samples": 179,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.6566666666666666,
+          "correct_samples": 197,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.5133333333333333,
+          "correct_samples": 154,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.4033333333333333,
+          "correct_samples": 121,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.33666666666666667,
+          "correct_samples": 101,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 10,
+      "task_spread": 0.16025,
+      "vci": 0.3624
+    },
+    {
+      "cognition_accuracy": 0.2942,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.15000000000000002,
+          "correct_samples": 30,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.29114478114478115,
+          "correct_samples": 87,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.39333333333333337,
+          "correct_samples": 118,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.13,
+          "correct_samples": 13,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.3434343434343434,
+          "correct_samples": 34,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.41,
+          "correct_samples": 41,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.56,
+          "correct_samples": 56,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.33,
+          "correct_samples": 33,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.12,
+          "correct_samples": 12,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.2942,
+      "cognition_micro_accuracy": 0.2941,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "24bd3fea-ae03-4496-b923-a8450ad25a75",
+      "cognition_task_spread": 0.1514,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.2942,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.13,
+          "correct_samples": 13,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.3434343434343434,
+          "correct_samples": 34,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.41,
+          "correct_samples": 41,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.17,
+          "correct_samples": 17,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.56,
+          "correct_samples": 56,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.33,
+          "correct_samples": 33,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.12,
+          "correct_samples": 12,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "24bd3fea-ae03-4496-b923-a8450ad25a75",
+      "model_id": "mdl_e51ed249d97e42a4890f32b87da6f956",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Qwen",
+        "organization": "Qwen",
+        "parameter_count": "9B",
+        "type": "open_weights"
+      },
+      "model_name": "Qwen3.5-9B (Non-thinking)",
+      "perception_accuracy": 0.4071,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.5513333333333333,
+          "correct_samples": 827,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.31666666666666665,
+          "correct_samples": 475,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.3973333333333333,
+          "correct_samples": 596,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.45143588805560636,
+          "correct_samples": 1354,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.3626666666666667,
+          "correct_samples": 544,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 622,
+          "jsonl_exact": 3878
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.6858710562414266,
+          "correct_samples": 500,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.25874125874125875,
+          "correct_samples": 111,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.4170096021947874,
+          "correct_samples": 304,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.16049382716049382,
+          "correct_samples": 117,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.6172839506172839,
+          "correct_samples": 450,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.24691358024691357,
+          "correct_samples": 180,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.5539906103286385,
+          "correct_samples": 236,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.4071,
+      "perception_micro_accuracy": 0.4218,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.4513333333333333,
+          "correct_samples": 1354,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.3626666666666667,
+          "correct_samples": 544,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "88846ba4-c9a8-460e-8a43-eb7bf1fb5ee4",
+      "perception_task_spread": 0.2761,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.668997668997669,
+          "correct_samples": 287,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.25874125874125875,
+          "correct_samples": 111,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.7086247086247086,
+          "correct_samples": 304,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.2727272727272727,
+          "correct_samples": 117,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.5128205128205128,
+          "correct_samples": 220,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.18414918414918416,
+          "correct_samples": 79,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.5539906103286385,
+          "correct_samples": 236,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.71,
+          "correct_samples": 213,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.7666666666666667,
+          "correct_samples": 230,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.33666666666666667,
+          "correct_samples": 101,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 11,
+      "task_spread": 0.21375,
+      "vci": 0.3506
+    },
+    {
+      "cognition_accuracy": 0.3155,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.35,
+          "correct_samples": 70,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.3014141414141414,
+          "correct_samples": 90,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.3066666666666667,
+          "correct_samples": 92,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 134,
+          "jsonl_exact": 665
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.21,
+          "correct_samples": 21,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.42424242424242425,
+          "correct_samples": 42,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.14,
+          "correct_samples": 14,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.49,
+          "correct_samples": 49,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.33,
+          "correct_samples": 33,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.34,
+          "correct_samples": 34,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.3155,
+      "cognition_micro_accuracy": 0.3154,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "2a3c347a-f9cf-488d-b358-1e6d4846b7dc",
+      "cognition_task_spread": 0.111,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.3155,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 134,
+          "jsonl_exact": 665
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.21,
+          "correct_samples": 21,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.42424242424242425,
+          "correct_samples": 42,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.14,
+          "correct_samples": 14,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.49,
+          "correct_samples": 49,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.28,
+          "correct_samples": 28,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.31,
+          "correct_samples": 31,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.33,
+          "correct_samples": 33,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.34,
+          "correct_samples": 34,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "2a3c347a-f9cf-488d-b358-1e6d4846b7dc",
+      "model_id": "mdl_97f55cc1ff074eabaae79be4332509d1",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Moonshot AI",
+        "organization": "Moonshot AI",
+        "parameter_count": "",
+        "type": "open_weights"
+      },
+      "model_name": "Kimi-VL-A3B-Instruct",
+      "perception_accuracy": 0.3372,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.416,
+          "correct_samples": 624,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.238,
+          "correct_samples": 357,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.26866666666666666,
+          "correct_samples": 403,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.24838307232673432,
+          "correct_samples": 745,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.426,
+          "correct_samples": 639,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 105,
+          "jsonl_exact": 4395
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.4924554183813443,
+          "correct_samples": 359,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.24475524475524477,
+          "correct_samples": 105,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.40329218106995884,
+          "correct_samples": 294,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.1522633744855967,
+          "correct_samples": 111,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.27709190672153633,
+          "correct_samples": 202,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.2551440329218107,
+          "correct_samples": 186,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.2981220657276995,
+          "correct_samples": 127,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.3372,
+      "perception_micro_accuracy": 0.3076,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.24833333333333332,
+          "correct_samples": 745,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.426,
+          "correct_samples": 639,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "2bbf47dd-d605-433b-bafd-557c43a98cf9",
+      "perception_task_spread": 0.1772,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.3356643356643357,
+          "correct_samples": 144,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.24475524475524477,
+          "correct_samples": 105,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.337995337995338,
+          "correct_samples": 145,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.2097902097902098,
+          "correct_samples": 90,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.16317016317016317,
+          "correct_samples": 70,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.14918414918414918,
+          "correct_samples": 64,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.2981220657276995,
+          "correct_samples": 127,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.7166666666666667,
+          "correct_samples": 215,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.49666666666666665,
+          "correct_samples": 149,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.07,
+          "correct_samples": 21,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.44,
+          "correct_samples": 132,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.4066666666666667,
+          "correct_samples": 122,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 12,
+      "task_spread": 0.1441,
+      "vci": 0.3264
+    },
+    {
+      "cognition_accuracy": 0.2653,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.24,
+          "correct_samples": 48,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.22740740740740742,
+          "correct_samples": 68,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.32,
+          "correct_samples": 96,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.18,
+          "correct_samples": 18,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.2222222222222222,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.19,
+          "correct_samples": 19,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.3,
+          "correct_samples": 30,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.37,
+          "correct_samples": 37,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.33,
+          "correct_samples": 33,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.27,
+          "correct_samples": 27,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.2653,
+      "cognition_micro_accuracy": 0.2653,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "2d537b95-e820-43b7-a7af-36276282fee5",
+      "cognition_task_spread": 0.0668,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.2653,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "jsonl_exact": 799
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.18,
+          "correct_samples": 18,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.2222222222222222,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.19,
+          "correct_samples": 19,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.3,
+          "correct_samples": 30,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.37,
+          "correct_samples": 37,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.33,
+          "correct_samples": 33,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.27,
+          "correct_samples": 27,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "2d537b95-e820-43b7-a7af-36276282fee5",
+      "model_id": "mdl_8511c98ccc924100b2f6a2212ac36278",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Microsoft",
+        "organization": "Microsoft",
+        "parameter_count": "",
+        "type": "open_weights"
+      },
+      "model_name": "Phi-4 Multimodal Instruct",
+      "perception_accuracy": 0.2968,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.37266666666666665,
+          "correct_samples": 559,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.24933333333333332,
+          "correct_samples": 374,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.2753333333333333,
+          "correct_samples": 413,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.30369864876907127,
+          "correct_samples": 911,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.29,
+          "correct_samples": 435,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 98,
+          "jsonl_exact": 4402
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.4869684499314129,
+          "correct_samples": 355,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.3123543123543124,
+          "correct_samples": 134,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.38271604938271603,
+          "correct_samples": 279,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.12757201646090535,
+          "correct_samples": 93,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.1700960219478738,
+          "correct_samples": 124,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.299039780521262,
+          "correct_samples": 218,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.33568075117370894,
+          "correct_samples": 143,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.2968,
+      "perception_micro_accuracy": 0.2991,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.30366666666666664,
+          "correct_samples": 911,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.29,
+          "correct_samples": 435,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "f199c5e4-4dab-4d8d-b20a-c7bd5fea8fda",
+      "perception_task_spread": 0.1484,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.47086247086247085,
+          "correct_samples": 202,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.3123543123543124,
+          "correct_samples": 134,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.3006993006993007,
+          "correct_samples": 129,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.20512820512820512,
+          "correct_samples": 88,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.16083916083916083,
+          "correct_samples": 69,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.34032634032634035,
+          "correct_samples": 146,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.33568075117370894,
+          "correct_samples": 143,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.51,
+          "correct_samples": 153,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.5,
+          "correct_samples": 150,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.016666666666666666,
+          "correct_samples": 5,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.18333333333333332,
+          "correct_samples": 55,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.24,
+          "correct_samples": 72,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 13,
+      "task_spread": 0.1076,
+      "vci": 0.2811
+    },
+    {
+      "cognition_accuracy": 0.2755,
+      "cognition_art": {
+        "abstraction": {
+          "accuracy": 0.24,
+          "correct_samples": 48,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 2
+          },
+          "name": "abstraction",
+          "total_samples": 200
+        },
+        "relation": {
+          "accuracy": 0.30797979797979796,
+          "correct_samples": 92,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "relation",
+          "total_samples": 299
+        },
+        "transformation": {
+          "accuracy": 0.26666666666666666,
+          "correct_samples": 80,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 3
+          },
+          "name": "transformation",
+          "total_samples": 300
+        }
+      },
+      "cognition_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 12,
+          "jsonl_exact": 787
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "cognition_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.19,
+          "correct_samples": 19,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.3939393939393939,
+          "correct_samples": 39,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "cognition_macro_accuracy": 0.2755,
+      "cognition_micro_accuracy": 0.2753,
+      "cognition_score_method": "unweighted_task_macro",
+      "cognition_submission": "a9de1d8a-0226-4e20-8622-f179c0765dfe",
+      "cognition_task_spread": 0.0636,
+      "complete": true,
+      "has_cognition": true,
+      "has_imagery": true,
+      "has_perception": true,
+      "imagery_accuracy": 0.2755,
+      "imagery_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 12,
+          "jsonl_exact": 787
+        },
+        "paper": "Mind's Eye (arXiv:2604.16054)"
+      },
+      "imagery_groups": {
+        "analogical_reasoning": {
+          "accuracy": 0.19,
+          "correct_samples": 19,
+          "meta": {},
+          "name": "analogical_reasoning",
+          "total_samples": 100
+        },
+        "conceptual_slippage": {
+          "accuracy": 0.3939393939393939,
+          "correct_samples": 39,
+          "meta": {},
+          "name": "conceptual_slippage",
+          "total_samples": 99
+        },
+        "dynamic_reasoning": {
+          "accuracy": 0.24,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "dynamic_reasoning",
+          "total_samples": 100
+        },
+        "hierarchical_reasoning": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "hierarchical_reasoning",
+          "total_samples": 100
+        },
+        "mental_composition": {
+          "accuracy": 0.32,
+          "correct_samples": 32,
+          "meta": {},
+          "name": "mental_composition",
+          "total_samples": 100
+        },
+        "mental_rotation": {
+          "accuracy": 0.26,
+          "correct_samples": 26,
+          "meta": {},
+          "name": "mental_rotation",
+          "total_samples": 100
+        },
+        "spatial_visualization": {
+          "accuracy": 0.22,
+          "correct_samples": 22,
+          "meta": {},
+          "name": "spatial_visualization",
+          "total_samples": 100
+        },
+        "symmetry_analysis": {
+          "accuracy": 0.29,
+          "correct_samples": 29,
+          "meta": {},
+          "name": "symmetry_analysis",
+          "total_samples": 100
+        }
+      },
+      "imagery_submission": "a9de1d8a-0226-4e20-8622-f179c0765dfe",
+      "model_id": "mdl_d70b329fe9a24d2d90cf9150aead8eeb",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "Meta",
+        "organization": "Meta",
+        "parameter_count": "11B",
+        "type": "open_weights"
+      },
+      "model_name": "Llama 3.2 11B Vision Instruct",
+      "perception_accuracy": 0.1699,
+      "perception_difficulty": {
+        "easy": {
+          "accuracy": 0.21733333333333332,
+          "correct_samples": 326,
+          "meta": {},
+          "name": "easy",
+          "total_samples": 1500
+        },
+        "hard": {
+          "accuracy": 0.17266666666666666,
+          "correct_samples": 259,
+          "meta": {},
+          "name": "hard",
+          "total_samples": 1500
+        },
+        "medium": {
+          "accuracy": 0.16666666666666666,
+          "correct_samples": 250,
+          "meta": {},
+          "name": "medium",
+          "total_samples": 1500
+        }
+      },
+      "perception_dimensions": {
+        "2D": {
+          "accuracy": 0.21705993536979454,
+          "correct_samples": 651,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 7
+          },
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.12266666666666666,
+          "correct_samples": 184,
+          "meta": {
+            "aggregation": "unweighted_task_mean",
+            "task_count": 5
+          },
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_grading": {
+        "backend": "deterministic",
+        "judge_model": null,
+        "llm_graded": false,
+        "method": "jsonl_exact",
+        "method_counts": {
+          "invalid_format": 992,
+          "jsonl_exact": 3508
+        },
+        "paper": "Do You See Me (arXiv:2506.02022)"
+      },
+      "perception_groups": {
+        "feature_binding": {
+          "accuracy": 0.3895747599451303,
+          "correct_samples": 284,
+          "meta": {},
+          "name": "feature_binding",
+          "total_samples": 729
+        },
+        "figure_ground": {
+          "accuracy": 0.2331002331002331,
+          "correct_samples": 100,
+          "meta": {},
+          "name": "figure_ground",
+          "total_samples": 429
+        },
+        "form_constancy": {
+          "accuracy": 0.1700960219478738,
+          "correct_samples": 124,
+          "meta": {},
+          "name": "form_constancy",
+          "total_samples": 729
+        },
+        "form_discrimination": {
+          "accuracy": 0.03429355281207133,
+          "correct_samples": 25,
+          "meta": {},
+          "name": "form_discrimination",
+          "total_samples": 729
+        },
+        "shape_discrimination": {
+          "accuracy": 0.19753086419753085,
+          "correct_samples": 144,
+          "meta": {},
+          "name": "shape_discrimination",
+          "total_samples": 729
+        },
+        "spatial_relation": {
+          "accuracy": 0.05486968449931413,
+          "correct_samples": 40,
+          "meta": {},
+          "name": "spatial_relation",
+          "total_samples": 729
+        },
+        "visual_closure": {
+          "accuracy": 0.27699530516431925,
+          "correct_samples": 118,
+          "meta": {},
+          "name": "visual_closure",
+          "total_samples": 426
+        }
+      },
+      "perception_macro_accuracy": 0.1699,
+      "perception_micro_accuracy": 0.1856,
+      "perception_sample_dimensions": {
+        "2D": {
+          "accuracy": 0.217,
+          "correct_samples": 651,
+          "meta": {},
+          "name": "2D",
+          "total_samples": 3000
+        },
+        "3D": {
+          "accuracy": 0.12266666666666666,
+          "correct_samples": 184,
+          "meta": {},
+          "name": "3D",
+          "total_samples": 1500
+        }
+      },
+      "perception_score_method": "dimension_balanced_task_macro",
+      "perception_submission": "09358bf4-2d79-4a82-9b9a-92528d55d6a4",
+      "perception_task_spread": 0.1418,
+      "perception_task_variants": {
+        "2D:feature_binding": {
+          "accuracy": 0.40792540792540793,
+          "correct_samples": 175,
+          "meta": {},
+          "name": "2D:feature_binding",
+          "total_samples": 429
+        },
+        "2D:figure_ground": {
+          "accuracy": 0.2331002331002331,
+          "correct_samples": 100,
+          "meta": {},
+          "name": "2D:figure_ground",
+          "total_samples": 429
+        },
+        "2D:form_constancy": {
+          "accuracy": 0.289044289044289,
+          "correct_samples": 124,
+          "meta": {},
+          "name": "2D:form_constancy",
+          "total_samples": 429
+        },
+        "2D:form_discrimination": {
+          "accuracy": 0.05827505827505827,
+          "correct_samples": 25,
+          "meta": {},
+          "name": "2D:form_discrimination",
+          "total_samples": 429
+        },
+        "2D:shape_discrimination": {
+          "accuracy": 0.19813519813519814,
+          "correct_samples": 85,
+          "meta": {},
+          "name": "2D:shape_discrimination",
+          "total_samples": 429
+        },
+        "2D:spatial_relation": {
+          "accuracy": 0.055944055944055944,
+          "correct_samples": 24,
+          "meta": {},
+          "name": "2D:spatial_relation",
+          "total_samples": 429
+        },
+        "2D:visual_closure": {
+          "accuracy": 0.27699530516431925,
+          "correct_samples": 118,
+          "meta": {},
+          "name": "2D:visual_closure",
+          "total_samples": 426
+        },
+        "3D:feature_binding": {
+          "accuracy": 0.36333333333333334,
+          "correct_samples": 109,
+          "meta": {},
+          "name": "3D:feature_binding",
+          "total_samples": 300
+        },
+        "3D:form_constancy": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_constancy",
+          "total_samples": 300
+        },
+        "3D:form_discrimination": {
+          "accuracy": 0.0,
+          "correct_samples": 0,
+          "meta": {},
+          "name": "3D:form_discrimination",
+          "total_samples": 300
+        },
+        "3D:shape_discrimination": {
+          "accuracy": 0.19666666666666666,
+          "correct_samples": 59,
+          "meta": {},
+          "name": "3D:shape_discrimination",
+          "total_samples": 300
+        },
+        "3D:spatial_relation": {
+          "accuracy": 0.05333333333333334,
+          "correct_samples": 16,
+          "meta": {},
+          "name": "3D:spatial_relation",
+          "total_samples": 300
+        }
+      },
+      "rank": 14,
+      "task_spread": 0.1027,
+      "vci": 0.2227
+    }
+  ],
+  "request_id": "21f8baf3-1b89-426c-9ab9-cce065ed2327"
+}

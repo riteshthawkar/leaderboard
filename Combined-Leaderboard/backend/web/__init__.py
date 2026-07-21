@@ -1,1 +1,5 @@
-"""Web package."""
+"""WSGI entrypoint package."""
+
+from .app import app
+
+__all__ = ["app"]

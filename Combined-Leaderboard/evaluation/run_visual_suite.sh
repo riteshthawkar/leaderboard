@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 
 VLLM_VERSION="${VLLM_VERSION:-0.25.1}"
+ANSWER_EXTRACTOR_VLLM_VERSION="0.25.1"
 OPENAI_VERSION="2.45.0"
 HUGGINGFACE_HUB_VERSION="${HUGGINGFACE_HUB_VERSION:-1.23.0}"
 PILLOW_VERSION="12.3.0"
@@ -17,6 +18,7 @@ DATASET_REPO_ID="amolharsh/visual-intelligence-leaderboard"
 DATASET_REVISION="cc41be90e74679a9d3c9dd295834b2cee9100b9d"
 
 VENV_DIR="${VENV_DIR:-$PROJECT_ROOT/.venv/visual-suite}"
+ANSWER_EXTRACTOR_VENV_DIR="${ANSWER_EXTRACTOR_VENV_DIR:-$PROJECT_ROOT/.venv/visual-suite-extractor-vllm-$ANSWER_EXTRACTOR_VLLM_VERSION}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-$PROJECT_ROOT/evaluation/results/visual_suite_bf16}"
 CACHE_ROOT="${CACHE_ROOT:-$PROJECT_ROOT/evaluation/results/.cache}"
 DATASET_DIR="${DATASET_DIR:-$CACHE_ROOT/visual-intelligence-dataset}"
@@ -55,8 +57,11 @@ HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
 BASE_SEED="${BASE_SEED:-0}"
 ANSWER_EXTRACTOR_SEED="${ANSWER_EXTRACTOR_SEED:-$BASE_SEED}"
 ANSWER_EXTRACTOR_MAX_TOKENS="${ANSWER_EXTRACTOR_MAX_TOKENS:-200}"
-EXTRACT_UNPARSEABLE_ONLY="${EXTRACT_UNPARSEABLE_ONLY:-0}"
-ALLOW_SMOKE_RAW_OUTPUT_FALLBACK="${ALLOW_SMOKE_RAW_OUTPUT_FALLBACK:-0}"
+ANSWER_EXTRACTOR_ATTEMPTS="${ANSWER_EXTRACTOR_ATTEMPTS:-2}"
+ANSWER_EXTRACTOR_CONCURRENCY="${ANSWER_EXTRACTOR_CONCURRENCY:-16}"
+ANSWER_EXTRACTOR_MAX_MODEL_LEN="${ANSWER_EXTRACTOR_MAX_MODEL_LEN:-32768}"
+ANSWER_EXTRACTOR_MAX_NUM_SEQS="${ANSWER_EXTRACTOR_MAX_NUM_SEQS:-16}"
+ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION="${ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION:-0.75}"
 SAMPLING_TOP_K="${SAMPLING_TOP_K:--1}"
 SAMPLING_MIN_P="${SAMPLING_MIN_P:-0.0}"
 PRESENCE_PENALTY="${PRESENCE_PENALTY:-0.0}"
@@ -85,9 +90,11 @@ QWEN36_MAX_TOKENS="${QWEN36_MAX_TOKENS:-8192}"
 VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
 VLLM_PHI4MM_MASK_SUM_PATCH_ID="vllm-0.25.1-phi4mm-fp32-mask-sum-v1"
 VLLM_DEEPSEEK_VL2_CONFIG_OVERRIDE_ID="vllm-0.25.1-deepseek-vl2-config-defaults-v1"
-ANSWER_EXTRACTION_METHOD_ID="same-served-model-text-only-v1"
-UNPARSEABLE_ANSWER_POLICY_ID="deterministic-retries-text-extraction-then-exact-raw-output-v5"
-PIPELINE_REVISION_ID="unquantized-bf16-smoke-and-full-text-extraction-v10"
+ANSWER_EXTRACTOR_MODEL_ID="Qwen/Qwen3.5-4B"
+ANSWER_EXTRACTOR_MODEL_REVISION="851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
+ANSWER_EXTRACTION_METHOD_ID="independent-qwen3.5-4b-text-only-all-responses-v1"
+UNPARSEABLE_ANSWER_POLICY_ID="mandatory-independent-extraction-then-invalid-format-marker-v7"
+PIPELINE_REVISION_ID="unquantized-bf16-mandatory-independent-extraction-v11"
 
 # slug|repository|revision|weight loading|max context
 MODEL_SPECS=(
@@ -116,6 +123,8 @@ INDEPENDENT_SERVER_LOGS=()
 PYTHON_BIN=""
 VLLM_BIN=""
 UV_BIN=""
+ANSWER_EXTRACTOR_PYTHON_BIN=""
+ANSWER_EXTRACTOR_VLLM_BIN=""
 GPU_NAME=""
 GPU_COUNT=0
 GPU_ID_LIST=()
@@ -147,14 +156,16 @@ Common overrides:
   DRY_RUN=1                          Validate and print the resolved plan
   INTERNVL35_MAX_TOKENS=8192         Bound InternVL3.5, GLM-4.6V, MiniCPM-V, Qwen2.5-VL, and Qwen3-VL completions
   QWEN36_MAX_TOKENS=8192             Bound Qwen3.6 completions
-  EXTRACT_UNPARSEABLE_ONLY=1         Judge only existing unparseable diagnostics
+  ANSWER_EXTRACTOR_CONCURRENCY=16    Batch independent text extraction requests
 
 The runner uses the original checkpoint tensors with BF16 compute. It never
 loads 4-bit or 8-bit weights, resizes benchmark images, or creates a synthetic
-answer. After deterministic visual retries, the same served model may extract
-an answer from raw response text only. If strict recovery is exhausted, a
-complete nonempty model output is copied exactly into the submission answer;
-missing, empty, or inference-error records still fail.
+answer. After visual inference, the evaluated model is unloaded and every raw
+response is canonicalized by the pinned Qwen3.5-4B text-only extractor. The
+extractor never receives benchmark images or ground truth. Responses that the
+extractor marks unresolved or unsupported receive __INVALID_FORMAT__ and zero
+credit. Missing, empty, inference-error, or extractor-infrastructure failures
+still fail the run.
 EOF
 }
 
@@ -462,7 +473,6 @@ validate_settings() {
   validate_positive_integer "MIN_FREE_GPU_MEMORY_MIB" "$MIN_FREE_GPU_MEMORY_MIB"
   validate_positive_integer "HF_HUB_DOWNLOAD_TIMEOUT" "$HF_HUB_DOWNLOAD_TIMEOUT"
   validate_flag "DISABLE_CUSTOM_ALL_REDUCE" "$DISABLE_CUSTOM_ALL_REDUCE"
-  validate_flag "ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" "$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK"
   [[ "$SERVING_REPLICA_MODE" == "builtin" || "$SERVING_REPLICA_MODE" == "independent" ]] \
     || die "SERVING_REPLICA_MODE must be builtin or independent."
   if [[ "$SERVING_REPLICA_MODE" == "independent" ]]; then
@@ -498,6 +508,13 @@ validate_settings() {
   validate_positive_integer "INTERNVL35_MAX_TOKENS" "$INTERNVL35_MAX_TOKENS"
   validate_positive_integer "QWEN36_MAX_TOKENS" "$QWEN36_MAX_TOKENS"
   validate_positive_integer "ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_MAX_TOKENS"
+  validate_positive_integer "ANSWER_EXTRACTOR_ATTEMPTS" "$ANSWER_EXTRACTOR_ATTEMPTS"
+  validate_positive_integer "ANSWER_EXTRACTOR_CONCURRENCY" "$ANSWER_EXTRACTOR_CONCURRENCY"
+  validate_positive_integer "ANSWER_EXTRACTOR_MAX_MODEL_LEN" "$ANSWER_EXTRACTOR_MAX_MODEL_LEN"
+  validate_positive_integer "ANSWER_EXTRACTOR_MAX_NUM_SEQS" "$ANSWER_EXTRACTOR_MAX_NUM_SEQS"
+  [[ "$ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION" =~ ^0([.][0-9]+)?$ ]] \
+    && awk -v value="$ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION" 'BEGIN { exit !(value > 0 && value < 1) }' \
+    || die "ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION must be greater than 0 and less than 1."
   [[ "$DYS_TEMPERATURE" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "DYS_TEMPERATURE must be non-negative."
   [[ "$MINDS_EYE_TEMPERATURE" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "MINDS_EYE_TEMPERATURE must be non-negative."
   validate_probability "DYS_TOP_P" "$DYS_TOP_P"
@@ -526,11 +543,6 @@ validate_settings() {
   validate_flag "KEEP_MODEL_CACHE" "$KEEP_MODEL_CACHE"
   validate_flag "CONTINUE_ON_MODEL_ERROR" "$CONTINUE_ON_MODEL_ERROR"
   validate_flag "HF_HUB_DISABLE_XET" "$HF_HUB_DISABLE_XET"
-  validate_flag "EXTRACT_UNPARSEABLE_ONLY" "$EXTRACT_UNPARSEABLE_ONLY"
-  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
-    [[ "$FORCE" != "1" ]] || die "EXTRACT_UNPARSEABLE_ONLY cannot be combined with FORCE=1."
-    [[ "$SMOKE_ONLY" != "1" ]] || die "EXTRACT_UNPARSEABLE_ONLY cannot be combined with SMOKE_ONLY=1."
-  fi
   [[ -n "$(selected_tracks)" ]] || die "TRACKS must select do_you_see_me, minds_eye, or all."
   (( $(selected_model_count) > 0 )) || die "MODELS did not match any configured model slug."
   if [[ -n "$PHI_OFFICIAL_SNAPSHOT_PATH" ]]; then
@@ -553,12 +565,13 @@ print_plan() {
     "$VLLM_DTYPE" "$VLLM_KV_CACHE_DTYPE"
   printf '  Serving engine: vLLM %s\n' "$VLLM_VERSION"
   printf '  Image preprocessing: original image bytes, no runner resize or recompression\n'
-  printf '  Answer recovery: same served model, text only, temperature=0, max_tokens=%s, seed=%s\n' \
-    "$ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_SEED"
-  printf '  Exhausted recovery: preserve exact nonempty diagnostics.output in submission\n'
-  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
-    printf '  Mode: extract existing unparseable diagnostics; no visual requests\n'
-  fi
+  printf '  Answer extraction: %s at %.12s, unquantized BF16, mandatory for every response\n' \
+    "$ANSWER_EXTRACTOR_MODEL_ID" "$ANSWER_EXTRACTOR_MODEL_REVISION"
+  printf '  Extractor runtime: vLLM %s, language-model-only, one assigned GPU, context=%s, concurrency=%s, max_tokens=%s, seed=%s\n' \
+    "$ANSWER_EXTRACTOR_VLLM_VERSION" "$ANSWER_EXTRACTOR_MAX_MODEL_LEN" \
+    "$ANSWER_EXTRACTOR_CONCURRENCY" "$ANSWER_EXTRACTOR_MAX_TOKENS" \
+    "$ANSWER_EXTRACTOR_SEED"
+  printf '  Extractor access: candidate text and answer contract only; no image or ground truth\n'
   printf '  Shared sampling: top_k=%s, min_p=%s, presence=%s, frequency=%s, repetition=%s\n' \
     "$SAMPLING_TOP_K" "$SAMPLING_MIN_P" "$PRESENCE_PENALTY" "$FREQUENCY_PENALTY" "$REPETITION_PENALTY"
   while IFS= read -r track; do
@@ -590,7 +603,7 @@ print_plan() {
       else
         max_tokens="do_you_see_me=$dys_max_tokens, minds_eye=$me_max_tokens"
       fi
-      printf '    Reasoning profile: %s; API max_tokens=%s; final_answer_max_tokens=%s\n' \
+      printf '    Reasoning profile: %s; API max_tokens=%s; independent_extractor_answer_max_tokens=%s\n' \
         "$reasoning_profile" "$max_tokens" "$FINAL_ANSWER_MAX_TOKENS"
       printf '    Engine mode: %s; server KV cache argument: %s\n' \
         "$(model_vllm_engine_mode "$slug")" "$(model_server_kv_cache_dtype "$slug")"
@@ -649,6 +662,48 @@ preflight_host() {
   log "Host preflight passed: $GPU_NAME; ${ram_gib} GiB RAM; ${free_gib} GiB cache disk free"
 }
 
+setup_answer_extractor_environment() {
+  if [[ "$VLLM_VERSION" == "$ANSWER_EXTRACTOR_VLLM_VERSION" ]]; then
+    ANSWER_EXTRACTOR_PYTHON_BIN="$PYTHON_BIN"
+    ANSWER_EXTRACTOR_VLLM_BIN="$VLLM_BIN"
+    return 0
+  fi
+
+  local marker="$ANSWER_EXTRACTOR_VENV_DIR/.ms-vista-independent-extractor-vllm-${ANSWER_EXTRACTOR_VLLM_VERSION}-uv-${UV_VERSION}"
+  if [[ ! -x "$ANSWER_EXTRACTOR_VENV_DIR/bin/python" ]]; then
+    log "Creating independent extractor environment at $ANSWER_EXTRACTOR_VENV_DIR"
+    python3 -m venv "$ANSWER_EXTRACTOR_VENV_DIR" \
+      || die "Could not create the independent extractor environment."
+  fi
+  ANSWER_EXTRACTOR_PYTHON_BIN="$ANSWER_EXTRACTOR_VENV_DIR/bin/python"
+  ANSWER_EXTRACTOR_VLLM_BIN="$ANSWER_EXTRACTOR_VENV_DIR/bin/vllm"
+  local extractor_uv="$ANSWER_EXTRACTOR_VENV_DIR/bin/uv"
+  if [[ ! -f "$marker" ]]; then
+    log "Installing pinned independent extractor runtime"
+    "$ANSWER_EXTRACTOR_PYTHON_BIN" -m pip install --upgrade pip setuptools wheel
+    "$ANSWER_EXTRACTOR_PYTHON_BIN" -m pip install "uv==$UV_VERSION"
+    "$extractor_uv" pip install \
+      --python "$ANSWER_EXTRACTOR_PYTHON_BIN" --torch-backend auto \
+      "vllm==$ANSWER_EXTRACTOR_VLLM_VERSION" \
+      "openai==$OPENAI_VERSION" \
+      "huggingface-hub==$HUGGINGFACE_HUB_VERSION"
+    : >"$marker"
+  fi
+  "$ANSWER_EXTRACTOR_PYTHON_BIN" - <<'PY'
+import torch
+import vllm
+
+if not torch.cuda.is_available():
+    raise SystemExit("The independent extractor runtime cannot access CUDA.")
+if not torch.cuda.is_bf16_supported():
+    raise SystemExit("The independent extractor runtime requires native BF16 support.")
+print(
+    f"Independent extractor environment ready: vLLM {vllm.__version__}, "
+    f"PyTorch {torch.__version__}, CUDA {torch.version.cuda}"
+)
+PY
+}
+
 setup_environment() {
   local marker="$VENV_DIR/.ms-vista-vllm-${VLLM_VERSION}-scipy-${SCIPY_VERSION}-timm-${TIMM_VERSION}-unquantized-bf16-uv-${UV_VERSION}"
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
@@ -698,10 +753,11 @@ print(
 )
 PY
   : >"$marker"
+  setup_answer_extractor_environment
 }
 
 verify_vllm_cli() {
-  local help_text option
+  local help_text extractor_help_text option
   if [[ "$VLLM_VERSION" == 0.10.* ]]; then
     help_text="$("$VLLM_BIN" serve --help 2>&1)" \
       || die "Could not inspect the installed vLLM serve command."
@@ -719,9 +775,18 @@ verify_vllm_cli() {
   if is_enabled "$MODELS" "phi4-multimodal"; then
     for option in --enable-lora --max-lora-rank --max-loras --lora-modules; do
       [[ "$help_text" == *"$option"* ]] \
-        || die "Installed vLLM $VLLM_VERSION does not expose Phi-4 requirement $option."
+      || die "Installed vLLM $VLLM_VERSION does not expose Phi-4 requirement $option."
     done
   fi
+  extractor_help_text="$("$ANSWER_EXTRACTOR_VLLM_BIN" serve --help=all 2>&1)" \
+    || die "Could not inspect the pinned independent extractor vLLM command."
+  for option in \
+    --host --port --served-model-name --revision --dtype --gpu-memory-utilization \
+    --max-model-len --max-num-seqs --generation-config --kv-cache-dtype \
+    --trust-remote-code --tensor-parallel-size --language-model-only; do
+    [[ "$extractor_help_text" == *"$option"* ]] \
+      || die "Independent extractor vLLM $ANSWER_EXTRACTOR_VLLM_VERSION does not expose required option $option."
+  done
   log "vLLM serve CLI compatibility preflight passed"
 }
 
@@ -1277,6 +1342,88 @@ start_server() {
   return 1
 }
 
+start_answer_extractor_server() {
+  local slug="$1" model_cache="$CACHE_ROOT/models/answer-extractor"
+  local extractor_gpu="${GPU_ID_LIST[0]}"
+  local -a command=(
+    "$ANSWER_EXTRACTOR_VLLM_BIN" serve "$ANSWER_EXTRACTOR_MODEL_ID"
+    --host 127.0.0.1
+    --port "$PORT"
+    --served-model-name "$ANSWER_EXTRACTOR_MODEL_ID"
+    --revision "$ANSWER_EXTRACTOR_MODEL_REVISION"
+    --dtype bfloat16
+    --kv-cache-dtype bfloat16
+    --tensor-parallel-size 1
+    --data-parallel-size 1
+    --gpu-memory-utilization "$ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION"
+    --max-model-len "$ANSWER_EXTRACTOR_MAX_MODEL_LEN"
+    --max-num-seqs "$ANSWER_EXTRACTOR_MAX_NUM_SEQS"
+    --generation-config vllm
+    --trust-remote-code
+    --language-model-only
+  )
+
+  SERVER_LOG="$OUTPUT_ROOT/$slug/extractor.vllm.log"
+  SERVER_ENDPOINTS="http://127.0.0.1:$PORT/v1"
+  mkdir -p "$(dirname "$SERVER_LOG")" "$model_cache"
+  : >"$SERVER_LOG"
+  port_is_available || die "Port $PORT is already in use. Set PORT to an unused local port."
+
+  log "Starting pinned independent extractor $ANSWER_EXTRACTOR_MODEL_ID at revision ${ANSWER_EXTRACTOR_MODEL_REVISION:0:12} on GPU $extractor_gpu (unquantized bfloat16, vLLM $ANSWER_EXTRACTOR_VLLM_VERSION, language-model-only)"
+  log "Extractor startup log: $SERVER_LOG"
+  if command -v setsid >/dev/null; then
+    setsid env \
+      HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+      HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+      HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
+      HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
+      HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" TOKENIZERS_PARALLELISM=false \
+      CUDA_VISIBLE_DEVICES="$extractor_gpu" PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+      PYTHONUNBUFFERED=1 \
+      "${command[@]}" >"$SERVER_LOG" 2>&1 &
+    SERVER_OWNS_PROCESS_GROUP=1
+  else
+    env \
+      HF_HOME="$model_cache" HF_HUB_CACHE="$model_cache/hub" \
+      HUGGINGFACE_HUB_CACHE="$model_cache/hub" TRANSFORMERS_CACHE="$model_cache/hub" \
+      HF_XET_CACHE="$model_cache/xet" HF_TOKEN="${HF_TOKEN:-}" \
+      HF_HUB_DISABLE_TELEMETRY=1 HF_HUB_DISABLE_XET="$HF_HUB_DISABLE_XET" \
+      HF_HUB_ENABLE_HF_TRANSFER="$HF_HUB_ENABLE_HF_TRANSFER" \
+      HF_HUB_DOWNLOAD_TIMEOUT="$HF_HUB_DOWNLOAD_TIMEOUT" TOKENIZERS_PARALLELISM=false \
+      CUDA_VISIBLE_DEVICES="$extractor_gpu" PYTORCH_CUDA_ALLOC_CONF="$PYTORCH_CUDA_ALLOC_CONF" \
+      PYTHONUNBUFFERED=1 \
+      "${command[@]}" >"$SERVER_LOG" 2>&1 &
+    SERVER_OWNS_PROCESS_GROUP=0
+  fi
+  SERVER_PID=$!
+
+  local elapsed=0
+  while (( elapsed < MODEL_START_TIMEOUT_SECONDS )); do
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      report_startup_failure
+      stop_server
+      return 1
+    fi
+    if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1 \
+      && server_serves_model "$ANSWER_EXTRACTOR_MODEL_ID"; then
+      log "Independent extractor server is ready"
+      return 0
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+    if (( elapsed % 60 == 0 )); then
+      report_startup_progress "$elapsed"
+    fi
+  done
+
+  printf 'Independent extractor did not become ready within %s seconds. Last log lines:\n' \
+    "$MODEL_START_TIMEOUT_SECONDS" >&2
+  tail -n 80 "$SERVER_LOG" >&2 || true
+  stop_server
+  return 1
+}
+
 validate_submission() {
   local output="$1" questions="$2"
   "$PYTHON_BIN" - "$output" "$questions" <<'PY'
@@ -1314,6 +1461,65 @@ print(f"Validated {output}: {len(rows)} canonical rows")
 PY
 }
 
+validate_extracted_submission() {
+  local output="$1" diagnostics="$2" questions="$3"
+  validate_submission "$output" "$questions" >/dev/null || return 1
+  "$PYTHON_BIN" - "$output" "$diagnostics" "$questions" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+from evaluation.common.visual_pipeline import (
+    EXTRACTOR_INCORRECT_STATUSES,
+    INVALID_FORMAT_ANSWER,
+    has_valid_extractor_provenance,
+    record_answer,
+)
+
+output_path, diagnostics_path, questions_path = map(Path, sys.argv[1:])
+if not diagnostics_path.is_file():
+    raise SystemExit(f"diagnostics file does not exist: {diagnostics_path}")
+
+def rows(path: Path):
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+questions = rows(questions_path)
+submissions = rows(output_path)
+diagnostics = rows(diagnostics_path)
+if len(diagnostics) != len(questions):
+    raise SystemExit("diagnostics coverage differs from the question bundle")
+diagnostics_by_id = {str(row.get("question_id") or ""): row for row in diagnostics}
+if len(diagnostics_by_id) != len(diagnostics):
+    raise SystemExit("diagnostics contain duplicate question IDs")
+
+for question, submission in zip(questions, submissions, strict=True):
+    question_id = str(question["question_id"])
+    diagnostic = diagnostics_by_id.get(question_id)
+    if diagnostic is None or str(submission["question_id"]) != question_id:
+        raise SystemExit(f"artifact order or coverage mismatch at {question_id}")
+    if not has_valid_extractor_provenance(diagnostic):
+        raise SystemExit(f"invalid mandatory extractor provenance for {question_id}")
+    answer = record_answer(
+        diagnostic,
+        str(question.get("answer_type") or "text"),
+        str(question.get("task") or ""),
+    )
+    if diagnostic.get("extractor_status") in EXTRACTOR_INCORRECT_STATUSES:
+        expected = INVALID_FORMAT_ANSWER
+    elif answer:
+        expected = answer
+    else:
+        raise SystemExit(f"extractor produced no canonical answer for {question_id}")
+    if submission["answer"] != expected:
+        raise SystemExit(f"submission answer differs from extraction for {question_id}")
+print(f"Validated mandatory extraction provenance: {output_path}")
+PY
+}
+
 runner_base_args() {
   local slug="$1" model_id="$2" track="$3" seed="$4"
   local prompt_mode max_tokens stop_sequence temperature top_p chat_kwargs
@@ -1341,7 +1547,6 @@ runner_base_args() {
     --max-retries 3
     --seed "$seed"
     --checkpoint-every "$CHECKPOINT_EVERY"
-    --max-final-answer-tokens "$FINAL_ANSWER_MAX_TOKENS"
   )
   if [[ -n "$max_tokens" ]]; then
     RUNNER_ARGS+=(--max-tokens "$max_tokens")
@@ -1354,80 +1559,54 @@ runner_base_args() {
   fi
 }
 
-run_answer_extraction() {
-  local slug="$1" model_id="$2" track="$3" questions="$4" output="$5" diagnostics="$6"
-  local module source
-  local -a source_args=()
+run_independent_extraction() {
+  local slug="$1" track="$2" questions="$3" output="$4" diagnostics="$5" limit="${6:-0}"
+  local module
+  local -a args
   module="$(track_module "$track")"
   [[ -f "$diagnostics" ]] || {
-    printf 'Evaluation failed: %s/%s has no diagnostics to extract from: %s\n' \
+    printf 'Evaluation failed: %s/%s has no raw diagnostics to extract from: %s\n' \
       "$slug" "$track" "$diagnostics" >&2
     return 1
   }
-  for source in "${diagnostics%/*}/${track}.attempt-"*.diagnostics.jsonl; do
-    if [[ -f "$source" ]]; then
-      source_args+=(--extraction-source-diagnostics "$source")
-    fi
-  done
-  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
-  log "Extracting existing unparseable $slug/$track answers with the same served model (text only, seed=$ANSWER_EXTRACTOR_SEED)"
-  "$PYTHON_BIN" -m "$module" \
-    "${RUNNER_ARGS[@]}" \
-    --questions "$questions" \
-    --resume \
-    --extract-unparseable-only \
-    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
-    "${source_args[@]}" \
-    --out "$output" \
-    --diagnostics "$diagnostics" \
-    && validate_submission "$output" "$questions"
-}
-
-finalize_raw_outputs() {
-  local slug="$1" model_id="$2" track="$3" questions="$4" output="$5" diagnostics="$6"
-  local module
-  module="$(track_module "$track")"
-  [[ -f "$diagnostics" ]] || return 1
-  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
-  log "Finalizing $slug/$track with exact faulty model outputs after strict recovery was exhausted"
-  "$PYTHON_BIN" -m "$module" \
-    "${RUNNER_ARGS[@]}" \
-    --questions "$questions" \
-    --finalize-existing-diagnostics \
-    --raw-output-fallback \
-    --out "$output" \
-    --diagnostics "$diagnostics" \
-    && validate_submission "$output" "$questions"
-}
-
-run_smoke_answer_extraction() {
-  local slug="$1" model_id="$2" track="$3" questions="$4" diagnostics="$5"
-  local module source
-  local -a source_args=()
-  module="$(track_module "$track")"
-  [[ -f "$diagnostics" ]] || return 1
-  for source in "${diagnostics%/*}/${track}.smoke.attempt-"*.diagnostics.jsonl; do
-    if [[ -f "$source" ]]; then
-      source_args+=(--extraction-source-diagnostics "$source")
-    fi
-  done
-  runner_base_args "$slug" "$model_id" "$track" "$ANSWER_EXTRACTOR_SEED"
-  log "Extracting unparseable $slug/$track smoke answers with the same served model (text only, seed=$ANSWER_EXTRACTOR_SEED)"
-  "$PYTHON_BIN" -m "$module" \
-    "${RUNNER_ARGS[@]}" \
-    --questions "$questions" \
-    --limit "$SMOKE_SAMPLES" \
-    --strict-partial \
-    --resume \
-    --extract-unparseable-only \
-    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
-    "${source_args[@]}" \
+  args=(
+    --model "$ANSWER_EXTRACTOR_MODEL_ID"
+    --endpoints "${SERVER_ENDPOINTS:-http://127.0.0.1:$PORT/v1}"
+    --api-key EMPTY
+    --questions "$questions"
+    --resume
+    --extract-all-only
+    --extractor-model-id "$ANSWER_EXTRACTOR_MODEL_ID"
+    --extractor-model-revision "$ANSWER_EXTRACTOR_MODEL_REVISION"
+    --extractor-quantization unquantized
+    --extractor-runtime "vllm $ANSWER_EXTRACTOR_VLLM_VERSION"
+    --extractor-max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS"
+    --extractor-attempts "$ANSWER_EXTRACTOR_ATTEMPTS"
+    --max-final-answer-tokens "$FINAL_ANSWER_MAX_TOKENS"
+    --concurrency "$ANSWER_EXTRACTOR_CONCURRENCY"
+    --request-timeout "$REQUEST_TIMEOUT_SECONDS"
+    --max-retries 3
+    --seed "$ANSWER_EXTRACTOR_SEED"
+    --checkpoint-every "$CHECKPOINT_EVERY"
+    --mark-unparseable-incorrect
     --diagnostics "$diagnostics"
+  )
+  if [[ "$limit" != "0" ]]; then
+    args+=(--limit "$limit" --strict-partial)
+  else
+    args+=(--out "$output")
+  fi
+  log "Canonicalizing every $slug/$track response with the independent pinned extractor"
+  "${ANSWER_EXTRACTOR_PYTHON_BIN:-$PYTHON_BIN}" -m "$module" "${args[@]}" \
+    || return 1
+  if [[ "$limit" == "0" ]]; then
+    validate_extracted_submission "$output" "$diagnostics" "$questions"
+  fi
 }
 
 smoke_outputs_are_complete() {
-  local questions="$1" diagnostics="$2"
-  "$PYTHON_BIN" - "$questions" "$diagnostics" "$SMOKE_SAMPLES" <<'PY'
+  local questions="$1" diagnostics="$2" limit="${3:-$SMOKE_SAMPLES}"
+  "$PYTHON_BIN" - "$questions" "$diagnostics" "$limit" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -1439,7 +1618,9 @@ expected = [
     str(json.loads(line)["question_id"])
     for line in questions_path.read_text(encoding="utf-8").splitlines()
     if line.strip()
-][:limit]
+]
+if limit:
+    expected = expected[:limit]
 rows = [
     json.loads(line)
     for line in diagnostics_path.read_text(encoding="utf-8").splitlines()
@@ -1465,8 +1646,9 @@ run_track() {
   smoke_diagnostics="$model_dir/${track}.smoke.diagnostics.jsonl"
   mkdir -p "$model_dir"
 
-  if [[ "$FORCE" != "1" ]] && validate_submission "$output" "$questions" >/dev/null 2>&1; then
-    log "$slug/$track already has a complete canonical output; skipping"
+  if [[ "$FORCE" != "1" ]] \
+    && validate_extracted_submission "$output" "$diagnostics" "$questions" >/dev/null 2>&1; then
+    log "$slug/$track already has a canonical output; skipping raw inference"
     return 0
   fi
   if [[ "$FORCE" == "1" ]]; then
@@ -1474,19 +1656,12 @@ run_track() {
   elif [[ -f "$output" ]]; then
     mv -- "$output" "$output.invalid.$(date -u '+%Y%m%dT%H%M%SZ')"
   fi
-  if [[ "$EXTRACT_UNPARSEABLE_ONLY" == "1" ]]; then
-    run_answer_extraction "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"
-    return
-  fi
-
   runner_base_args "$slug" "$model_id" "$track" "$BASE_SEED"
   smoke_passed=0
-  if [[ "$FORCE" != "1" && -f "$smoke_diagnostics" ]]; then
-    log "Resuming the saved $slug/$track smoke checkpoint with text-only answer extraction"
-    if run_smoke_answer_extraction \
-      "$slug" "$model_id" "$track" "$questions" "$smoke_diagnostics"; then
-      smoke_passed=1
-    fi
+  if [[ "$FORCE" != "1" && -f "$smoke_diagnostics" ]] \
+    && smoke_outputs_are_complete "$questions" "$smoke_diagnostics"; then
+    log "Reusing the complete raw $slug/$track smoke checkpoint"
+    smoke_passed=1
   fi
   if [[ "$smoke_passed" != "1" ]]; then
     rm -f -- "$smoke_diagnostics"
@@ -1496,6 +1671,7 @@ run_track() {
       log "Running strict $SMOKE_SAMPLES-sample smoke test for $slug/$track, pass $attempt/$MAX_EVAL_ATTEMPTS (seed=$seed)"
       smoke_args=(
         "${RUNNER_ARGS[@]}"
+        --inference-only
         --questions "$questions"
         --limit "$SMOKE_SAMPLES"
         --strict-partial
@@ -1512,22 +1688,13 @@ run_track() {
         cp -- "$smoke_diagnostics" "$model_dir/${track}.smoke.attempt-${attempt}.diagnostics.jsonl"
       fi
       if (( attempt < MAX_EVAL_ATTEMPTS )); then
-        log "Smoke pass $attempt left failed or unparseable samples; retrying only those samples with seed $((seed + 1))"
+        log "Smoke pass $attempt left missing, empty, or failed responses; retrying only those samples with seed $((seed + 1))"
         sleep 15
       fi
     done
   fi
-  if [[ "$smoke_passed" != "1" ]] && run_smoke_answer_extraction \
-    "$slug" "$model_id" "$track" "$questions" "$smoke_diagnostics"; then
-    smoke_passed=1
-  fi
-  if [[ "$smoke_passed" != "1" && "$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" == "1" ]] \
-    && smoke_outputs_are_complete "$questions" "$smoke_diagnostics"; then
-    log "Accepting $slug/$track smoke with complete nonempty raw outputs after strict recovery was exhausted"
-    smoke_passed=1
-  fi
   if [[ "$smoke_passed" != "1" ]]; then
-    printf 'Evaluation failed: %s/%s smoke test still has failed or unparseable outputs after %s passes. Raw responses remain in %s. The full evaluation was not started.\n' \
+    printf 'Evaluation failed: %s/%s smoke test still has missing, empty, or failed outputs after %s passes. Raw responses remain in %s. The full evaluation was not started.\n' \
       "$slug" "$track" "$MAX_EVAL_ATTEMPTS" "$smoke_diagnostics" >&2
     return 1
   fi
@@ -1541,36 +1708,51 @@ run_track() {
     log "Running $slug/$track full evaluation, pass $attempt/$MAX_EVAL_ATTEMPTS (seed=$seed)"
     if "$PYTHON_BIN" -m "$module" \
       "${RUNNER_ARGS[@]}" \
+      --inference-only \
       --questions "$questions" \
       --resume \
-      --out "$output" \
-      --diagnostics "$diagnostics" \
-      && validate_submission "$output" "$questions"; then
-      rm -f -- "$smoke_diagnostics"
+      --diagnostics "$diagnostics"; then
       return 0
     fi
     if [[ -f "$diagnostics" ]]; then
       cp -- "$diagnostics" "$model_dir/${track}.attempt-${attempt}.diagnostics.jsonl"
     fi
     if (( attempt < MAX_EVAL_ATTEMPTS )); then
-      log "Pass $attempt left failed or unparseable samples; retrying only those samples with seed $((seed + 1))"
+      log "Pass $attempt left missing, empty, or failed samples; retrying only those samples with seed $((seed + 1))"
       sleep 15
     fi
   done
 
-  if run_answer_extraction "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"; then
-    rm -f -- "$smoke_diagnostics"
-    return 0
-  fi
-
-  if finalize_raw_outputs "$slug" "$model_id" "$track" "$questions" "$output" "$diagnostics"; then
-    rm -f -- "$smoke_diagnostics"
-    return 0
-  fi
-
-  printf 'Evaluation failed: %s/%s still has missing, failed, or empty outputs after %s visual passes, same-model text extraction, and exact raw-output finalization. Raw responses remain in %s. No submission file was finalized.\n' \
+  printf 'Evaluation failed: %s/%s still has missing, failed, or empty outputs after %s visual inference passes. Raw responses remain in %s. No extraction was attempted.\n' \
     "$slug" "$track" "$MAX_EVAL_ATTEMPTS" "$diagnostics" >&2
   return 1
+}
+
+extract_model_tracks() {
+  local slug="$1" track questions model_dir output diagnostics limit
+  model_dir="$OUTPUT_ROOT/$slug"
+  while IFS= read -r track; do
+    questions="$(track_questions "$track")"
+    output="$model_dir/${track}_submission.jsonl"
+    if [[ "$SMOKE_ONLY" == "1" ]]; then
+      diagnostics="$model_dir/${track}.smoke.diagnostics.jsonl"
+      limit="$SMOKE_SAMPLES"
+    else
+      diagnostics="$model_dir/${track}.diagnostics.jsonl"
+      limit=0
+      if [[ "$FORCE" != "1" ]] \
+        && validate_extracted_submission "$output" "$diagnostics" "$questions" >/dev/null 2>&1; then
+        log "$slug/$track already has a canonical submission; skipping extraction"
+        continue
+      fi
+    fi
+    run_independent_extraction \
+      "$slug" "$track" "$questions" "$output" "$diagnostics" "$limit" \
+      || return 1
+    if [[ "$SMOKE_ONLY" != "1" ]]; then
+      rm -f -- "$model_dir/${track}.smoke.diagnostics.jsonl"
+    fi
+  done < <(selected_tracks)
 }
 
 completed_tracks() {
@@ -1578,7 +1760,9 @@ completed_tracks() {
   for track in do_you_see_me minds_eye; do
     questions="$(track_questions "$track")"
     output="$OUTPUT_ROOT/$slug/${track}_submission.jsonl"
-    if validate_submission "$output" "$questions" >/dev/null 2>&1; then
+    if validate_extracted_submission \
+      "$output" "$OUTPUT_ROOT/$slug/${track}.diagnostics.jsonl" "$questions" \
+      >/dev/null 2>&1; then
       printf '%s\n' "$track"
     fi
   done
@@ -1601,7 +1785,15 @@ ensure_run_config() {
   RUN_CONFIG_REASONING_PROFILE="$(model_reasoning_profile "$slug")" \
   RUN_CONFIG_FINAL_ANSWER_MAX_TOKENS="$FINAL_ANSWER_MAX_TOKENS" \
   RUN_CONFIG_ANSWER_EXTRACTION_METHOD="$ANSWER_EXTRACTION_METHOD_ID" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_MODEL_ID="$ANSWER_EXTRACTOR_MODEL_ID" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_MODEL_REVISION="$ANSWER_EXTRACTOR_MODEL_REVISION" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_VLLM_VERSION="$ANSWER_EXTRACTOR_VLLM_VERSION" \
   RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS="$ANSWER_EXTRACTOR_MAX_TOKENS" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_ATTEMPTS="$ANSWER_EXTRACTOR_ATTEMPTS" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_CONCURRENCY="$ANSWER_EXTRACTOR_CONCURRENCY" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_MAX_MODEL_LEN="$ANSWER_EXTRACTOR_MAX_MODEL_LEN" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_MAX_NUM_SEQS="$ANSWER_EXTRACTOR_MAX_NUM_SEQS" \
+  RUN_CONFIG_ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION="$ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION" \
   RUN_CONFIG_ANSWER_EXTRACTOR_SEED="$ANSWER_EXTRACTOR_SEED" \
   RUN_CONFIG_REQUEST_MODEL="$(model_request_name "$slug" "$model_id")" \
   RUN_CONFIG_SOURCE_PROVIDER="$(model_source_provider "$slug")" \
@@ -1618,7 +1810,6 @@ ensure_run_config() {
   RUN_CONFIG_COMPATIBILITY_PATCH="$(model_compatibility_patch "$slug")" \
   RUN_CONFIG_HF_OVERRIDES="$(model_hf_overrides "$slug")" \
   RUN_CONFIG_UNPARSEABLE_POLICY="$UNPARSEABLE_ANSWER_POLICY_ID" \
-  RUN_CONFIG_ALLOW_SMOKE_RAW_OUTPUT_FALLBACK="$ALLOW_SMOKE_RAW_OUTPUT_FALLBACK" \
   RUN_CONFIG_PIPELINE_REVISION="$PIPELINE_REVISION_ID" RUN_CONFIG_MAX_ATTEMPTS="$MAX_EVAL_ATTEMPTS" \
   RUN_CONFIG_BASE_SEED="$BASE_SEED" RUN_CONFIG_FORCE="$FORCE" \
   RUN_CONFIG_TOP_K="$SAMPLING_TOP_K" RUN_CONFIG_MIN_P="$SAMPLING_MIN_P" \
@@ -1640,6 +1831,9 @@ import json
 import os
 from pathlib import Path
 
+from evaluation.common.visual_pipeline import ANSWER_PARSER_POLICY_ID
+from evaluation.common.vllm_runner import EXTRACTOR_PROMPT_SHA256
+
 path = Path(os.environ["RUN_CONFIG_PATH"])
 root = Path(os.environ["RUN_CONFIG_PROJECT_ROOT"])
 
@@ -1653,21 +1847,11 @@ def sha256(file_path: Path) -> str:
 def protocol(prefix: str, track: str) -> dict:
     raw_max_tokens = os.environ[f"RUN_CONFIG_{prefix}_MAX_TOKENS"]
     max_tokens = int(raw_max_tokens) if raw_max_tokens else None
-    final_answer_max_tokens = int(os.environ["RUN_CONFIG_FINAL_ANSWER_MAX_TOKENS"])
-    needs_separate_answer_check = (
-        max_tokens is None or max_tokens > final_answer_max_tokens
-    )
     stop_sequence = os.environ[f"RUN_CONFIG_{prefix}_STOP_SEQUENCE"]
     return {
         "prompt_mode": os.environ[f"RUN_CONFIG_{prefix}_PROMPT_MODE"],
         "max_tokens": max_tokens,
         "max_tokens_policy": os.environ[f"RUN_CONFIG_{prefix}_MAX_TOKENS_POLICY"],
-          "final_answer_max_tokens": final_answer_max_tokens,
-          "final_answer_token_enforcement": (
-            "post-extraction-served-model-tokenizer"
-            if needs_separate_answer_check
-            else "total-completion-cap"
-          ),
         "stop_sequences": [stop_sequence] if stop_sequence else [],
         "include_stop_str_in_output": bool(stop_sequence),
         "temperature": float(os.environ[f"RUN_CONFIG_{prefix}_TEMPERATURE"]),
@@ -1685,7 +1869,7 @@ def protocol(prefix: str, track: str) -> dict:
     }
 
 desired = {
-  "schema_version": 10,
+  "schema_version": 11,
     "model_id": os.environ["RUN_CONFIG_MODEL_ID"],
     "model_revision": os.environ["RUN_CONFIG_REVISION"],
     "reasoning_profile": os.environ["RUN_CONFIG_REASONING_PROFILE"],
@@ -1737,50 +1921,65 @@ desired = {
         "do_you_see_me": protocol("DYS", "do_you_see_me"),
         "minds_eye": protocol("ME", "minds_eye"),
         "base_seed": int(os.environ["RUN_CONFIG_BASE_SEED"]),
-        "format_retry_attempts": int(os.environ["RUN_CONFIG_MAX_ATTEMPTS"]),
+        "inference_retry_attempts": int(os.environ["RUN_CONFIG_MAX_ATTEMPTS"]),
     },
     "image_preprocessing": "original-bytes-no-runner-resize-or-recompression",
     "answer_extraction": {
-      "local_parser": "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
-      "fallback": {
+      "policy": "mandatory-for-every-complete-response",
+      "extractor_output_parser": ANSWER_PARSER_POLICY_ID,
+      "extractor": {
         "method": os.environ["RUN_CONFIG_ANSWER_EXTRACTION_METHOD"],
-        "model": os.environ["RUN_CONFIG_REQUEST_MODEL"],
-        "input_fields": ["question", "answer_type", "candidate_response"],
+        "model": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MODEL_ID"],
+        "model_revision": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MODEL_REVISION"],
+        "weight_loading": "unquantized",
+        "compute_dtype": "bfloat16",
+        "runtime": f"vllm {os.environ['RUN_CONFIG_ANSWER_EXTRACTOR_VLLM_VERSION']}",
+        "language_model_only": True,
+        "max_model_len": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MAX_MODEL_LEN"]),
+        "gpu_memory_utilization": float(
+          os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_GPU_MEMORY_UTILIZATION"]
+        ),
+        "max_num_seqs": int(
+          os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MAX_NUM_SEQS"]
+        ),
+        "request_concurrency": int(
+          os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_CONCURRENCY"]
+        ),
+        "input_fields": ["question", "answer_type", "task", "candidate_response"],
         "image_supplied": False,
         "ground_truth_supplied": False,
         "temperature": 0.0,
         "top_p": 1.0,
+        "chat_template_kwargs": {"enable_thinking": False},
         "seed": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_SEED"]),
         "max_tokens": int(os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_MAX_TOKENS"]),
+        "attempts_for_extractor_or_transport_failure": int(
+          os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_ATTEMPTS"]
+        ),
         "stop_sequences": ["</answer>"],
         "include_stop_str_in_output": True,
+        "prompt_sha256": EXTRACTOR_PROMPT_SHA256,
         "support_validation": "answer-must-be-stated-in-candidate-response",
-        "source_order": "current-then-archived-attempts-in-ascending-attempt-number",
-        "source_deduplication": "candidate-response-utf8-sha256",
-        "source_provenance": ["diagnostics_filename", "candidate-response-utf8-sha256"],
-        "judge_attempt_history": "preserved",
-        "applies_after": ["smoke_visual_retries", "full_visual_retries"],
+        "source": "one-complete-current-diagnostics-response",
+        "source_provenance": [
+          "diagnostics_filename",
+          "candidate-response-utf8-sha256",
+        ],
+        "attempt_history": "preserved",
+        "execution_order": "after-evaluated-model-unload",
       },
     },
     "unparseable_answers": {
       "policy": os.environ["RUN_CONFIG_UNPARSEABLE_POLICY"],
-      "final_fallback": {
-        "applies_after": ["full_visual_retries", "same_model_text_extraction"],
-        "eligible_records": "complete-nonerror-nonempty-output",
+      "incorrect_marker": {
+        "applies_after": ["mandatory_independent_extraction"],
+        "eligible_extractor_statuses": ["unresolved", "unsupported"],
         "source_field": "diagnostics.output",
-        "transformation": "none",
+        "submission_value": "__INVALID_FORMAT__",
+        "transformation": "bounded-invalid-format-marker",
+        "score_effect": "always-incorrect",
+        "raw_output_retention": "diagnostics-only",
       },
-      **(
-        {
-          "smoke_admission": {
-            "applies_after": ["smoke_visual_retries", "same_model_text_extraction"],
-            "eligible_records": "complete-nonerror-nonempty-output",
-            "canonical_output_effect": "none",
-          }
-        }
-        if os.environ["RUN_CONFIG_ALLOW_SMOKE_RAW_OUTPUT_FALLBACK"] == "1"
-        else {}
-      ),
     },
     "pipeline_revision": os.environ["RUN_CONFIG_PIPELINE_REVISION"],
     "source_hashes": {
@@ -1821,6 +2020,38 @@ def extraction_upgrade_invariants(config: dict) -> dict:
   serving_engine.pop("gpu_memory_utilization", None)
   serving_engine.pop("cuda_allocator_config", None)
   return invariant
+
+def mandatory_extractor_upgrade_invariants(config: dict) -> dict:
+  invariant = json.loads(json.dumps(config))
+  for key in (
+    "schema_version",
+    "answer_extraction",
+    "unparseable_answers",
+    "pipeline_revision",
+    "artifact_migrations",
+  ):
+    invariant.pop(key, None)
+  invariant.get("source_hashes", {}).pop("runner", None)
+  generation = invariant.get("generation", {})
+  generation.pop("format_retry_attempts", None)
+  generation.pop("inference_retry_attempts", None)
+  for track in ("do_you_see_me", "minds_eye"):
+    protocol = generation.get(track, {})
+    protocol.pop("final_answer_max_tokens", None)
+    protocol.pop("final_answer_token_enforcement", None)
+  return invariant
+
+def is_supported_mandatory_extractor_upgrade(existing: dict) -> bool:
+  return (
+    existing.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and desired.get("schema_version") == 11
+    and desired.get("pipeline_revision")
+    == "unquantized-bf16-mandatory-independent-extraction-v11"
+    and mandatory_extractor_upgrade_invariants(existing)
+    == mandatory_extractor_upgrade_invariants(desired)
+  )
 
 def is_supported_extraction_upgrade(existing: dict) -> bool:
   return (
@@ -1867,9 +2098,10 @@ def local_parser_upgrade_invariants(config: dict) -> dict:
   invariant = json.loads(json.dumps(config))
   invariant.pop("artifact_migrations", None)
   invariant.get("answer_extraction", {}).pop("local_parser", None)
-  invariant.get("source_hashes", {}).get("runner", {}).pop(
-    "visual_pipeline", None
+  invariant.get("answer_extraction", {}).get("fallback", {}).pop(
+    "input_fields", None
   )
+  invariant.get("source_hashes", {}).pop("runner", None)
   return invariant
 
 def is_supported_local_parser_upgrade(existing: dict) -> bool:
@@ -1883,9 +2115,12 @@ def is_supported_local_parser_upgrade(existing: dict) -> bool:
       "strict-local-final-answer-parser-v2-number-words-zero-through-twenty",
       "strict-local-final-answer-parser-v3-number-words-and-explicit-odd-figure",
       "strict-local-final-answer-parser-v4-innermost-glm-box",
+      "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
+      "strict-local-final-answer-parser-v6-task-aware-text-contracts",
+      "strict-local-final-answer-parser-v7-explicit-integer-commitments",
     }
     and desired.get("answer_extraction", {}).get("local_parser")
-    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    == "strict-local-final-answer-parser-v8-explicit-integers-and-latex-boxes"
     and local_parser_upgrade_invariants(existing)
     == local_parser_upgrade_invariants(desired)
   )
@@ -1895,6 +2130,9 @@ def raw_output_finalization_upgrade_invariants(config: dict) -> dict:
   invariant.pop("artifact_migrations", None)
   invariant.pop("unparseable_answers", None)
   invariant.get("answer_extraction", {}).pop("local_parser", None)
+  invariant.get("answer_extraction", {}).get("fallback", {}).pop(
+    "input_fields", None
+  )
   invariant.get("source_hashes", {}).pop("runner", None)
   return invariant
 
@@ -1907,7 +2145,7 @@ def is_supported_raw_output_finalization_upgrade(existing: dict) -> bool:
     and existing.get("unparseable_answers", {}).get("policy")
     == "deterministic-smoke-and-full-visual-retries-then-text-extraction-v4"
     and desired.get("unparseable_answers", {}).get("policy")
-    == "deterministic-retries-text-extraction-then-exact-raw-output-v5"
+    == "deterministic-retries-text-extraction-then-invalid-format-marker-v6"
     and existing.get("answer_extraction", {}).get("local_parser")
     in {
       "strict-local-final-answer-parser-v3-number-words-and-explicit-odd-figure",
@@ -1915,9 +2153,44 @@ def is_supported_raw_output_finalization_upgrade(existing: dict) -> bool:
       "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
     }
     and desired.get("answer_extraction", {}).get("local_parser")
-    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    == "strict-local-final-answer-parser-v8-explicit-integers-and-latex-boxes"
     and raw_output_finalization_upgrade_invariants(existing)
     == raw_output_finalization_upgrade_invariants(desired)
+  )
+
+def is_supported_invalid_format_marker_upgrade(existing: dict) -> bool:
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("unparseable_answers", {}).get("policy")
+    == "deterministic-retries-text-extraction-then-exact-raw-output-v5"
+    and desired.get("unparseable_answers", {}).get("policy")
+    == "deterministic-retries-text-extraction-then-invalid-format-marker-v6"
+    and existing.get("answer_extraction", {}).get("local_parser")
+    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    and desired.get("answer_extraction", {}).get("local_parser")
+    == "strict-local-final-answer-parser-v8-explicit-integers-and-latex-boxes"
+    and raw_output_finalization_upgrade_invariants(existing)
+    == raw_output_finalization_upgrade_invariants(desired)
+  )
+
+def is_supported_task_aware_parser_upgrade(existing: dict) -> bool:
+  return (
+    existing.get("schema_version") == desired.get("schema_version") == 10
+    and existing.get("pipeline_revision")
+    == desired.get("pipeline_revision")
+    == "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    and existing.get("unparseable_answers", {}).get("policy")
+    == desired.get("unparseable_answers", {}).get("policy")
+    == "deterministic-retries-text-extraction-then-invalid-format-marker-v6"
+    and existing.get("answer_extraction", {}).get("local_parser")
+    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    and desired.get("answer_extraction", {}).get("local_parser")
+    == "strict-local-final-answer-parser-v8-explicit-integers-and-latex-boxes"
+    and local_parser_upgrade_invariants(existing)
+    == local_parser_upgrade_invariants(desired)
   )
 
 def smoke_admission_upgrade_invariants(config: dict) -> dict:
@@ -1949,9 +2222,10 @@ def glm_extended_retry_invariants(config: dict) -> dict:
   invariant.pop("artifact_migrations", None)
   invariant.get("generation", {}).pop("format_retry_attempts", None)
   invariant.get("answer_extraction", {}).pop("local_parser", None)
-  invariant.get("source_hashes", {}).get("runner", {}).pop(
-    "visual_pipeline", None
+  invariant.get("answer_extraction", {}).get("fallback", {}).pop(
+    "input_fields", None
   )
+  invariant.get("source_hashes", {}).pop("runner", None)
   return invariant
 
 def is_supported_glm_extended_retry(existing: dict) -> bool:
@@ -1975,7 +2249,7 @@ def is_supported_glm_extended_retry(existing: dict) -> bool:
       "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box",
     }
     and desired.get("answer_extraction", {}).get("local_parser")
-    == "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
+    == "strict-local-final-answer-parser-v8-explicit-integers-and-latex-boxes"
     and glm_extended_retry_invariants(existing)
     == glm_extended_retry_invariants(desired)
   )
@@ -2556,7 +2830,28 @@ elif path.is_file():
     if existing.get("artifact_migrations"):
         desired["artifact_migrations"] = existing["artifact_migrations"]
     if existing != desired and artifacts:
-        if is_supported_extraction_upgrade(existing):
+        if is_supported_mandatory_extractor_upgrade(existing):
+          for submission in path.parent.glob("*_submission.jsonl"):
+            submission.unlink()
+          (path.parent / "run_manifest.json").unlink(missing_ok=True)
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "mandatory-independent-extractor-upgrade",
+              "from_schema_version": existing["schema_version"],
+              "from_pipeline_revision": existing["pipeline_revision"],
+              "previous_answer_extraction": existing.get("answer_extraction"),
+              "to_schema_version": desired["schema_version"],
+              "to_pipeline_revision": desired["pipeline_revision"],
+              "raw_diagnostics_preserved": True,
+              "previous_submissions_removed": True,
+            },
+          ]
+          print(
+            f"Migrated {path.parent.name} to mandatory independent extraction; "
+            "raw diagnostics were preserved and old submissions were removed."
+          )
+        elif is_supported_extraction_upgrade(existing):
           desired["artifact_migrations"] = [
             *existing.get("artifact_migrations", []),
             {
@@ -2605,6 +2900,26 @@ elif path.is_file():
             f"Recorded bounded serving resources for {path.parent.name}; "
             "existing diagnostics were preserved."
           )
+        elif is_supported_task_aware_parser_upgrade(existing):
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "provenance-preserving-task-aware-parser-upgrade",
+              "schema_version": existing["schema_version"],
+              "previous_local_parser": existing["answer_extraction"][
+                "local_parser"
+              ],
+              "current_local_parser": desired["answer_extraction"][
+                "local_parser"
+              ],
+              "previous_runner_source_hashes": existing["source_hashes"]["runner"],
+              "current_runner_source_hashes": desired["source_hashes"]["runner"],
+            },
+          ]
+          print(
+            f"Recorded task-aware answer parser for {path.parent.name}; "
+            "existing diagnostics will be canonicalized without model inference."
+          )
         elif is_supported_local_parser_upgrade(existing):
           desired["artifact_migrations"] = [
             *existing.get("artifact_migrations", []),
@@ -2634,7 +2949,7 @@ elif path.is_file():
           desired["artifact_migrations"] = [
             *existing.get("artifact_migrations", []),
             {
-              "reason": "provenance-preserving-exact-raw-output-finalization-upgrade",
+              "reason": "provenance-preserving-invalid-format-policy-upgrade",
               "schema_version": existing["schema_version"],
               "previous_unparseable_answers": existing["unparseable_answers"],
               "current_unparseable_answers": desired["unparseable_answers"],
@@ -2645,8 +2960,25 @@ elif path.is_file():
             },
           ]
           print(
-            f"Recorded exact raw-output finalization policy for {path.parent.name}; "
-            "existing diagnostics were preserved."
+            f"Recorded invalid-format finalization policy for {path.parent.name}; "
+            "existing diagnostics will be canonicalized without model inference."
+          )
+        elif is_supported_invalid_format_marker_upgrade(existing):
+          desired["artifact_migrations"] = [
+            *existing.get("artifact_migrations", []),
+            {
+              "reason": "provenance-preserving-invalid-format-marker-upgrade",
+              "schema_version": existing["schema_version"],
+              "previous_unparseable_answers": existing["unparseable_answers"],
+              "current_unparseable_answers": desired["unparseable_answers"],
+              "previous_runner_source_hashes": existing["source_hashes"]["runner"],
+              "current_runner_source_hashes": desired["source_hashes"]["runner"],
+            },
+          ]
+          print(
+            f"Recorded invalid-format marker policy for {path.parent.name}; "
+            "existing diagnostics were preserved and unresolved rows will be "
+            "re-exported without new model inference."
           )
         elif is_supported_smoke_admission_upgrade(existing):
           desired["artifact_migrations"] = [
@@ -2754,7 +3086,13 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from evaluation.common.visual_pipeline import record_answer
+from evaluation.common.visual_pipeline import (
+  EXTRACTOR_INCORRECT_STATUSES,
+  INVALID_FORMAT_ANSWER,
+  INVALID_FORMAT_REASON,
+  has_valid_extractor_provenance,
+  record_answer,
+)
 
 path = Path(os.environ["MANIFEST_PATH"])
 root = Path(os.environ["MANIFEST_PROJECT_ROOT"])
@@ -2780,16 +3118,43 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     diagnostics_by_id = {
       str(row["question_id"]): row for row in diagnostic_rows
     }
-    exact_raw_output_fallback_question_ids = []
+    invalid_format_question_ids = []
     for row in rows:
       question_id = str(row["question_id"])
       diagnostic = diagnostics_by_id[question_id]
       answer_type = str(diagnostic.get("answer_type") or "text")
-      if (
-        not record_answer(diagnostic, answer_type)
-        and row["answer"] == diagnostic.get("output")
-      ):
-        exact_raw_output_fallback_question_ids.append(question_id)
+      task = str(diagnostic.get("task") or "")
+      if not has_valid_extractor_provenance(diagnostic):
+        raise SystemExit(
+          f"Mandatory extractor provenance mismatch for {track}/{question_id}."
+        )
+      extracted_answer = record_answer(diagnostic, answer_type, task)
+      if row["answer"] == INVALID_FORMAT_ANSWER:
+        raw_output = diagnostic.get("output")
+        raw_bytes = raw_output.encode("utf-8") if isinstance(raw_output, str) else b""
+        if (
+          extracted_answer
+          or diagnostic.get("extractor_status") not in EXTRACTOR_INCORRECT_STATUSES
+          or diagnostic.get("error")
+          or not isinstance(raw_output, str)
+          or not raw_output.strip()
+          or diagnostic.get("submission_status") != "invalid_format"
+          or diagnostic.get("format_failure_reason")
+          != INVALID_FORMAT_REASON
+          or diagnostic.get("raw_output_characters") != len(raw_output)
+          or diagnostic.get("raw_output_bytes") != len(raw_bytes)
+          or diagnostic.get("raw_output_sha256")
+          != hashlib.sha256(raw_bytes).hexdigest()
+        ):
+          raise SystemExit(
+            f"Invalid-format provenance mismatch for {track}/{question_id}."
+          )
+        invalid_format_question_ids.append(question_id)
+      elif row["answer"] != extracted_answer:
+        raise SystemExit(
+          f"Submission answer differs from independent extraction for "
+          f"{track}/{question_id}."
+        )
     attempt_files = sorted(path.parent.glob(f"{track}.attempt-*.diagnostics.jsonl"))
     smoke_attempt_files = sorted(path.parent.glob(f"{track}.smoke.attempt-*.diagnostics.jsonl"))
     tracks[track] = {
@@ -2798,9 +3163,7 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
         "row_count": len(rows),
         "submission_sha256": sha256(output),
         "diagnostics_sha256": sha256(diagnostics),
-        "exact_raw_output_fallback_question_ids": (
-          exact_raw_output_fallback_question_ids
-        ),
+        "invalid_format_question_ids": invalid_format_question_ids,
         "failed_attempt_diagnostics": [
             {
                 "file": attempt.name,
@@ -2826,7 +3189,7 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     }
 
 manifest = {
-  "schema_version": 10,
+  "schema_version": 11,
     "created_at": datetime.now(timezone.utc).isoformat(),
     "model_id": os.environ["MANIFEST_MODEL_ID"],
     "model_revision": os.environ["MANIFEST_REVISION"],
@@ -2883,12 +3246,24 @@ delete_model_cache() {
   esac
 }
 
+raw_diagnostics_complete() {
+  local slug="$1" track questions diagnostics
+  while IFS= read -r track; do
+    questions="$(track_questions "$track")"
+    diagnostics="$OUTPUT_ROOT/$slug/${track}.diagnostics.jsonl"
+    smoke_outputs_are_complete "$questions" "$diagnostics" 0 \
+      >/dev/null 2>&1 || return 1
+  done < <(selected_tracks)
+}
+
 model_outputs_complete() {
   local slug="$1" track questions output
   while IFS= read -r track; do
     questions="$(track_questions "$track")"
     output="$OUTPUT_ROOT/$slug/${track}_submission.jsonl"
-    validate_submission "$output" "$questions" >/dev/null 2>&1 || return 1
+    validate_extracted_submission \
+      "$output" "$OUTPUT_ROOT/$slug/${track}.diagnostics.jsonl" "$questions" \
+      >/dev/null 2>&1 || return 1
   done < <(selected_tracks)
 }
 
@@ -2916,22 +3291,38 @@ run_model() {
     return 0
   fi
 
-  if ! start_server "$slug" "$model_id" "$revision" "$loading" "$model_cache" "$model_max_len"; then
-    delete_model_cache "$model_cache"
-    return 1
-  fi
-  request_model="$(model_request_name "$slug" "$model_id")"
-  while IFS= read -r track; do
-    if ! run_track "$slug" "$request_model" "$track"; then
-      track_failed=1
-      log "$slug/$track failed; continuing with remaining selected tracks"
+  if [[ "$SMOKE_ONLY" != "1" && "$FORCE" != "1" ]] \
+    && raw_diagnostics_complete "$slug"; then
+    log "$slug already has complete raw diagnostics; skipping visual model startup"
+  else
+    if ! start_server "$slug" "$model_id" "$revision" "$loading" "$model_cache" "$model_max_len"; then
+      delete_model_cache "$model_cache"
+      return 1
     fi
-  done < <(selected_tracks)
-  stop_server
-  if [[ "$track_failed" == "1" ]]; then
+    request_model="$(model_request_name "$slug" "$model_id")"
+    while IFS= read -r track; do
+      if ! run_track "$slug" "$request_model" "$track"; then
+        track_failed=1
+        log "$slug/$track failed; continuing with remaining selected tracks"
+      fi
+    done < <(selected_tracks)
+    stop_server
+    if [[ "$track_failed" == "1" ]]; then
+      delete_model_cache "$model_cache"
+      return 1
+    fi
+  fi
+
+  if ! start_answer_extractor_server "$slug"; then
     delete_model_cache "$model_cache"
     return 1
   fi
+  if ! extract_model_tracks "$slug"; then
+    stop_server
+    delete_model_cache "$model_cache"
+    return 1
+  fi
+  stop_server
 
   if [[ "$SMOKE_ONLY" != "1" ]]; then
     write_manifest "$slug" "$model_id" "$revision" "$loading" "$model_max_len"
@@ -2986,6 +3377,7 @@ main() {
   (( selected_count > 0 )) || die "MODELS did not match any configured model slug."
 
   stop_server
+  delete_model_cache "$CACHE_ROOT/models/answer-extractor"
   printf '\nEvaluation summary\n'
   printf '  Completed: %s\n' "${SUCCESS_MODELS[*]:-none}"
   printf '  Skipped:   %s\n' "${SKIPPED_MODELS[*]:-none}"

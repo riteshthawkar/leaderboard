@@ -1,17 +1,45 @@
 {
+  "schema_version": "ms-vista-spatial-benchmark/v2",
   "task_id": "spatial",
-  "version": "1.0",
-  "note": "We do not redistribute these datasets. The harness downloads each from its official source on your machine. Verify every hf_id/config (entries with verify=true) against VLMEvalKit.",
-  "conditions": [
-    "standard",
-    "cot",
-    "no_image",
-    "no_image_plus"
+  "benchmark_version": "demo-only",
+  "demo": true,
+  "note": "This checked-in bundle only exercises local code paths. It cannot be used for leaderboard submissions.",
+  "datasets": [
+    "BLINK",
+    "CV-Bench-2D",
+    "CV-Bench-3D",
+    "MMVP",
+    "RealWorldQA",
+    "VStarBench",
+    "MMSIBench_wo_circular",
+    "3DSRBench",
+    "VSR_MCQ",
+    "SpatialBench",
+    "MindCube",
+    "OmniSpatial",
+    "SAT-Real"
   ],
+  "required_conditions": [
+    "main_noncot",
+    "main_cot",
+    "no_image_noncot",
+    "no_image_cot",
+    "no_image_plus_noncot",
+    "no_image_plus_cot"
+  ],
+  "primary_condition": "main_noncot",
   "no_image_plus_option": "Cannot determine from the image",
   "dataset_count": 13,
+  "condition_counts": {
+    "main_noncot": 39,
+    "main_cot": 39,
+    "no_image_noncot": 39,
+    "no_image_cot": 39,
+    "no_image_plus_noncot": 39,
+    "no_image_plus_cot": 39
+  },
   "approx_total_samples": 16830,
-  "datasets": [
+  "dataset_catalog": [
     {
       "id": "blink",
       "name": "BLINK",

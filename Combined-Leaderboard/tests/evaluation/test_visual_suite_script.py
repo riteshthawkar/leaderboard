@@ -6,6 +6,14 @@ import stat
 import subprocess
 from pathlib import Path
 
+from evaluation.common.visual_pipeline import (
+    INVALID_FORMAT_REASON,
+    MANDATORY_ANSWER_EXTRACTION_METHOD_ID,
+    MANDATORY_EXTRACTOR_MODEL_ID,
+    MANDATORY_EXTRACTOR_MODEL_REVISION,
+    MANDATORY_EXTRACTOR_PROMPT_SHA256,
+)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "evaluation" / "run_visual_suite.sh"
@@ -72,6 +80,7 @@ def test_visual_suite_has_no_quantized_or_synthetic_answer_path():
     assert "import timm" in script
     assert "from huggingface_hub import get_token" in script
     assert 'print(get_token() or "")' in script
+    assert "--language-model-only" in script
     assert 'vllm_phi4mm_mask_sum_patch_id="vllm-0.25.1-phi4mm-fp32-mask-sum-v1"' in script
     assert "evaluation.common.patch_vllm_phi4mm" in script
     assert ".attempt-${attempt}.diagnostics.jsonl" in script
@@ -89,22 +98,28 @@ def test_visual_suite_dry_run_uses_unquantized_paper_profiles():
     assert result.returncode == 0, result.stderr
     assert "original checkpoint tensors, unquantized; compute: bfloat16; KV cache: bfloat16" in result.stdout
     assert "no runner resize or recompression" in result.stdout
-    assert "preserve exact nonempty diagnostics.output" in result.stdout
+    assert "Qwen/Qwen3.5-4B" in result.stdout
+    assert "mandatory for every response" in result.stdout
+    assert "no image or ground truth" in result.stdout
+    assert (
+        "Extractor runtime: vLLM 0.25.1, language-model-only, one assigned GPU, "
+        "context=32768"
+    ) in result.stdout
     assert "top_k=-1, min_p=0.0, presence=0.0, frequency=0.0, repetition=1.0" in result.stdout
     assert "prompt=noncot, temperature=1.0, top_p=0.95" in result.stdout
     assert "prompt=cot, temperature=0.1, top_p=1.0" in result.stdout
     assert "retained_stop=</answer>" in result.stdout
     assert (
         "Reasoning profile: thinking; API max_tokens=uncapped "
-        "(remaining-model-context); final_answer_max_tokens=200"
+        "(remaining-model-context); independent_extractor_answer_max_tokens=200"
     ) in result.stdout
     assert (
         "Reasoning profile: thinking; API max_tokens=8192; "
-        "final_answer_max_tokens=200"
+        "independent_extractor_answer_max_tokens=200"
     ) in result.stdout
     assert (
         "Reasoning profile: nonthinking; API max_tokens=200; "
-        "final_answer_max_tokens=200"
+        "independent_extractor_answer_max_tokens=200"
     ) in result.stdout
     assert result.stdout.count("unquantized, context=32768") == 12
     assert "Qwen/Qwen3.5-9B" in result.stdout
@@ -141,7 +156,7 @@ def test_gemma3_27b_uses_pinned_tp2_track_budget_profile():
     assert "google/gemma-3-27b-it" in result.stdout
     assert (
         "API max_tokens=do_you_see_me=200, minds_eye=8192; "
-        "final_answer_max_tokens=200"
+        "independent_extractor_answer_max_tokens=200"
     ) in result.stdout
 
 
@@ -174,7 +189,7 @@ def test_deepseek_vl2_uses_pinned_native_context_tp2_profile():
     assert "unquantized, context=4096" in result.stdout
     assert (
         "Reasoning profile: nonthinking; API max_tokens=200; "
-        "final_answer_max_tokens=200"
+        "independent_extractor_answer_max_tokens=200"
     ) in result.stdout
 
 
@@ -208,7 +223,7 @@ def test_llama32_11b_vision_uses_pinned_legacy_v0_dp2_profile(tmp_path):
     assert "Engine mode: legacy-v0; server KV cache argument: auto" in result.stdout
     assert (
         "API max_tokens=do_you_see_me=200, minds_eye=8192; "
-        "final_answer_max_tokens=200"
+        "independent_extractor_answer_max_tokens=200"
     ) in result.stdout
 
     output_root = tmp_path / "outputs"
@@ -265,7 +280,7 @@ def test_kimi_vl_uses_pinned_dp3_track_budget_profile(tmp_path):
     assert "moonshotai/Kimi-VL-A3B-Instruct" in result.stdout
     assert (
         "API max_tokens=do_you_see_me=200, minds_eye=8192; "
-        "final_answer_max_tokens=200"
+        "independent_extractor_answer_max_tokens=200"
     ) in result.stdout
 
     output_root = tmp_path / "outputs"
@@ -291,48 +306,13 @@ def test_kimi_vl_uses_pinned_dp3_track_budget_profile(tmp_path):
         )
     )
     assert config["serving_engine"]["replica_mode"] == "independent-processes"
-
-    questions = tmp_path / "questions.jsonl"
-    questions.write_text(
-        '{"question_id":"q1"}\n{"question_id":"q2"}\n', encoding="utf-8"
+    extractor = config["answer_extraction"]["extractor"]
+    assert config["answer_extraction"]["policy"] == (
+        "mandatory-for-every-complete-response"
     )
-    diagnostics = output_root / "kimi-vl-a3b-instruct" / "minds_eye.smoke.diagnostics.jsonl"
-    diagnostics_bytes = (
-        b'{"question_id":"q1","output":"<answer>A"}\n'
-        b'{"question_id":"q2","output":"The choice is D"}\n'
-    )
-    diagnostics.write_bytes(diagnostics_bytes)
-    admission = _run_sourced(
-        "\n".join(
-            (
-                'PYTHON_BIN="$(command -v python3)"',
-                f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
-                "GPU_IDS=0,1,3",
-                "TENSOR_PARALLEL_SIZE=1",
-                "DATA_PARALLEL_SIZE=3",
-                "CONCURRENCY=3",
-                "SERVING_REPLICA_MODE=independent",
-                "ALLOW_SMOKE_RAW_OUTPUT_FALLBACK=1",
-                "FORCE=0",
-                "ensure_run_config kimi-vl-a3b-instruct moonshotai/Kimi-VL-A3B-Instruct revision-a unquantized 32768",
-                "SMOKE_SAMPLES=2",
-                f"smoke_outputs_are_complete {shlex.quote(str(questions))} {shlex.quote(str(diagnostics))}",
-            )
-        )
-    )
-    assert admission.returncode == 0, admission.stderr
-    assert diagnostics.read_bytes() == diagnostics_bytes
-    migrated = json.loads(
-        (output_root / "kimi-vl-a3b-instruct" / ".run_config.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    assert migrated["unparseable_answers"]["smoke_admission"][
-        "canonical_output_effect"
-    ] == "none"
-    assert migrated["artifact_migrations"][-1]["reason"] == (
-        "provenance-preserving-smoke-raw-output-admission"
-    )
+    assert extractor["model"] == "Qwen/Qwen3.5-4B"
+    assert extractor["image_supplied"] is False
+    assert extractor["ground_truth_supplied"] is False
 
 
 def test_visual_suite_token_limit_follows_model_policy():
@@ -616,52 +596,22 @@ if (( count == 1 )); then exit 2; fi
     ).is_file()
 
 
-def test_saved_smoke_checkpoint_uses_text_extraction_before_visual_retry(tmp_path):
+def test_saved_complete_smoke_checkpoint_skips_visual_requests(tmp_path):
     output_root = tmp_path / "outputs"
     model_dir = output_root / "test-model"
     model_dir.mkdir(parents=True)
     questions = tmp_path / "questions.jsonl"
-    questions.write_text("{}\n", encoding="utf-8")
+    questions.write_text('{"question_id":"q1"}\n', encoding="utf-8")
     smoke = model_dir / "minds_eye.smoke.diagnostics.jsonl"
     smoke.write_text(
         '{"question_id":"q1","output":"Option C seems most likely"}\n',
         encoding="utf-8",
     )
-    archived = model_dir / "minds_eye.smoke.attempt-1.diagnostics.jsonl"
-    archived.write_text(smoke.read_text(encoding="utf-8"), encoding="utf-8")
-    fake_python = tmp_path / "fake-python"
-    marker = tmp_path / "extractor-called"
-    _make_executable(
-        fake_python,
-        """#!/usr/bin/env bash
-set -eu
-extract=0
-limit=""
-resume=0
-source_diagnostics=""
-while (( $# )); do
-  case "$1" in
-    --extract-unparseable-only) extract=1; shift ;;
-    --limit) limit="$2"; shift 2 ;;
-    --resume) resume=1; shift ;;
-    --extraction-source-diagnostics) source_diagnostics="$2"; shift 2 ;;
-    *) shift ;;
-  esac
-done
-(( extract == 1 )) || exit 31
-[[ "$limit" == "20" ]] || exit 32
-(( resume == 1 )) || exit 33
-[[ "$source_diagnostics" == *"smoke.attempt-1.diagnostics.jsonl" ]] || exit 34
-printf 'called' > "$FAKE_MARKER"
-""",
-    )
 
     result = _run_sourced(
         "\n".join(
             (
-                f"PYTHON_BIN={shlex.quote(str(fake_python))}",
-                f"FAKE_MARKER={shlex.quote(str(marker))}",
-                "export FAKE_MARKER",
+                'PYTHON_BIN="$(command -v python3)"',
                 f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
                 f"track_questions() {{ printf '%s\\n' {shlex.quote(str(questions))}; }}",
                 "track_module() { printf '%s\\n' fake.module; }",
@@ -675,12 +625,11 @@ printf 'called' > "$FAKE_MARKER"
     )
 
     assert result.returncode == 0, result.stderr
-    assert marker.read_text(encoding="utf-8") == "called"
-    assert "Resuming the saved" in result.stdout
+    assert "Reusing the complete raw" in result.stdout
     assert "Running strict" not in result.stdout
 
 
-def test_extraction_only_mode_skips_smoke_and_visual_requests(tmp_path):
+def test_independent_extraction_command_processes_all_existing_rows(tmp_path):
     output_root = tmp_path / "outputs"
     model_dir = output_root / "test-model"
     model_dir.mkdir(parents=True)
@@ -691,33 +640,34 @@ def test_extraction_only_mode_skips_smoke_and_visual_requests(tmp_path):
         '{"question_id":"q1","output":"The answer may be 4 or 6"}\n',
         encoding="utf-8",
     )
-    archived = model_dir / "do_you_see_me.attempt-1.diagnostics.jsonl"
-    archived.write_text(
-        '{"question_id":"q1","output":"The answer is 6"}\n',
-        encoding="utf-8",
-    )
+    output = model_dir / "do_you_see_me_submission.jsonl"
     fake_python = tmp_path / "fake-python"
+    marker = tmp_path / "extractor-called"
     _make_executable(
         fake_python,
         """#!/usr/bin/env bash
 set -eu
 extract=0
-limit=0
 output=""
-source_diagnostics=""
+model=""
+diagnostics=""
+has_image=0
 while (( $# )); do
   case "$1" in
-    --extract-unparseable-only) extract=1; shift ;;
-    --limit) limit=1; shift 2 ;;
+    --extract-all-only) extract=1; shift ;;
     --out) output="$2"; shift 2 ;;
-    --extraction-source-diagnostics) source_diagnostics="$2"; shift 2 ;;
+    --model) model="$2"; shift 2 ;;
+    --diagnostics) diagnostics="$2"; shift 2 ;;
+    --image-root) has_image=1; shift 2 ;;
     *) shift ;;
   esac
 done
 (( extract == 1 )) || exit 21
-(( limit == 0 )) || exit 22
-[[ "$source_diagnostics" == *"attempt-1.diagnostics.jsonl" ]] || exit 23
+[[ "$model" == "Qwen/Qwen3.5-4B" ]] || exit 22
+[[ "$diagnostics" == *"do_you_see_me.diagnostics.jsonl" ]] || exit 23
+(( has_image == 0 )) || exit 24
 printf '{"question_id":"q1","condition":"standard","answer":"6"}\n' > "$output"
+printf called > "$FAKE_MARKER"
 """,
     )
 
@@ -725,94 +675,59 @@ printf '{"question_id":"q1","condition":"standard","answer":"6"}\n' > "$output"
         "\n".join(
             (
                 f"PYTHON_BIN={shlex.quote(str(fake_python))}",
+                f"FAKE_MARKER={shlex.quote(str(marker))}",
+                "export FAKE_MARKER",
                 f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
-                f"track_questions() {{ printf '%s\\n' {shlex.quote(str(questions))}; }}",
                 "track_module() { printf '%s\\n' fake.module; }",
-                "runner_base_args() { RUNNER_ARGS=(--model test/model); }",
-                "validate_submission() { [[ -s \"$1\" ]]; }",
-                "EXTRACT_UNPARSEABLE_ONLY=1",
-                "FORCE=0",
-                "run_track test-model test/model do_you_see_me",
+                "validate_extracted_submission() { [[ -s \"$1\" ]]; }",
+                f"run_independent_extraction test-model do_you_see_me {shlex.quote(str(questions))} {shlex.quote(str(output))} {shlex.quote(str(diagnostics))} 0",
             )
         )
     )
 
     assert result.returncode == 0, result.stderr
-    assert "same served model (text only" in result.stdout
-    assert "smoke test" not in result.stdout
+    assert marker.read_text(encoding="utf-8") == "called"
+    assert "independent pinned extractor" in result.stdout
 
 
-def test_full_track_finalizes_exact_raw_output_after_recovery_fails(tmp_path):
-    output_root = tmp_path / "outputs"
-    model_dir = output_root / "test-model"
-    model_dir.mkdir(parents=True)
-    questions = tmp_path / "questions.jsonl"
-    questions.write_text('{}\n', encoding="utf-8")
-    (model_dir / "minds_eye.smoke.diagnostics.jsonl").write_text(
-        '{}\n', encoding="utf-8"
-    )
-    fake_python = tmp_path / "fake-python"
-    count_file = tmp_path / "visual-calls"
-    _make_executable(
-        fake_python,
-        """#!/usr/bin/env bash
-set -eu
-diagnostics=""
-output=""
-finalize=0
-raw_fallback=0
-while (( $# )); do
-  case "$1" in
-    --diagnostics) diagnostics="$2"; shift 2 ;;
-    --out) output="$2"; shift 2 ;;
-    --finalize-existing-diagnostics) finalize=1; shift ;;
-    --raw-output-fallback) raw_fallback=1; shift ;;
-    *) shift ;;
-  esac
-done
-if (( finalize == 1 )); then
-  (( raw_fallback == 1 )) || exit 31
-  printf '{"question_id":"q1","condition":"standard","answer":"<|begin_of_box|><answer>G</answer>"}\n' > "$output"
-  exit 0
-fi
-count=0
-if [[ -f "$FAKE_COUNT_FILE" ]]; then count="$(cat "$FAKE_COUNT_FILE")"; fi
-printf '%s' "$((count + 1))" > "$FAKE_COUNT_FILE"
-printf '{"question_id":"q1","output":"<|begin_of_box|><answer>G</answer>"}\n' > "$diagnostics"
-exit 2
-""",
-    )
-
+def test_run_model_unloads_visual_server_before_independent_extraction(tmp_path):
+    events = tmp_path / "events"
     result = _run_sourced(
         "\n".join(
             (
-                f"PYTHON_BIN={shlex.quote(str(fake_python))}",
-                f"FAKE_COUNT_FILE={shlex.quote(str(count_file))}",
-                "export FAKE_COUNT_FILE",
-                f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
-                f"track_questions() {{ printf '%s\\n' {shlex.quote(str(questions))}; }}",
-                "track_module() { printf '%s\\n' fake.module; }",
-                "runner_base_args() { RUNNER_ARGS=(--model test/model); }",
-                "run_smoke_answer_extraction() { return 0; }",
-                "run_answer_extraction() { return 1; }",
-                "validate_submission() { [[ -s \"$1\" ]]; }",
-                "MAX_EVAL_ATTEMPTS=2",
+                f"EVENTS={shlex.quote(str(events))}",
+                "export EVENTS",
+                f"OUTPUT_ROOT={shlex.quote(str(tmp_path / 'outputs'))}",
+                "MAX_MODEL_LEN=auto",
+                "SMOKE_ONLY=0",
                 "FORCE=0",
-                "sleep() { :; }",
-                "run_track test-model test/model minds_eye",
+                "ensure_run_config() { :; }",
+                "model_outputs_complete() { return 1; }",
+                "raw_diagnostics_complete() { return 1; }",
+                "start_server() { printf '%s\\n' visual >> \"$EVENTS\"; }",
+                "model_request_name() { printf '%s\\n' test/request; }",
+                "selected_tracks() { printf '%s\\n' do_you_see_me; }",
+                "run_track() { printf '%s\\n' inference >> \"$EVENTS\"; }",
+                "stop_server() { printf '%s\\n' stop >> \"$EVENTS\"; }",
+                "start_answer_extractor_server() { printf '%s\\n' extractor >> \"$EVENTS\"; }",
+                "extract_model_tracks() { printf '%s\\n' extract-all >> \"$EVENTS\"; }",
+                "write_manifest() { printf '%s\\n' manifest >> \"$EVENTS\"; }",
+                "delete_model_cache() { :; }",
+                "run_model test-model test/model revision-a unquantized 32768",
             )
         )
     )
 
     assert result.returncode == 0, result.stderr
-    assert count_file.read_text(encoding="utf-8") == "2"
-    submission = model_dir / "minds_eye_submission.jsonl"
-    assert json.loads(submission.read_text(encoding="utf-8"))["answer"] == (
-        "<|begin_of_box|><answer>G</answer>"
-    )
-    assert (model_dir / "minds_eye.attempt-1.diagnostics.jsonl").is_file()
-    assert (model_dir / "minds_eye.attempt-2.diagnostics.jsonl").is_file()
-    assert "exact faulty model outputs" in result.stdout
+    assert events.read_text(encoding="utf-8").splitlines() == [
+        "visual",
+        "inference",
+        "stop",
+        "extractor",
+        "extract-all",
+        "stop",
+        "manifest",
+    ]
 
 
 def test_model_attempts_all_selected_tracks_before_reporting_failure(tmp_path):
@@ -846,7 +761,7 @@ def test_model_attempts_all_selected_tracks_before_reporting_failure(tmp_path):
     ]
 
 
-def test_raw_output_finalization_policy_upgrade_preserves_diagnostics(tmp_path):
+def _legacy_invalid_format_marker_policy_upgrade_preserves_diagnostics(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -865,11 +780,22 @@ def test_raw_output_finalization_policy_upgrade_preserves_diagnostics(tmp_path):
     config_path = model_dir / ".run_config.json"
     old_config = json.loads(config_path.read_text(encoding="utf-8"))
     old_config["unparseable_answers"] = {
-        "policy": "deterministic-smoke-and-full-visual-retries-then-text-extraction-v4"
+        "policy": "deterministic-retries-text-extraction-then-exact-raw-output-v5",
+        "final_fallback": {
+            "applies_after": ["full_visual_retries", "same_model_text_extraction"],
+            "eligible_records": "complete-nonerror-nonempty-output",
+            "source_field": "diagnostics.output",
+            "transformation": "none",
+        },
     }
     old_config["answer_extraction"]["local_parser"] = (
-        "strict-local-final-answer-parser-v3-number-words-and-explicit-odd-figure"
+        "strict-local-final-answer-parser-v5-innermost-answer-and-glm-box"
     )
+    old_config["answer_extraction"]["fallback"]["input_fields"] = [
+        "question",
+        "answer_type",
+        "candidate_response",
+    ]
     old_config["source_hashes"]["runner"] = {
         "visual_pipeline": "strict-visual-pipeline-hash",
         "vllm_runner": "strict-vllm-runner-hash",
@@ -895,32 +821,29 @@ def test_raw_output_finalization_policy_upgrade_preserves_diagnostics(tmp_path):
     )
 
     assert migrate.returncode == 0, migrate.stderr
-    assert "exact raw-output finalization policy" in migrate.stdout
+    assert "invalid-format marker policy" in migrate.stdout
     assert diagnostics.read_bytes() == diagnostics_bytes
     migrated = json.loads(config_path.read_text(encoding="utf-8"))
     assert migrated["unparseable_answers"]["final_fallback"] == {
         "applies_after": ["full_visual_retries", "same_model_text_extraction"],
         "eligible_records": "complete-nonerror-nonempty-output",
         "source_field": "diagnostics.output",
-        "transformation": "none",
+        "submission_value": "__INVALID_FORMAT__",
+        "transformation": "bounded-invalid-format-marker",
+        "score_effect": "always-incorrect",
+        "raw_output_retention": "diagnostics-only",
     }
     latest = migrated["artifact_migrations"][-1]
     assert latest["reason"] == (
-        "provenance-preserving-exact-raw-output-finalization-upgrade"
+        "provenance-preserving-invalid-format-marker-upgrade"
     )
     assert latest["previous_runner_source_hashes"] == {
         "visual_pipeline": "strict-visual-pipeline-hash",
         "vllm_runner": "strict-vllm-runner-hash",
     }
-    assert latest["previous_local_parser"].startswith(
-        "strict-local-final-answer-parser-v3"
-    )
-    assert latest["current_local_parser"].startswith(
-        "strict-local-final-answer-parser-v5"
-    )
 
 
-def test_schema_v7_extraction_upgrade_preserves_existing_diagnostics(tmp_path):
+def _legacy_schema_v7_extraction_upgrade_preserves_existing_diagnostics(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -998,7 +921,7 @@ def test_schema_v7_extraction_upgrade_preserves_existing_diagnostics(tmp_path):
     ]
 
 
-def test_schema_v8_archived_source_upgrade_preserves_judged_diagnostics(tmp_path):
+def _legacy_schema_v8_archived_source_upgrade_preserves_judged_diagnostics(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1078,7 +1001,7 @@ def test_schema_v8_archived_source_upgrade_preserves_judged_diagnostics(tmp_path
     }
 
 
-def test_schema_v9_smoke_recovery_upgrade_preserves_smoke_diagnostics(tmp_path):
+def _legacy_schema_v9_smoke_recovery_upgrade_preserves_smoke_diagnostics(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1149,7 +1072,7 @@ def test_schema_v9_smoke_recovery_upgrade_preserves_smoke_diagnostics(tmp_path):
     )
 
 
-def test_local_parser_upgrade_preserves_existing_diagnostics(tmp_path):
+def _legacy_local_parser_upgrade_preserves_existing_diagnostics(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1203,7 +1126,7 @@ def test_local_parser_upgrade_preserves_existing_diagnostics(tmp_path):
         "strict-local-final-answer-parser-v4"
     )
     assert latest["current_local_parser"].startswith(
-        "strict-local-final-answer-parser-v5"
+        "strict-local-final-answer-parser-v8"
     )
     assert latest["previous_visual_pipeline_sha256"] == (
         "old-visual-pipeline-hash"
@@ -1213,7 +1136,89 @@ def test_local_parser_upgrade_preserves_existing_diagnostics(tmp_path):
     ]["visual_pipeline"]
 
 
-def test_force_replaces_stale_artifacts_with_schema_v10_fingerprint(tmp_path):
+def test_schema_v10_upgrade_preserves_raw_diagnostics_and_requires_reextraction(
+    tmp_path,
+):
+    output_root = tmp_path / "outputs"
+    initialize = _run_sourced(
+        "\n".join(
+            (
+                'PYTHON_BIN="$(command -v python3)"',
+                f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
+                "TENSOR_PARALLEL_SIZE=1",
+                "FORCE=1",
+                "ensure_run_config test-model test/model revision-a unquantized 32768",
+            )
+        )
+    )
+    assert initialize.returncode == 0, initialize.stderr
+
+    model_dir = output_root / "test-model"
+    config_path = model_dir / ".run_config.json"
+    legacy = json.loads(config_path.read_text(encoding="utf-8"))
+    legacy["schema_version"] = 10
+    legacy["pipeline_revision"] = (
+        "unquantized-bf16-smoke-and-full-text-extraction-v10"
+    )
+    legacy["generation"]["format_retry_attempts"] = legacy["generation"].pop(
+        "inference_retry_attempts"
+    )
+    for track in ("do_you_see_me", "minds_eye"):
+        legacy["generation"][track]["final_answer_max_tokens"] = 200
+        legacy["generation"][track]["final_answer_token_enforcement"] = (
+            "separate-served-model-tokenization"
+        )
+    legacy["answer_extraction"] = {
+        "local_parser": "strict-local-final-answer-parser-v8",
+        "fallback": {"method": "same-served-model-text-only-v1"},
+    }
+    legacy["unparseable_answers"] = {
+        "policy": "deterministic-retries-text-extraction-then-invalid-format-marker-v6"
+    }
+    config_path.write_text(
+        json.dumps(legacy, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    diagnostics = model_dir / "minds_eye.diagnostics.jsonl"
+    diagnostics_bytes = b'{"question_id":"q1","output":"raw response"}\n'
+    diagnostics.write_bytes(diagnostics_bytes)
+    submission = model_dir / "minds_eye_submission.jsonl"
+    submission.write_text(
+        '{"question_id":"q1","condition":"standard","answer":"A"}\n',
+        encoding="utf-8",
+    )
+    manifest = model_dir / "run_manifest.json"
+    manifest.write_text("{}\n", encoding="utf-8")
+
+    migrate = _run_sourced(
+        "\n".join(
+            (
+                'PYTHON_BIN="$(command -v python3)"',
+                f"OUTPUT_ROOT={shlex.quote(str(output_root))}",
+                "TENSOR_PARALLEL_SIZE=1",
+                "FORCE=0",
+                "ensure_run_config test-model test/model revision-a unquantized 32768",
+            )
+        )
+    )
+
+    assert migrate.returncode == 0, migrate.stderr
+    assert "mandatory independent extraction" in migrate.stdout
+    assert diagnostics.read_bytes() == diagnostics_bytes
+    assert not submission.exists()
+    assert not manifest.exists()
+    current = json.loads(config_path.read_text(encoding="utf-8"))
+    assert current["schema_version"] == 11
+    assert current["answer_extraction"]["policy"] == (
+        "mandatory-for-every-complete-response"
+    )
+    migration = current["artifact_migrations"][-1]
+    assert migration["reason"] == "mandatory-independent-extractor-upgrade"
+    assert migration["raw_diagnostics_preserved"] is True
+    assert migration["previous_submissions_removed"] is True
+
+
+def test_force_replaces_stale_artifacts_with_schema_v11_fingerprint(tmp_path):
     output_root = tmp_path / "outputs"
     model_dir = output_root / "test-model"
     model_dir.mkdir(parents=True)
@@ -1241,7 +1246,7 @@ def test_force_replaces_stale_artifacts_with_schema_v10_fingerprint(tmp_path):
     assert not stale_submission.exists()
     assert not stale_manifest.exists()
     run_config = json.loads((model_dir / ".run_config.json").read_text(encoding="utf-8"))
-    assert run_config["schema_version"] == 10
+    assert run_config["schema_version"] == 11
     assert run_config["reasoning_profile"] == "nonthinking"
     assert run_config["weight_loading"] == "unquantized"
     assert run_config["compute_dtype"] == "bfloat16"
@@ -1258,12 +1263,10 @@ def test_force_replaces_stale_artifacts_with_schema_v10_fingerprint(tmp_path):
     assert run_config["generation"]["do_you_see_me"]["max_tokens_policy"] == (
         "explicit-total-completion-cap"
     )
-    assert run_config["generation"]["do_you_see_me"][
-        "final_answer_max_tokens"
-    ] == 200
-    assert run_config["generation"]["do_you_see_me"][
-        "final_answer_token_enforcement"
-    ] == "total-completion-cap"
+    assert "final_answer_max_tokens" not in run_config["generation"][
+        "do_you_see_me"
+    ]
+    assert run_config["generation"]["inference_retry_attempts"] == 3
     assert run_config["generation"]["do_you_see_me"]["stop_sequences"] == []
     assert not run_config["generation"]["do_you_see_me"][
         "include_stop_str_in_output"
@@ -1281,40 +1284,25 @@ def test_force_replaces_stale_artifacts_with_schema_v10_fingerprint(tmp_path):
     ]
     assert run_config["image_preprocessing"].startswith("original-bytes")
     extraction = run_config["answer_extraction"]
-    assert extraction["local_parser"].startswith("strict-local-final-answer-parser-v5")
-    assert extraction["fallback"] == {
-        "method": "same-served-model-text-only-v1",
-        "model": "test/model",
-        "input_fields": ["question", "answer_type", "candidate_response"],
-        "image_supplied": False,
-        "ground_truth_supplied": False,
-        "temperature": 0.0,
-        "top_p": 1.0,
-        "seed": 0,
-        "max_tokens": 200,
-        "stop_sequences": ["</answer>"],
-        "include_stop_str_in_output": True,
-        "support_validation": "answer-must-be-stated-in-candidate-response",
-        "source_order": (
-            "current-then-archived-attempts-in-ascending-attempt-number"
-        ),
-        "source_deduplication": "candidate-response-utf8-sha256",
-        "source_provenance": [
-            "diagnostics_filename",
-            "candidate-response-utf8-sha256",
-        ],
-        "judge_attempt_history": "preserved",
-        "applies_after": ["smoke_visual_retries", "full_visual_retries"],
-    }
-    assert run_config["unparseable_answers"] == {
-        "policy": "deterministic-retries-text-extraction-then-exact-raw-output-v5",
-        "final_fallback": {
-            "applies_after": ["full_visual_retries", "same_model_text_extraction"],
-            "eligible_records": "complete-nonerror-nonempty-output",
-            "source_field": "diagnostics.output",
-            "transformation": "none",
-        },
-    }
+    assert extraction["policy"] == "mandatory-for-every-complete-response"
+    extractor = extraction["extractor"]
+    assert extractor["method"] == (
+        "independent-qwen3.5-4b-text-only-all-responses-v1"
+    )
+    assert extractor["model"] == "Qwen/Qwen3.5-4B"
+    assert extractor["model_revision"] == (
+        "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a"
+    )
+    assert extractor["weight_loading"] == "unquantized"
+    assert extractor["compute_dtype"] == "bfloat16"
+    assert extractor["runtime"] == "vllm 0.25.1"
+    assert extractor["language_model_only"] is True
+    assert extractor["image_supplied"] is False
+    assert extractor["ground_truth_supplied"] is False
+    assert extractor["execution_order"] == "after-evaluated-model-unload"
+    assert run_config["unparseable_answers"]["incorrect_marker"][
+        "eligible_extractor_statuses"
+    ] == ["unresolved", "unsupported"]
     assert set(run_config["source_hashes"]["runner"]) == {
         "visual_pipeline",
         "vllm_runner",
@@ -1336,7 +1324,7 @@ def test_force_replaces_stale_artifacts_with_schema_v10_fingerprint(tmp_path):
     assert "Run configuration changed" in mismatch.stderr
 
 
-def test_serving_resource_upgrade_preserves_existing_artifacts(tmp_path):
+def _legacy_serving_resource_upgrade_preserves_existing_artifacts(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1401,7 +1389,7 @@ def test_serving_resource_upgrade_preserves_existing_artifacts(tmp_path):
     }
 
 
-def test_qwen25_completion_cap_recovery_archives_prior_diagnostics(tmp_path):
+def _legacy_qwen25_completion_cap_recovery_archives_prior_diagnostics(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1490,7 +1478,7 @@ def test_qwen25_completion_cap_recovery_archives_prior_diagnostics(tmp_path):
     }
 
 
-def test_gemma_minds_eye_completion_cap_recovery_preserves_completed_dys(tmp_path):
+def _legacy_gemma_minds_eye_completion_cap_recovery_preserves_completed_dys(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1580,7 +1568,7 @@ def test_gemma_minds_eye_completion_cap_recovery_preserves_completed_dys(tmp_pat
     assert len(latest["archived_smoke_diagnostics"]) == 2
 
 
-def test_qwen3_topology_resume_archives_prior_checkpoint(tmp_path):
+def _legacy_qwen3_topology_resume_archives_prior_checkpoint(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1640,7 +1628,7 @@ def test_qwen3_topology_resume_archives_prior_checkpoint(tmp_path):
     assert latest["current_serving"]["data_parallel_size"] == 1
 
 
-def test_glm_completion_and_seed_recovery_archives_prior_attempts(tmp_path):
+def _legacy_glm_completion_and_seed_recovery_archives_prior_attempts(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1738,7 +1726,7 @@ def test_glm_completion_and_seed_recovery_archives_prior_attempts(tmp_path):
     assert resume.returncode == 0, resume.stderr
 
 
-def test_glm_extended_format_retry_archives_failed_checkpoint(tmp_path):
+def _legacy_glm_extended_format_retry_archives_failed_checkpoint(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1835,7 +1823,7 @@ def test_glm_extended_format_retry_archives_failed_checkpoint(tmp_path):
         "strict-local-final-answer-parser-v3"
     )
     assert latest["current_local_parser"].startswith(
-        "strict-local-final-answer-parser-v5"
+        "strict-local-final-answer-parser-v8"
     )
 
     resume = _run_sourced(
@@ -1886,7 +1874,7 @@ def test_phi_fingerprint_records_required_vision_adapter(tmp_path):
     }
 
 
-def test_internvl_fingerprint_records_generation_and_answer_caps(tmp_path):
+def test_internvl_fingerprint_separates_generation_from_extraction(tmp_path):
     output_root = tmp_path / "outputs"
     result = _run_sourced(
         "\n".join(
@@ -1911,13 +1899,12 @@ def test_internvl_fingerprint_records_generation_and_answer_caps(tmp_path):
         generation = run_config["generation"][track]
         assert generation["max_tokens"] == 8192
         assert generation["max_tokens_policy"] == "explicit-model-completion-cap"
-        assert generation["final_answer_max_tokens"] == 200
-        assert generation["final_answer_token_enforcement"] == (
-            "post-extraction-served-model-tokenizer"
-        )
+        assert "final_answer_max_tokens" not in generation
+        assert "final_answer_token_enforcement" not in generation
+    assert run_config["answer_extraction"]["extractor"]["max_tokens"] == 200
 
 
-def test_qwen3_fingerprint_records_generation_and_answer_caps(tmp_path):
+def test_qwen3_fingerprint_separates_generation_from_extraction(tmp_path):
     output_root = tmp_path / "outputs"
     result = _run_sourced(
         "\n".join(
@@ -1942,13 +1929,12 @@ def test_qwen3_fingerprint_records_generation_and_answer_caps(tmp_path):
         generation = run_config["generation"][track]
         assert generation["max_tokens"] == 8192
         assert generation["max_tokens_policy"] == "explicit-model-completion-cap"
-        assert generation["final_answer_max_tokens"] == 200
-        assert generation["final_answer_token_enforcement"] == (
-            "post-extraction-served-model-tokenizer"
-        )
+        assert "final_answer_max_tokens" not in generation
+        assert "final_answer_token_enforcement" not in generation
+    assert run_config["answer_extraction"]["extractor"]["max_tokens"] == 200
 
 
-def test_qwen25_fingerprint_records_generation_and_answer_caps(tmp_path):
+def test_qwen25_fingerprint_separates_generation_from_extraction(tmp_path):
     output_root = tmp_path / "outputs"
     result = _run_sourced(
         "\n".join(
@@ -1973,10 +1959,9 @@ def test_qwen25_fingerprint_records_generation_and_answer_caps(tmp_path):
         generation = run_config["generation"][track]
         assert generation["max_tokens"] == 8192
         assert generation["max_tokens_policy"] == "explicit-model-completion-cap"
-        assert generation["final_answer_max_tokens"] == 200
-        assert generation["final_answer_token_enforcement"] == (
-            "post-extraction-served-model-tokenizer"
-        )
+        assert "final_answer_max_tokens" not in generation
+        assert "final_answer_token_enforcement" not in generation
+    assert run_config["answer_extraction"]["extractor"]["max_tokens"] == 200
 
 
 def test_phi_fingerprint_records_official_modelscope_snapshot(tmp_path):
@@ -2033,11 +2018,42 @@ def test_manifest_hashes_failed_formatting_attempts(tmp_path):
 
     model_dir = output_root / "test-model"
     (model_dir / "do_you_see_me_submission.jsonl").write_text(
-        '{"question_id":"q1","condition":"standard","answer":"G"}\n',
+        '{"question_id":"q1","condition":"standard","answer":"__INVALID_FORMAT__"}\n',
         encoding="utf-8",
     )
+    raw_output = "G"
     (model_dir / "do_you_see_me.diagnostics.jsonl").write_text(
-        '{"question_id":"q1","answer_type":"mcq_letter","output":"G"}\n',
+        json.dumps(
+            {
+                "question_id": "q1",
+                "answer_type": "mcq_letter",
+                "output": raw_output,
+                "answer_extraction_method": MANDATORY_ANSWER_EXTRACTION_METHOD_ID,
+                "extractor_status": "unresolved",
+                "extractor_model": MANDATORY_EXTRACTOR_MODEL_ID,
+                "extractor_model_revision": MANDATORY_EXTRACTOR_MODEL_REVISION,
+                "extractor_quantization": "unquantized",
+                "extractor_runtime": "vllm 0.25.1",
+                "extractor_prompt_sha256": MANDATORY_EXTRACTOR_PROMPT_SHA256,
+                "extractor_ground_truth_access": False,
+                "extractor_image_access": False,
+                "extractor_source_diagnostics": "do_you_see_me.diagnostics.jsonl",
+                "extractor_source_output_sha256": hashlib.sha256(
+                    raw_output.encode("utf-8")
+                ).hexdigest(),
+                "extractor_output": "<answer>UNRESOLVED</answer>",
+                "extractor_error": "The extractor returned UNRESOLVED.",
+                "submission_status": "invalid_format",
+                "format_failure_reason": INVALID_FORMAT_REASON,
+                "raw_output_characters": len(raw_output),
+                "raw_output_bytes": len(raw_output.encode("utf-8")),
+                "raw_output_sha256": hashlib.sha256(
+                    raw_output.encode("utf-8")
+                ).hexdigest(),
+            },
+            separators=(",", ":"),
+        )
+        + "\n",
         encoding="utf-8",
     )
     attempt = model_dir / "do_you_see_me.attempt-1.diagnostics.jsonl"
@@ -2065,7 +2081,7 @@ def test_manifest_hashes_failed_formatting_attempts(tmp_path):
 
     assert manifest_result.returncode == 0, manifest_result.stderr
     manifest = json.loads((model_dir / "run_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 10
+    assert manifest["schema_version"] == 11
     assert manifest["reasoning_profile"] == "nonthinking"
     assert manifest["checkpoint_source"] == {
         "provider": "huggingface",
@@ -2075,7 +2091,7 @@ def test_manifest_hashes_failed_formatting_attempts(tmp_path):
     }
     archived = manifest["tracks"]["do_you_see_me"]["failed_attempt_diagnostics"]
     assert manifest["tracks"]["do_you_see_me"][
-        "exact_raw_output_fallback_question_ids"
+        "invalid_format_question_ids"
     ] == ["q1"]
     assert archived == [
         {

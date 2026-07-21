@@ -1,0 +1,120 @@
+/* Theme tokens. Component styling lives in Tailwind classes. */
+
+:root {
+  --bg: #ffffff;
+  --bg-2: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f5fa;
+  --border: #e1e4ec;
+  --border-strong: #cdd2de;
+  --text: #161826;
+  --text-muted: #5a6076;
+  --text-faint: #838a9e;
+
+  --brand: #1a1a1a;
+  --brand-strong: #000000;
+  --brand-soft: rgba(0, 0, 0, 0.07);
+  --dysm: #1f6f78;
+  --dysm-soft: rgba(31, 111, 120, 0.1);
+  --me: #545a9c;
+  --me-soft: rgba(84, 90, 156, 0.1);
+  --spatial: #8e5a24;
+  --spatial-soft: rgba(142, 90, 36, 0.11);
+
+  --pos: #26865e;
+  --pos-soft: rgba(38, 134, 94, 0.12);
+  --neg: #c44f5b;
+  --neg-soft: rgba(196, 79, 91, 0.12);
+  --warn: #ad6c24;
+  --warn-soft: rgba(173, 108, 36, 0.12);
+
+  --chart-primary: var(--dysm);
+  --chart-positive: var(--pos);
+  --chart-negative: var(--neg);
+  --chart-neutral: #718795;
+  --chart-accent: var(--warn);
+
+  --font: "Geist Variable", "Segoe UI", Arial, sans-serif;
+  --display: "Geist Variable", "Segoe UI", Arial, sans-serif;
+  --num: "Geist Variable", "Segoe UI", Arial, sans-serif;
+  --radius: 0;
+  --radius-sm: 0;
+  --radius-lg: 0;
+  --shadow-sm: 0 1px 2px rgba(18, 27, 33, 0.05);
+  --shadow: 0 10px 28px rgba(18, 27, 33, 0.08);
+  --shadow-lg: 0 22px 54px rgba(18, 27, 33, 0.14);
+  --invert-bg: #161618;
+  --invert-bg-hover: #2b2b2f;
+  --invert-text: #ffffff;
+  --invert-border: #161618;
+  --header-h: 66px;
+  --hero-section-h: 560px;
+  --maxw: 1180px;
+}
+
+[data-theme="dark"] {
+  --bg: #000000;
+  --bg-2: #000000;
+  --surface: #101317;
+  --surface-2: #171b20;
+  --border: #272d33;
+  --border-strong: #3a434b;
+  --text: #f2f5f6;
+  --text-muted: #aab3ba;
+  --text-faint: #75818a;
+
+  --brand: #e4e4e7;
+  --brand-strong: #ffffff;
+  --brand-soft: rgba(220, 229, 233, 0.09);
+  --dysm: #76c8ce;
+  --dysm-soft: rgba(118, 200, 206, 0.11);
+  --me: #a9afe5;
+  --me-soft: rgba(169, 175, 229, 0.11);
+  --spatial: #e1ad70;
+  --spatial-soft: rgba(225, 173, 112, 0.12);
+
+  --pos: #68c795;
+  --pos-soft: rgba(104, 199, 149, 0.12);
+  --neg: #ed7d88;
+  --neg-soft: rgba(237, 125, 136, 0.12);
+  --warn: #e7ad68;
+  --warn-soft: rgba(231, 173, 104, 0.12);
+
+  --chart-primary: var(--dysm);
+  --chart-positive: var(--pos);
+  --chart-negative: var(--neg);
+  --chart-neutral: #8fa4b1;
+  --chart-accent: var(--warn);
+  --invert-bg: #f3f6f7;
+  --invert-bg-hover: #ffffff;
+  --invert-text: #101417;
+  --invert-border: #f3f6f7;
+}
+
+body[data-page="dysm"] {
+  --page-accent: var(--dysm);
+  --page-accent-soft: var(--dysm-soft);
+  --chart-primary: var(--dysm);
+}
+
+body[data-page="minds_eye"] {
+  --page-accent: var(--me);
+  --page-accent-soft: var(--me-soft);
+  --chart-primary: var(--me);
+}
+
+body[data-page="spatial"] {
+  --page-accent: var(--spatial);
+  --page-accent-soft: var(--spatial-soft);
+  --chart-primary: var(--spatial);
+}
+
+body:is([data-page="dysm"], [data-page="minds_eye"], [data-page="spatial"]) {
+  --page-accent-hero: color-mix(in srgb, var(--page-accent) 4%, var(--bg));
+  --page-accent-stat: color-mix(in srgb, var(--page-accent) 2.5%, var(--bg));
+  --page-accent-border: color-mix(in srgb, var(--page-accent) 30%, var(--border));
+  --page-accent-chip: color-mix(in srgb, var(--page-accent) 6%, var(--surface-2));
+  --page-accent-chip-border: color-mix(in srgb, var(--page-accent) 26%, var(--border));
+  --page-accent-muted: color-mix(in srgb, var(--page-accent) 70%, var(--text-faint));
+  --page-accent-line: color-mix(in srgb, var(--page-accent) 40%, transparent);
+}

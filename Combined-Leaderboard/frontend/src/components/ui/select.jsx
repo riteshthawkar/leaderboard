@@ -10,12 +10,12 @@ const SelectValue = SelectPrimitive.Value;
 const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
-    className={cn("select-trigger", className)}
+    className={cn("flex min-h-10 w-full items-center justify-between gap-3 border border-border-strong bg-surface px-3 py-2 text-left text-sm text-foreground outline-none transition-colors placeholder:text-faint hover:border-foreground focus:border-brand-strong focus:ring-2 focus:ring-brand-soft disabled:cursor-not-allowed disabled:opacity-60", className)}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="select-trigger-icon" aria-hidden />
+      <ChevronDown className="size-4 shrink-0 text-muted" aria-hidden />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -26,12 +26,12 @@ const SelectContent = React.forwardRef(
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         ref={ref}
-        className={cn("select-content", className)}
+        className={cn("z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden border border-border-strong bg-surface text-foreground shadow-lg", className)}
         position={position}
         sideOffset={6}
         {...props}
       >
-        <SelectPrimitive.Viewport className="select-viewport">
+        <SelectPrimitive.Viewport className="p-1">
           {children}
         </SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
@@ -41,10 +41,10 @@ const SelectContent = React.forwardRef(
 SelectContent.displayName = "SelectContent";
 
 const SelectItem = React.forwardRef(({ className, children, ...props }, ref) => (
-  <SelectPrimitive.Item ref={ref} className={cn("select-item", className)} {...props}>
-    <span className="select-item-indicator">
+  <SelectPrimitive.Item ref={ref} className={cn("relative flex cursor-default select-none items-center py-2 pl-8 pr-3 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-surface-subtle data-[highlighted]:text-foreground", className)} {...props}>
+    <span className="absolute left-2 inline-flex size-4 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check aria-hidden />
+        <Check className="size-4" aria-hidden />
       </SelectPrimitive.ItemIndicator>
     </span>
     <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>

@@ -1,0 +1,236 @@
+{
+  "archive_members": [
+    "submission.jsonl",
+    "run_manifest.json",
+    "leaderboard.json"
+  ],
+  "bundle_details": {
+    "conditions": 0,
+    "datasets": 0,
+    "error": "Spatial benchmark manifest is a demo bundle",
+    "min_samples": 1000,
+    "production_ready": false,
+    "required": false,
+    "samples": 0
+  },
+  "bundle_status": "unhealthy",
+  "conditions": [
+    "main_noncot",
+    "main_cot",
+    "no_image_noncot",
+    "no_image_cot",
+    "no_image_plus_noncot",
+    "no_image_plus_cot"
+  ],
+  "datasets": [
+    {
+      "approx_n": 1900,
+      "hf_id": "BLINK-Benchmark/BLINK",
+      "id": "blink",
+      "license": "Apache-2.0",
+      "name": "BLINK",
+      "tags": [
+        "depth",
+        "relation",
+        "count",
+        "localization"
+      ],
+      "type": "2D",
+      "verify": false
+    },
+    {
+      "approx_n": 1400,
+      "hf_id": "nyu-visionx/CV-Bench",
+      "id": "cvbench2d",
+      "license": "Apache-2.0",
+      "name": "CV-Bench (2D)",
+      "tags": [
+        "relation",
+        "count",
+        "localization",
+        "size"
+      ],
+      "type": "2D",
+      "verify": false
+    },
+    {
+      "approx_n": 300,
+      "hf_id": "MMVP/MMVP",
+      "id": "mmvp",
+      "license": "MIT",
+      "name": "MMVP",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "type": "2D",
+      "verify": true
+    },
+    {
+      "approx_n": 765,
+      "hf_id": "xai-org/RealworldQA",
+      "id": "realworldqa",
+      "license": "CC BY-ND 4.0",
+      "name": "RealWorldQA",
+      "tags": [
+        "relation",
+        "localization"
+      ],
+      "type": "2D",
+      "verify": false
+    },
+    {
+      "approx_n": 174,
+      "hf_id": "RussRobin/SpatialBench",
+      "id": "spatialbench",
+      "license": "see source",
+      "name": "SpatialBench",
+      "tags": [
+        "relation",
+        "localization",
+        "size"
+      ],
+      "type": "2D",
+      "verify": true
+    },
+    {
+      "approx_n": 1200,
+      "hf_id": "cambridgeltl/vsr_zeroshot",
+      "id": "vsr",
+      "license": "Apache-2.0",
+      "name": "VSR",
+      "tags": [
+        "relation",
+        "orientation",
+        "egocentric"
+      ],
+      "type": "2D",
+      "verify": true
+    },
+    {
+      "approx_n": 191,
+      "hf_id": "craigwu/vstar_bench",
+      "id": "vstar",
+      "license": "MIT",
+      "name": "V*Bench",
+      "tags": [
+        "attribute",
+        "relation"
+      ],
+      "type": "2D",
+      "verify": false
+    },
+    {
+      "approx_n": 5200,
+      "hf_id": "ccvl/3DSRBench",
+      "id": "3dsrbench",
+      "license": "see source",
+      "name": "3DSRBench",
+      "tags": [
+        "3d",
+        "localization",
+        "orientation"
+      ],
+      "type": "3D",
+      "verify": false
+    },
+    {
+      "approx_n": 1200,
+      "hf_id": "nyu-visionx/CV-Bench",
+      "id": "cvbench3d",
+      "license": "Apache-2.0",
+      "name": "CV-Bench (3D)",
+      "tags": [
+        "depth",
+        "3d",
+        "relation"
+      ],
+      "type": "3D",
+      "verify": false
+    },
+    {
+      "approx_n": 1000,
+      "hf_id": "MLL-Lab/MindCube",
+      "id": "mindcube",
+      "license": "see source",
+      "name": "MindCube",
+      "tags": [
+        "multiview",
+        "relation",
+        "egocentric"
+      ],
+      "type": "3D",
+      "verify": true
+    },
+    {
+      "approx_n": 1000,
+      "hf_id": "RunsenXu/MMSI-Bench",
+      "id": "mmsibench",
+      "license": "see source",
+      "name": "MMSI-Bench",
+      "tags": [
+        "multiimage",
+        "spatial"
+      ],
+      "type": "3D",
+      "verify": false
+    },
+    {
+      "approx_n": 1500,
+      "hf_id": "qizekun/OmniSpatial",
+      "id": "omnispatial",
+      "license": "see source",
+      "name": "OmniSpatial",
+      "tags": [
+        "spatial",
+        "reasoning"
+      ],
+      "type": "3D",
+      "verify": true
+    },
+    {
+      "approx_n": 1000,
+      "hf_id": "array/SAT",
+      "id": "satreal",
+      "license": "see source",
+      "name": "SAT (Real)",
+      "tags": [
+        "dynamic",
+        "egocentric",
+        "action"
+      ],
+      "type": "dynamic",
+      "verify": true
+    }
+  ],
+  "description": "Spatial reasoning robustness across 13 public benchmarks, with CoT / no-image / no-image++ diagnostics.",
+  "grading": {
+    "method": "harness_reported_public_evidence",
+    "paper": "CoT Degrades Visual Spatial Reasoning (arXiv:2604.16060)",
+    "random_baseline": null,
+    "server_ground_truth_evaluation": false,
+    "submission_format": "spatial_evidence_zip"
+  },
+  "group_by": "dataset",
+  "harness_url": "/api/spatial/harness",
+  "label": "Spatial Reasoning Analysis",
+  "layer": "reasoning",
+  "manifest_url": "/api/spatial/manifest",
+  "max_upload_bytes": 10485760,
+  "no_image_plus_option": "Cannot determine from the image",
+  "paper_total_samples": null,
+  "public_evidence": true,
+  "request_id": "c13d4e2c-c50f-4bbe-9086-40f3501963d8",
+  "required_uploads": [
+    "spatial_reasoning_submission.zip"
+  ],
+  "score_description": "Unweighted mean of main non-CoT accuracy across the 13 datasets.",
+  "score_method": "unweighted_dataset_macro",
+  "score_provenance": "harness_report_with_public_evidence",
+  "section": "spatial",
+  "submission_ready": false,
+  "supports_diagnostics": true,
+  "task_id": "spatial",
+  "total_samples": 0,
+  "upload_processing": "in_memory"
+}

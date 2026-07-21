@@ -1,0 +1,20 @@
+{
+  "_comment": "Third-party datasets can change/be withdrawn upstream. Record the exact revision you evaluated against here so results stay reproducible. Fill the HF commit hash per dataset after the first download (e.g. via huggingface_hub.dataset_info(repo, revision).sha).",
+  "accessed": "2026-07-06",
+  "vlmevalkit_commit": "TODO-pin",
+  "datasets": {
+    "BLINK": {"source": "hf:BLINK-Benchmark/BLINK", "revision": "TODO-pin"},
+    "CV-Bench-2D": {"source": "hf:nyu-visionx/CV-Bench", "revision": "TODO-pin"},
+    "CV-Bench-3D": {"source": "hf:nyu-visionx/CV-Bench", "revision": "TODO-pin"},
+    "MMVP": {"source": "hf:MMVP", "revision": "TODO-pin"},
+    "RealWorldQA": {"source": "hf:xai-org/RealworldQA", "revision": "TODO-pin"},
+    "VStarBench": {"source": "hf:craigwu/vstar_bench", "revision": "TODO-pin"},
+    "MMSIBench_circular": {"source": "hf:RunsenXu/MMSI-Bench", "revision": "TODO-pin"},
+    "3DSRBench": {"source": "hf:ccvl/3DSRBench", "revision": "TODO-pin"},
+    "VSR": {"source": "TODO", "revision": "TODO-pin"},
+    "SpatialBench": {"source": "hf:RussRobin/SpatialBench", "revision": "TODO-pin"},
+    "MindCube": {"source": "TODO", "revision": "TODO-pin"},
+    "OmniSpatial": {"source": "TODO", "revision": "TODO-pin"},
+    "SAT-Real": {"source": "TODO", "revision": "TODO-pin"}
+  }
+}

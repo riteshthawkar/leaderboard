@@ -2,11 +2,36 @@
 Application constants and configuration limits.
 """
 
+import os
+
 # File upload limits
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-MAX_FILE_SIZE_PER_SUBMISSION = 10 * 1024 * 1024  # 10MB per submission
-ALLOWED_FILE_EXTENSIONS = {'.csv', '.json'}
-ALLOWED_MIME_TYPES = {'text/csv', 'application/json', 'text/plain'}
+MAX_FILE_SIZE = int(os.getenv("MAX_CONTENT_LENGTH", str(50 * 1024 * 1024)))
+MAX_FILE_SIZE_PER_SUBMISSION = int(
+    os.getenv("MAX_FILE_SIZE_PER_SUBMISSION", str(MAX_FILE_SIZE))
+)
+MAX_SPATIAL_ARCHIVE_BYTES = int(
+    os.getenv("MAX_SPATIAL_ARCHIVE_BYTES", str(10 * 1024 * 1024))
+)
+MAX_SPATIAL_MULTIPART_BYTES = int(
+    os.getenv(
+        "MAX_SPATIAL_MULTIPART_BYTES",
+        str(MAX_SPATIAL_ARCHIVE_BYTES + 2 * 1024 * 1024),
+    )
+)
+MAX_SPATIAL_SUBMISSION_BYTES = int(
+    os.getenv("MAX_SPATIAL_SUBMISSION_BYTES", str(20 * 1024 * 1024))
+)
+MAX_SPATIAL_MANIFEST_BYTES = int(
+    os.getenv("MAX_SPATIAL_MANIFEST_BYTES", str(1024 * 1024))
+)
+MAX_SPATIAL_REPORT_BYTES = int(
+    os.getenv("MAX_SPATIAL_REPORT_BYTES", str(2 * 1024 * 1024))
+)
+MAX_SPATIAL_ZIP_COMPRESSION_RATIO = int(
+    os.getenv("MAX_SPATIAL_ZIP_COMPRESSION_RATIO", "100")
+)
+ALLOWED_FILE_EXTENSIONS = {'.jsonl'}
+ALLOWED_MIME_TYPES = {'application/jsonl', 'application/x-ndjson', 'application/json', 'text/plain'}
 
 # Model name constraints
 MAX_MODEL_NAME_LENGTH = 255
@@ -20,12 +45,37 @@ MIN_LEADERBOARD_LIMIT = 1
 # Rate limiting
 SUBMISSIONS_PER_HOUR = 3
 SUBMISSIONS_PER_DAY = 10
+# Authoritative DB-backed per-account, per-benchmark submission quota over a
+# rolling 24-hour window. Each benchmark has an independent allowance.
+SUBMISSION_DAILY_LIMIT_PER_BENCHMARK = int(
+    os.getenv("SUBMISSION_DAILY_LIMIT_PER_BENCHMARK", "1")
+)
+if SUBMISSION_DAILY_LIMIT_PER_BENCHMARK <= 0:
+    raise RuntimeError(
+        "SUBMISSION_DAILY_LIMIT_PER_BENCHMARK must be a positive whole number."
+    )
+# Compatibility alias for older imports. The value is now per benchmark.
+SUBMISSION_DAILY_LIMIT = SUBMISSION_DAILY_LIMIT_PER_BENCHMARK
+SUBMISSION_RESERVATION_TIMEOUT_MINUTES = int(
+    os.getenv("SUBMISSION_RESERVATION_TIMEOUT_MINUTES", "15")
+)
+if SUBMISSION_RESERVATION_TIMEOUT_MINUTES <= 0:
+    raise RuntimeError(
+        "SUBMISSION_RESERVATION_TIMEOUT_MINUTES must be a positive whole number."
+    )
 LEADERBOARD_REQUESTS_PER_MINUTE = 60
 API_REQUESTS_PER_MINUTE = 100
 
 # Prediction constraints
 MIN_PREDICTIONS_REQUIRED = 1
 MAX_PREDICTIONS_PER_SUBMISSION = 1000000
+MAX_SUBMISSION_LINE_CHARS = int(
+    os.getenv("MAX_SUBMISSION_LINE_CHARS", "100000")
+)
+if MAX_SUBMISSION_LINE_CHARS <= 0:
+    raise RuntimeError(
+        "MAX_SUBMISSION_LINE_CHARS must be a positive whole number."
+    )
 
 # Answer extraction
 VALID_OPTIONS = {'A', 'B', 'C', 'D', 'E', 'F'}
@@ -63,10 +113,10 @@ GT_LOADING_TIMEOUT = 60  # 1 minute
 API_TIMEOUT = 30  # 30 seconds
 
 # Error messages
-ERROR_INVALID_BENCHMARK = "Invalid benchmark. Must be 'minds_eye' or 'do_you_see_me'"
-ERROR_INVALID_FILE_FORMAT = "Only CSV and JSON files are supported"
+ERROR_INVALID_BENCHMARK = "Invalid benchmark. Must be 'minds_eye', 'do_you_see_me', or 'spatial'"
+ERROR_INVALID_FILE_FORMAT = "Only JSONL files are supported"
 ERROR_FILE_TOO_LARGE = f"File exceeds maximum size of {MAX_FILE_SIZE_PER_SUBMISSION / 1024 / 1024}MB"
 ERROR_INVALID_MODEL_NAME = f"Model name must be 1-{MAX_MODEL_NAME_LENGTH} characters, alphanumeric with hyphens/underscores"
 ERROR_NO_PREDICTIONS_FOUND = "No valid predictions found in submission"
-ERROR_MALFORMED_CSV = "CSV file is malformed or missing required columns"
-ERROR_MALFORMED_JSON = "JSON file is malformed or missing required fields"
+ERROR_MALFORMED_CSV = "CSV submissions are no longer supported"
+ERROR_MALFORMED_JSON = "JSONL file is malformed or missing required fields"
