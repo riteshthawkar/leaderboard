@@ -16,11 +16,21 @@ from evaluation.extract_canonical_answers import (
     classify_extractor_output,
 )
 from evaluation.finalize_visual_results import read_json, sha256, verify_canonical_results
+from scripts.import_canonical_visual_results import MODEL_CATALOG
 
 
 def _write_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def test_qwen35_production_catalog_identity_is_pinned():
+    assert MODEL_CATALOG["qwen35-9b"] == {
+        "repository": "Qwen/Qwen3.5-9B",
+        "display_name": "Qwen3.5-9B",
+        "organization": "Qwen",
+        "parameter_count": "9B",
+    }
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:

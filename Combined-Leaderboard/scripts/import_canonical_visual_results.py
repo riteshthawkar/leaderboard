@@ -49,6 +49,12 @@ DEFAULT_OWNER = "admin-import@ms-vista.local"
 
 
 MODEL_CATALOG: dict[str, dict[str, str]] = {
+    "qwen35-9b": {
+        "repository": "Qwen/Qwen3.5-9B",
+        "display_name": "Qwen3.5-9B",
+        "organization": "Qwen",
+        "parameter_count": "9B",
+    },
     "internvl35-8b": {
         "repository": "OpenGVLab/InternVL3_5-8B",
         "display_name": "InternVL3.5-8B (Thinking)",
