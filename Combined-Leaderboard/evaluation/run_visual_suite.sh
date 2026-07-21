@@ -53,7 +53,7 @@ HF_HUB_ENABLE_HF_TRANSFER="0"
 HF_HUB_DOWNLOAD_TIMEOUT="${HF_HUB_DOWNLOAD_TIMEOUT:-120}"
 BASE_SEED="${BASE_SEED:-0}"
 ANSWER_EXTRACTOR_SEED="${ANSWER_EXTRACTOR_SEED:-$BASE_SEED}"
-ANSWER_EXTRACTOR_MAX_TOKENS="${ANSWER_EXTRACTOR_MAX_TOKENS:-256}"
+ANSWER_EXTRACTOR_MAX_TOKENS="${ANSWER_EXTRACTOR_MAX_TOKENS:-64}"
 ANSWER_EXTRACTOR_MODEL="${ANSWER_EXTRACTOR_MODEL:-Qwen/Qwen3-8B}"
 ANSWER_EXTRACTOR_REVISION="${ANSWER_EXTRACTOR_REVISION:-b968826d9c46dd6066d109eabc6255188de91218}"
 ANSWER_EXTRACTOR_ENDPOINTS="${ANSWER_EXTRACTOR_ENDPOINTS:-}"
@@ -70,6 +70,15 @@ PRESENCE_PENALTY="${PRESENCE_PENALTY:-0.0}"
 FREQUENCY_PENALTY="${FREQUENCY_PENALTY:-0.0}"
 REPETITION_PENALTY="${REPETITION_PENALTY:-1.0}"
 PHI_OFFICIAL_SNAPSHOT_PATH="${PHI_OFFICIAL_SNAPSHOT_PATH:-}"
+CUSTOM_MODEL_SPEC="${CUSTOM_MODEL_SPEC:-}"
+CUSTOM_MODEL_SLUG="${CUSTOM_MODEL_SLUG:-}"
+CUSTOM_REASONING_PROFILE="${CUSTOM_REASONING_PROFILE:-nonthinking}"
+CUSTOM_CHAT_TEMPLATE_KWARGS="${CUSTOM_CHAT_TEMPLATE_KWARGS:-{}}"
+CUSTOM_DYS_MAX_TOKENS="${CUSTOM_DYS_MAX_TOKENS:-8192}"
+CUSTOM_MINDS_EYE_MAX_TOKENS="${CUSTOM_MINDS_EYE_MAX_TOKENS:-8192}"
+CUSTOM_VLLM_ENGINE_MODE="${CUSTOM_VLLM_ENGINE_MODE:-v1}"
+CUSTOM_SERVER_KV_CACHE_DTYPE="${CUSTOM_SERVER_KV_CACHE_DTYPE:-bfloat16}"
+CUSTOM_HF_OVERRIDES="${CUSTOM_HF_OVERRIDES:-}"
 
 PHI_OFFICIAL_SNAPSHOT_REPO_ID="microsoft/Phi-4-multimodal-instruct"
 PHI_OFFICIAL_SNAPSHOT_COMMIT="7641bf905e6965ee54166808d275266371e28343"
@@ -92,9 +101,9 @@ QWEN36_MAX_TOKENS="${QWEN36_MAX_TOKENS:-8192}"
 VLLM_STACKED_WEIGHT_PATCH_ID="vllm-0.25.1-stacked-weight-single-match-v1"
 VLLM_PHI4MM_MASK_SUM_PATCH_ID="vllm-0.25.1-phi4mm-fp32-mask-sum-v1"
 VLLM_DEEPSEEK_VL2_CONFIG_OVERRIDE_ID="vllm-0.25.1-deepseek-vl2-config-defaults-v1"
-ANSWER_EXTRACTION_METHOD_ID="qwen3-8b-gold-blind-evidence-extractor-v4"
-UNPARSEABLE_ANSWER_POLICY_ID="evidence-extractor-terminal-status-v1"
-PIPELINE_REVISION_ID="unquantized-bf16-single-evidence-extraction-v13"
+ANSWER_EXTRACTION_METHOD_ID="qwen3-8b-model-only-answer-extractor-v1"
+UNPARSEABLE_ANSWER_POLICY_ID="model-empty-answer-to-unresolved-v1"
+PIPELINE_REVISION_ID="unquantized-bf16-model-only-extraction-v14"
 
 # slug|repository|revision|weight loading|max context
 MODEL_SPECS=(
@@ -112,6 +121,9 @@ MODEL_SPECS=(
   'deepseek-vl2|deepseek-ai/deepseek-vl2|f363772d1c47f4239dd844015b4bd53beb87951b|unquantized|4096'
   'llama32-11b-vision-instruct|meta-llama/Llama-3.2-11B-Vision-Instruct|9eb2daaa8597bf192a8b0e73f848f3a102794df5|unquantized|32768'
 )
+if [[ -n "$CUSTOM_MODEL_SPEC" ]]; then
+  MODEL_SPECS+=("$CUSTOM_MODEL_SPEC")
+fi
 
 SERVER_PID=""
 SERVER_OWNS_PROCESS_GROUP=0
@@ -263,6 +275,10 @@ track_prompt_mode() {
 }
 
 model_reasoning_profile() {
+  if [[ -n "$CUSTOM_MODEL_SLUG" && "$1" == "$CUSTOM_MODEL_SLUG" ]]; then
+    printf '%s\n' "$CUSTOM_REASONING_PROFILE"
+    return
+  fi
   case "$1" in
     internvl35-8b) printf '%s\n' 'thinking' ;;
     qwen36-27b) printf '%s\n' 'nonthinking' ;;
@@ -288,6 +304,14 @@ model_max_tokens_policy() {
 
 track_max_tokens() {
   local slug="$1" track="$2"
+  if [[ -n "$CUSTOM_MODEL_SLUG" && "$slug" == "$CUSTOM_MODEL_SLUG" ]]; then
+    if [[ "$track" == "do_you_see_me" ]]; then
+      printf '%s\n' "$CUSTOM_DYS_MAX_TOKENS"
+    else
+      printf '%s\n' "$CUSTOM_MINDS_EYE_MAX_TOKENS"
+    fi
+    return
+  fi
   if [[ ( "$slug" == gemma3-*-it || "$slug" == "kimi-vl-a3b-instruct" || "$slug" == "llama32-11b-vision-instruct" ) && "$track" == "minds_eye" ]]; then
     printf '%s\n' "$INTERNVL35_MAX_TOKENS"
   else
@@ -297,6 +321,10 @@ track_max_tokens() {
 
 track_max_tokens_policy() {
   local slug="$1" track="$2"
+  if [[ -n "$CUSTOM_MODEL_SLUG" && "$slug" == "$CUSTOM_MODEL_SLUG" ]]; then
+    printf '%s\n' 'explicit-model-completion-cap'
+    return
+  fi
   if [[ ( "$slug" == gemma3-*-it || "$slug" == "kimi-vl-a3b-instruct" || "$slug" == "llama32-11b-vision-instruct" ) && "$track" == "minds_eye" ]]; then
     printf '%s\n' 'explicit-model-completion-cap'
   else
@@ -330,6 +358,10 @@ track_top_p() {
 
 track_chat_kwargs() {
   local slug="$1"
+  if [[ -n "$CUSTOM_MODEL_SLUG" && "$slug" == "$CUSTOM_MODEL_SLUG" ]]; then
+    printf '%s\n' "$CUSTOM_CHAT_TEMPLATE_KWARGS"
+    return
+  fi
   case "$slug" in
     glm46v-flash|qwen36-27b) printf '%s\n' '{"enable_thinking":false}' ;;
     qwen35-9b) printf '%s\n' '{"enable_thinking":false}' ;;
@@ -621,7 +653,7 @@ print_plan() {
     "$VLLM_DTYPE" "$VLLM_KV_CACHE_DTYPE"
   printf '  Serving engine: vLLM %s\n' "$VLLM_VERSION"
   printf '  Image preprocessing: original image bytes, no runner resize or recompression\n'
-  printf '  Sole v4 evidence extraction: model=%s, endpoints=%s, text only, temperature=0, max_tokens=%s, seed=%s\n' \
+  printf '  Model-only answer extraction: model=%s, endpoints=%s, text only, temperature=0, max_tokens=%s, seed=%s\n' \
     "${ANSWER_EXTRACTOR_MODEL:-same-as-inference}" \
     "${ANSWER_EXTRACTOR_ENDPOINTS:-same-as-inference}" \
     "$ANSWER_EXTRACTOR_MAX_TOKENS" "$ANSWER_EXTRACTOR_SEED"
@@ -629,7 +661,7 @@ print_plan() {
     printf '  Managed extractor GPUs: %s (started only after visual shutdown)\n' \
       "$ANSWER_EXTRACTOR_GPU_IDS"
   fi
-  printf '  Missing/ambiguous response token: UNRESOLVED; extractor transport/schema failures stop finalization\n'
+  printf '  Missing/ambiguous extractor answer: empty; submission token: UNRESOLVED\n'
   if [[ "$phase" == "inference" ]]; then
     printf '  Mode: hash-addressed visual inference only; no extractor requests\n'
   elif [[ "$phase" == "extraction" ]]; then
@@ -843,12 +875,20 @@ model_compatibility_patch_source() {
 }
 
 model_hf_overrides() {
+  if [[ -n "$CUSTOM_MODEL_SLUG" && "$1" == "$CUSTOM_MODEL_SLUG" ]]; then
+    printf '%s\n' "$CUSTOM_HF_OVERRIDES"
+    return
+  fi
   case "$1" in
     deepseek-vl2) printf '%s\n' '{"text_config":{"kv_lora_rank":512,"num_hidden_layers":30}}' ;;
   esac
 }
 
 model_vllm_engine_mode() {
+  if [[ -n "$CUSTOM_MODEL_SLUG" && "$1" == "$CUSTOM_MODEL_SLUG" ]]; then
+    printf '%s\n' "$CUSTOM_VLLM_ENGINE_MODE"
+    return
+  fi
   case "$1" in
     llama32-11b-vision-instruct) printf '%s\n' 'legacy-v0' ;;
     *) printf '%s\n' 'v1' ;;
@@ -856,6 +896,10 @@ model_vllm_engine_mode() {
 }
 
 model_server_kv_cache_dtype() {
+  if [[ -n "$CUSTOM_MODEL_SLUG" && "$1" == "$CUSTOM_MODEL_SLUG" ]]; then
+    printf '%s\n' "$CUSTOM_SERVER_KV_CACHE_DTYPE"
+    return
+  fi
   case "$1" in
     llama32-11b-vision-instruct) printf '%s\n' 'auto' ;;
     *) printf '%s\n' "$VLLM_KV_CACHE_DTYPE" ;;
@@ -1681,13 +1725,12 @@ run_inference_track() {
 
 run_extraction_track() {
   local slug="$1" model_id="$2" track="$3"
-  local questions model_dir output diagnostics inference_diagnostics evidence
+  local questions model_dir output diagnostics inference_diagnostics
   questions="$(track_questions "$track")"
   model_dir="$OUTPUT_ROOT/$slug"
   output="$model_dir/${track}_submission.jsonl"
   diagnostics="$model_dir/${track}.diagnostics.jsonl"
   inference_diagnostics="$model_dir/${track}.inference.diagnostics.jsonl"
-  evidence="$model_dir/${track}.evidence_extraction.jsonl"
 
   if [[ "$FORCE" != "1" ]] \
     && validate_submission "$output" "$questions" >/dev/null 2>&1; then
@@ -1702,13 +1745,11 @@ run_extraction_track() {
   if [[ -f "$output" ]]; then
     mv -- "$output" "$output.invalid.$(date -u '+%Y%m%dT%H%M%SZ')"
   fi
-  log "Running the single production v4 evidence extractor for every saved $slug/$track response"
-  "$PYTHON_BIN" -m evaluation.extract_staging_evidence \
-    --model-slug "$slug" \
+  log "Running model-only answer extraction for every saved $slug/$track response"
+  "$PYTHON_BIN" -m evaluation.extract_staging_answers \
     --track "$track" \
     --questions "$questions" \
     --source "$inference_diagnostics" \
-    --evidence "$evidence" \
     --out "$output" \
     --diagnostics "$diagnostics" \
     --endpoint "$ANSWER_EXTRACTOR_ENDPOINTS" \
@@ -1717,9 +1758,9 @@ run_extraction_track() {
     --max-tokens "$ANSWER_EXTRACTOR_MAX_TOKENS" \
     --concurrency "$CONCURRENCY" \
     --timeout "$REQUEST_TIMEOUT_SECONDS" \
-    --endpoint-start-timeout "$MODEL_START_TIMEOUT_SECONDS" \
     --retries 2 \
-    --report-every "$CHECKPOINT_EVERY" \
+    --checkpoint-every "$CHECKPOINT_EVERY" \
+    --report-every 100 \
     && validate_submission "$output" "$questions"
 }
 
@@ -1809,7 +1850,7 @@ import json
 import os
 from pathlib import Path
 
-from evaluation.evidence_contract import extractor_contract_sha256
+from evaluation.answer_extraction_contract import extractor_contract_sha256
 
 path = Path(os.environ["RUN_CONFIG_PATH"])
 root = Path(os.environ["RUN_CONFIG_PROJECT_ROOT"])
@@ -1838,7 +1879,7 @@ def protocol(prefix: str, track: str) -> dict:
         "max_tokens_policy": os.environ[f"RUN_CONFIG_{prefix}_MAX_TOKENS_POLICY"],
           "final_answer_max_tokens": final_answer_max_tokens,
           "final_answer_token_enforcement": (
-            "v4-evidence-domain-validation"
+            "extractor-response-format-schema"
             if needs_separate_answer_check
             else "total-completion-cap"
           ),
@@ -1859,7 +1900,7 @@ def protocol(prefix: str, track: str) -> dict:
     }
 
 desired = {
-  "schema_version": 13,
+  "schema_version": 14,
     "model_id": os.environ["RUN_CONFIG_MODEL_ID"],
     "model_revision": os.environ["RUN_CONFIG_REVISION"],
     "reasoning_profile": os.environ["RUN_CONFIG_REASONING_PROFILE"],
@@ -1917,7 +1958,6 @@ desired = {
       "mode": "separate-post-inference-phase",
       "phase_order": ["inference", "extraction"],
       "inference_artifact": "<track>.inference.diagnostics.jsonl",
-      "evidence_artifact": "<track>.evidence_extraction.jsonl",
       "inference_method": "visual-inference-output-sha256-v1",
       "source_immutability": "extract-from-separate-hash-validated-artifact",
       "authoritative_answer_field": "diagnostics.extracted_answer",
@@ -1932,11 +1972,8 @@ desired = {
         "revision": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_REVISION"],
         "endpoints": os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_ENDPOINTS"].split(","),
         "input_fields": [
-          "question",
-          "answer_type",
           "candidate_response",
-          "response_metadata",
-          "task",
+          "expected_answer_format",
         ],
         "image_supplied": False,
         "ground_truth_supplied": False,
@@ -1947,12 +1984,12 @@ desired = {
         "chat_template_kwargs": json.loads(
           os.environ["RUN_CONFIG_ANSWER_EXTRACTOR_CHAT_KWARGS"]
         ),
-        "support_validation": "literal-evidence-quote-and-commitment-validation",
+        "deterministic_answer_recovery": False,
         "source_provenance": [
           "inference_diagnostics_filename",
           "candidate-response-utf8-sha256",
         ],
-        "output_contract": "strict-json-verdict-answer-evidence",
+        "output_contract": "strict-json-answer-or-empty",
         "unresolved_token": "UNRESOLVED",
       },
     },
@@ -1972,8 +2009,8 @@ desired = {
         "runner": {
             "visual_pipeline": sha256(root / "evaluation" / "common" / "visual_pipeline.py"),
             "vllm_runner": sha256(root / "evaluation" / "common" / "vllm_runner.py"),
-          "evidence_extractor": sha256(root / "evaluation" / "extract_canonical_answers.py"),
-          "staging_evidence_adapter": sha256(root / "evaluation" / "extract_staging_evidence.py"),
+            "answer_extraction_contract": sha256(root / "evaluation" / "answer_extraction_contract.py"),
+            "staging_answer_extractor": sha256(root / "evaluation" / "extract_staging_answers.py"),
         },
     },
 }
@@ -2012,9 +2049,9 @@ def is_supported_extraction_upgrade(existing: dict) -> bool:
     and (
       existing.get("schema_version"), existing.get("pipeline_revision")
     ) == (10, "unquantized-bf16-smoke-and-full-text-extraction-v10")
-    and desired.get("schema_version") == 13
+    and desired.get("schema_version") == 14
     and desired.get("pipeline_revision")
-    == "unquantized-bf16-single-evidence-extraction-v13"
+    == "unquantized-bf16-model-only-extraction-v14"
     and extraction_upgrade_invariants(existing)
     == extraction_upgrade_invariants(desired)
   )
@@ -2037,9 +2074,9 @@ def is_supported_split_phase_upgrade(existing: dict) -> bool:
     existing.get("schema_version") == 11
     and existing.get("pipeline_revision")
     == "unquantized-bf16-mandatory-extraction-v11"
-    and desired.get("schema_version") == 13
+    and desired.get("schema_version") == 14
     and desired.get("pipeline_revision")
-    == "unquantized-bf16-single-evidence-extraction-v13"
+    == "unquantized-bf16-model-only-extraction-v14"
     and any(
       (model_dir / f"{track}.diagnostics.jsonl").is_file()
       for track in ("do_you_see_me", "minds_eye")
@@ -2495,6 +2532,7 @@ def is_supported_serving_topology_resume(existing: dict) -> bool:
       "unquantized-bf16-mandatory-extraction-v11",
       "unquantized-bf16-split-inference-extraction-v12",
       "unquantized-bf16-single-evidence-extraction-v13",
+      "unquantized-bf16-model-only-extraction-v14",
     }
     and has_checkpoint
     and topology_changed
@@ -3160,14 +3198,9 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     output = path.parent / f"{track}_submission.jsonl"
     diagnostics = path.parent / f"{track}.diagnostics.jsonl"
     inference_diagnostics = path.parent / f"{track}.inference.diagnostics.jsonl"
-    evidence_extraction = path.parent / f"{track}.evidence_extraction.jsonl"
     if not inference_diagnostics.is_file():
       raise SystemExit(
         f"Cannot write manifest without {inference_diagnostics.name}."
-      )
-    if not evidence_extraction.is_file():
-      raise SystemExit(
-        f"Cannot write manifest without {evidence_extraction.name}."
       )
     rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line]
     diagnostic_rows = [
@@ -3190,8 +3223,6 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
         "diagnostics_sha256": sha256(diagnostics),
         "inference_diagnostics_file": inference_diagnostics.name,
         "inference_diagnostics_sha256": sha256(inference_diagnostics),
-        "evidence_extraction_file": evidence_extraction.name,
-        "evidence_extraction_sha256": sha256(evidence_extraction),
         "resolved_answer_count": len(rows) - len(unresolved_answer_question_ids),
         "unresolved_answer_count": len(unresolved_answer_question_ids),
         "unresolved_answer_question_ids": unresolved_answer_question_ids,
@@ -3221,7 +3252,7 @@ for track in os.environ["MANIFEST_TRACKS"].split(","):
     }
 
 manifest = {
-  "schema_version": 13,
+  "schema_version": 14,
     "created_at": datetime.now(timezone.utc).isoformat(),
     "model_id": os.environ["MANIFEST_MODEL_ID"],
     "model_revision": os.environ["MANIFEST_REVISION"],

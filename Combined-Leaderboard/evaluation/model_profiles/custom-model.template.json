@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "slug": "my-model",
+  "model_id": "organization/model-repository",
+  "revision": "replace-with-40-character-commit-hash",
+  "max_model_len": 32768,
+  "reasoning_profile": "nonthinking",
+  "chat_template_kwargs": {},
+  "generation": {
+    "do_you_see_me_max_tokens": 8192,
+    "minds_eye_max_tokens": 8192
+  },
+  "serving_mode": "replica",
+  "minimum_gpu_count": 1,
+  "vllm_engine_mode": "v1",
+  "server_kv_cache_dtype": "bfloat16",
+  "hf_overrides": {}
+}

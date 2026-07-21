@@ -4,9 +4,11 @@ from pathlib import Path
 
 import pytest
 
+from evaluation.answer_extraction_contract import METHOD as PUBLIC_EXTRACTION_METHOD
 from evaluation.finalize_visual_results import (
     CURRENT_PIPELINE_REVISION,
     FinalizationError,
+    answer_provenance_counts,
     build_canonical_results,
     discover_candidates,
     prune_cache,
@@ -21,6 +23,21 @@ TRACK_IDS = {
     "do_you_see_me": ["d1", "d2"],
     "minds_eye": ["m1", "m2"],
 }
+
+
+def test_model_only_extractor_answer_is_authoritative_without_raw_parsing():
+    submission = [{"question_id": "q1", "condition": "standard", "answer": "C"}]
+    diagnostics = {
+        "q1": {
+            "question_id": "q1",
+            "answer_type": "mcq_letter",
+            "output": "The final answer is B.",
+            "answer_extraction_method": PUBLIC_EXTRACTION_METHOD,
+            "extracted_answer": "C",
+        }
+    }
+
+    assert answer_provenance_counts(submission, diagnostics) == (1, 0, 0, 0)
 
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:

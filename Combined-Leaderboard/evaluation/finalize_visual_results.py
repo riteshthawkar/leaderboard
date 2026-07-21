@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from evaluation.answer_extraction_contract import METHOD as PUBLIC_EXTRACTION_METHOD
 from evaluation.common.vllm_runner import ANSWER_EXTRACTION_METHOD
 from evaluation.common.visual_pipeline import (
     MISSING_ANSWER_TOKEN,
@@ -31,6 +32,7 @@ SUPPORTED_PIPELINE_REVISIONS = {
     "unquantized-bf16-mandatory-extraction-v11",
     "unquantized-bf16-split-inference-extraction-v12",
     "unquantized-bf16-single-evidence-extraction-v13",
+    "unquantized-bf16-model-only-extraction-v14",
     CURRENT_PIPELINE_REVISION,
 }
 SUBMISSION_FIELDS = {"question_id", "condition", "answer"}
@@ -178,7 +180,11 @@ def answer_provenance_counts(
         answer_type = str(diagnostic.get("answer_type") or "text")
         mandatory = (
             diagnostic.get("answer_extraction_method")
-            in {ANSWER_EXTRACTION_METHOD, PRODUCTION_EXTRACTION_METHOD}
+            in {
+                ANSWER_EXTRACTION_METHOD,
+                PRODUCTION_EXTRACTION_METHOD,
+                PUBLIC_EXTRACTION_METHOD,
+            }
         )
         parsed = ""
         if mandatory and "extracted_answer" in diagnostic:

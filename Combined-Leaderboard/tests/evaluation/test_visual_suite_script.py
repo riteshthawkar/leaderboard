@@ -74,11 +74,11 @@ def test_visual_suite_has_no_quantized_or_synthetic_answer_path():
     assert 'vllm_phi4mm_mask_sum_patch_id="vllm-0.25.1-phi4mm-fp32-mask-sum-v1"' in script
     assert "evaluation.common.patch_vllm_phi4mm" in script
     assert ".attempt-${attempt}.diagnostics.jsonl" not in script
-    assert "qwen3-8b-gold-blind-evidence-extractor-v4" in script
+    assert "qwen3-8b-model-only-answer-extractor-v1" in script
     assert "qwen/qwen3-8b" in script
     assert "b968826d9c46dd6066d109eabc6255188de91218" in script
-    assert "evaluation.extract_staging_evidence" in script
-    assert 'evidence="$model_dir/${track}.evidence_extraction.jsonl"' in script
+    assert "evaluation.extract_staging_answers" in script
+    assert "deterministic_answer_recovery" in script
     assert "--raw-output-fallback" not in script
     assert 'setup_only="${setup_only:-0}"' in script
     assert 'df -pk "$cache_root"' in script
@@ -95,7 +95,7 @@ def test_visual_suite_dry_run_uses_unquantized_paper_profiles():
     assert "original checkpoint tensors, unquantized; compute: bfloat16; KV cache: bfloat16" in result.stdout
     assert "no runner resize or recompression" in result.stdout
     assert "model=Qwen/Qwen3-8B" in result.stdout
-    assert "Missing/ambiguous response token: UNRESOLVED" in result.stdout
+    assert "Missing/ambiguous extractor answer: empty" in result.stdout
     assert "no answer reruns or raw fallback" not in result.stdout
     assert "top_k=-1, min_p=0.0, presence=0.0, frequency=0.0, repetition=1.0" in result.stdout
     assert "prompt=noncot, temperature=1.0, top_p=0.95" in result.stdout
@@ -298,7 +298,7 @@ def test_kimi_vl_uses_pinned_dp3_track_budget_profile(tmp_path):
         )
     )
     assert config["serving_engine"]["replica_mode"] == "independent-processes"
-    assert config["schema_version"] == 13
+    assert config["schema_version"] == 14
     assert config["answer_extraction"]["mode"] == (
         "separate-post-inference-phase"
     )
@@ -733,10 +733,9 @@ output=""
 archived_source=0
 while (( $# )); do
   case "$1" in
-        --evidence) extract=1; shift 2 ;;
+        --source) extract=1; archived_source=1; shift 2 ;;
     --limit) limit=1; shift 2 ;;
     --out) output="$2"; shift 2 ;;
-        --source) archived_source=1; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -765,7 +764,7 @@ printf '{"question_id":"q1","condition":"standard","answer":"6"}\n' > "$output"
     )
 
     assert result.returncode == 0, result.stderr
-    assert "single production v4 evidence extractor" in result.stdout
+    assert "model-only answer extraction" in result.stdout
     assert "smoke test" not in result.stdout
 
 
@@ -821,7 +820,7 @@ while (( $# )); do
     --out) output="$2"; shift 2 ;;
         --limit) limit=1; shift 2 ;;
         --inference-only) inference=1; shift ;;
-        --evidence) extract=1; shift 2 ;;
+        --source) extract=1; shift 2 ;;
     *) shift ;;
   esac
 done
@@ -831,7 +830,7 @@ printf '%s' "$((count + 1))" > "$FAKE_COUNT_FILE"
 if (( inference == 1 )); then
     printf '{"question_id":"q1","output":"unfinished"}\n' > "$diagnostics"
 elif (( extract == 1 )); then
-    printf '{"question_id":"q1","output":"unfinished","answer_extraction_method":"qwen3-8b-gold-blind-evidence-extractor-v4","extracted_answer":"UNRESOLVED"}\n' > "$diagnostics"
+    printf '{"question_id":"q1","output":"unfinished","answer_extraction_method":"qwen3-8b-model-only-answer-extractor-v1","extracted_answer":"UNRESOLVED"}\n' > "$diagnostics"
     printf '{"question_id":"q1","condition":"standard","answer":"UNRESOLVED"}\n' > "$output"
 fi
 """,
@@ -1309,7 +1308,7 @@ def legacy_removed_local_parser_upgrade(tmp_path):
     ]["visual_pipeline"]
 
 
-def test_schema_v10_to_v13_extraction_only_migration_preserves_diagnostics(tmp_path):
+def test_schema_v10_to_v14_extraction_only_migration_preserves_diagnostics(tmp_path):
     output_root = tmp_path / "outputs"
     initialize = _run_sourced(
         "\n".join(
@@ -1367,9 +1366,9 @@ def test_schema_v10_to_v13_extraction_only_migration_preserves_diagnostics(tmp_p
     assert migrate.returncode == 0, migrate.stderr
     assert diagnostics.read_bytes() == original
     migrated = json.loads(config_path.read_text(encoding="utf-8"))
-    assert migrated["schema_version"] == 13
+    assert migrated["schema_version"] == 14
     assert migrated["pipeline_revision"] == (
-        "unquantized-bf16-single-evidence-extraction-v13"
+        "unquantized-bf16-model-only-extraction-v14"
     )
     assert migrated["answer_extraction"]["extractor"]["model"] == (
         "Qwen/Qwen3-8B"
@@ -1377,14 +1376,14 @@ def test_schema_v10_to_v13_extraction_only_migration_preserves_diagnostics(tmp_p
     latest = migrated["artifact_migrations"][-1]
     assert latest["reason"] == "provenance-preserving-answer-extraction-upgrade"
     assert latest["from_schema_version"] == 10
-    assert latest["to_schema_version"] == 13
+    assert latest["to_schema_version"] == 14
     assert latest["previous_runner_source_hashes"] == {
         "visual_pipeline": "schema-10-visual-pipeline-hash",
         "vllm_runner": "schema-10-vllm-runner-hash",
     }
 
 
-def test_force_replaces_stale_artifacts_with_schema_v13_fingerprint(tmp_path):
+def test_force_replaces_stale_artifacts_with_schema_v14_fingerprint(tmp_path):
     output_root = tmp_path / "outputs"
     model_dir = output_root / "test-model"
     model_dir.mkdir(parents=True)
@@ -1412,7 +1411,7 @@ def test_force_replaces_stale_artifacts_with_schema_v13_fingerprint(tmp_path):
     assert not stale_submission.exists()
     assert not stale_manifest.exists()
     run_config = json.loads((model_dir / ".run_config.json").read_text(encoding="utf-8"))
-    assert run_config["schema_version"] == 13
+    assert run_config["schema_version"] == 14
     assert run_config["reasoning_profile"] == "nonthinking"
     assert run_config["weight_loading"] == "unquantized"
     assert run_config["compute_dtype"] == "bfloat16"
@@ -1462,34 +1461,29 @@ def test_force_replaces_stale_artifacts_with_schema_v13_fingerprint(tmp_path):
         "diagnostics.extracted_answer"
     )
     extractor = extraction["extractor"]
-    assert extractor["method"] == "qwen3-8b-gold-blind-evidence-extractor-v4"
+    assert extractor["method"] == "qwen3-8b-model-only-answer-extractor-v1"
     assert extractor["model"] == "Qwen/Qwen3-8B"
     assert extractor["revision"] == "b968826d9c46dd6066d109eabc6255188de91218"
     assert len(extractor["contract_sha256"]) == 64
-    assert extractor["max_tokens"] == 256
+    assert extractor["max_tokens"] == 64
     assert extractor["input_fields"] == [
-        "question",
-        "answer_type",
         "candidate_response",
-        "response_metadata",
-        "task",
+        "expected_answer_format",
     ]
-    assert extractor["output_contract"] == "strict-json-verdict-answer-evidence"
-    assert extractor["support_validation"] == (
-        "literal-evidence-quote-and-commitment-validation"
-    )
+    assert extractor["output_contract"] == "strict-json-answer-or-empty"
+    assert extractor["deterministic_answer_recovery"] is False
     assert not extractor["image_supplied"]
     assert not extractor["ground_truth_supplied"]
     assert run_config["unparseable_answers"] == {
-        "policy": "evidence-extractor-terminal-status-v1",
+        "policy": "model-empty-answer-to-unresolved-v1",
         "standardized_token": "UNRESOLVED",
         "visual_answer_retries": 0,
         "local_parser_answer_selection": False,
         "raw_output_fallback": False,
     }
     assert set(run_config["source_hashes"]["runner"]) == {
-        "evidence_extractor",
-        "staging_evidence_adapter",
+        "answer_extraction_contract",
+        "staging_answer_extractor",
         "visual_pipeline",
         "vllm_runner",
     }
@@ -1934,7 +1928,7 @@ def test_schema11_split_phase_upgrade_reuses_only_hash_verified_responses(tmp_pa
         model_dir / "minds_eye.pre-split-phase.smoke.diagnostics.jsonl"
     ).read_bytes() == old_diagnostics
     migrated = json.loads(config_path.read_text(encoding="utf-8"))
-    assert migrated["schema_version"] == 13
+    assert migrated["schema_version"] == 14
     assert migrated["answer_extraction"]["mode"] == "separate-post-inference-phase"
     assert migrated["artifact_migrations"][-1]["converted_tracks"]["minds_eye"][
         "row_count"
@@ -2217,7 +2211,7 @@ def test_internvl_fingerprint_records_generation_and_answer_caps(tmp_path):
         assert generation["max_tokens_policy"] == "explicit-model-completion-cap"
         assert generation["final_answer_max_tokens"] == 200
         assert generation["final_answer_token_enforcement"] == (
-            "v4-evidence-domain-validation"
+            "extractor-response-format-schema"
         )
 
 
@@ -2248,7 +2242,7 @@ def test_qwen3_fingerprint_records_generation_and_answer_caps(tmp_path):
         assert generation["max_tokens_policy"] == "explicit-model-completion-cap"
         assert generation["final_answer_max_tokens"] == 200
         assert generation["final_answer_token_enforcement"] == (
-            "v4-evidence-domain-validation"
+            "extractor-response-format-schema"
         )
 
 
@@ -2279,7 +2273,7 @@ def test_qwen25_fingerprint_records_generation_and_answer_caps(tmp_path):
         assert generation["max_tokens_policy"] == "explicit-model-completion-cap"
         assert generation["final_answer_max_tokens"] == 200
         assert generation["final_answer_token_enforcement"] == (
-            "v4-evidence-domain-validation"
+            "extractor-response-format-schema"
         )
 
 
@@ -2342,7 +2336,7 @@ def test_manifest_records_mandatory_extractor_unresolved_answers(tmp_path):
     )
     (model_dir / "do_you_see_me.diagnostics.jsonl").write_text(
         '{"question_id":"q1","answer_type":"mcq_letter","output":"ambiguous",'
-        '"answer_extraction_method":"qwen3-8b-gold-blind-evidence-extractor-v4",'
+        '"answer_extraction_method":"qwen3-8b-model-only-answer-extractor-v1",'
         '"extractor_model":"Qwen/Qwen3-8B","extractor_status":"unresolved",'
         '"extractor_output":"<answer>UNRESOLVED</answer>",'
         '"extracted_answer":"UNRESOLVED"}\n',
@@ -2365,20 +2359,6 @@ def test_manifest_records_mandatory_extractor_unresolved_answers(tmp_path):
         + "\n",
         encoding="utf-8",
     )
-    (model_dir / "do_you_see_me.evidence_extraction.jsonl").write_text(
-        json.dumps(
-            {
-                "model_slug": "test-model",
-                "track": "do_you_see_me",
-                "question_id": "q1",
-                "method": "qwen3-8b-gold-blind-evidence-extractor-v4",
-                "status": "unresolved",
-                "response_sha256": inference_hash,
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
 
     manifest_result = _run_sourced(
         "\n".join(
@@ -2396,12 +2376,9 @@ def test_manifest_records_mandatory_extractor_unresolved_answers(tmp_path):
 
     assert manifest_result.returncode == 0, manifest_result.stderr
     manifest = json.loads((model_dir / "run_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["schema_version"] == 13
+    assert manifest["schema_version"] == 14
     assert manifest["tracks"]["do_you_see_me"][
         "inference_diagnostics_sha256"
-    ]
-    assert manifest["tracks"]["do_you_see_me"][
-        "evidence_extraction_sha256"
     ]
     assert manifest["reasoning_profile"] == "nonthinking"
     assert manifest["checkpoint_source"] == {

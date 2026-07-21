@@ -16,6 +16,7 @@ from typing import Any, Iterable, Sequence
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from evaluation.answer_extraction_contract import METHOD as PUBLIC_EXTRACTION_METHOD
 from visual_answer_contract import INVALID_FORMAT_TOKEN
 
 
@@ -384,6 +385,9 @@ def extracted_record_answer(record: dict[str, Any], answer_type: str) -> str:
     if "extracted_answer" not in record:
         return ""
     extracted = record.get("extracted_answer")
+    if record.get("answer_extraction_method") == PUBLIC_EXTRACTION_METHOD:
+        value = str(extracted or "")
+        return value if value else MISSING_ANSWER_TOKEN
     if str(extracted).strip().upper() == MISSING_ANSWER_TOKEN:
         return MISSING_ANSWER_TOKEN
     if str(extracted).strip() == INVALID_FORMAT_TOKEN:

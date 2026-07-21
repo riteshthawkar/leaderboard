@@ -202,13 +202,15 @@ The Do-You-See-Me and Mind's-Eye public `questions.jsonl` bundles mirror the pub
 
 ## Visual Evaluation
 
-On a Linux machine with a free 40 GB-class BF16 NVIDIA GPU, run configured Do You See Me and Mind's Eye models with original, unquantized checkpoint weights:
+On a Linux machine with a free 40 GB-class BF16 NVIDIA GPU, choose a shipped model profile and run both benchmarks with one command:
 
 ```bash
-bash evaluation/run_visual_suite.sh
+python evaluation/run_public_evaluation.py \
+  --profile evaluation/model_profiles/qwen35-9b.json \
+  --gpus 0,1
 ```
 
-The command provisions a pinned shared environment, downloads verified public data and pinned model revisions, performs strict smoke runs, resumes checkpoints, and writes upload-ready JSONL files under `evaluation/results/visual_suite_bf16/`. Visual inference first uses all assigned GPUs and saves hash-addressed responses; those servers unload before the same GPUs run the sole pinned v4 evidence extractor with no image or ground-truth access. Its evidence artifact is reused directly by canonical packaging, so no second extractor pass is needed. See [`evaluation/README.md`](evaluation/README.md) for the paper-aligned track protocols, two-GPU commands, extraction provenance, audit behavior, and explicit deviations from the papers.
+The command provisions the pinned environment and dataset, runs DYS and Mind's Eye inference with resume checkpoints, unloads the visual model, runs model-only answer extraction, and writes both upload-ready submission files. The extractor receives only each saved model response and its expected answer format; it returns the formatted answer or an empty string. There is no deterministic answer recovery. Copy `evaluation/model_profiles/custom-model.template.json` to add a new vLLM-compatible checkpoint. See [`evaluation/README.md`](evaluation/README.md) for profiles, protocols, outputs, and advanced controls.
 
 ## Score Semantics
 
