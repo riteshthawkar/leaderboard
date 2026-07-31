@@ -20,6 +20,8 @@ def test_release_deployment_has_smoke_checked_rollback_and_locking():
     assert "scripts/production_smoke.py" in script
     assert "restored and verified image tag" in script
     assert "CRITICAL: deployment and automatic rollback both failed" in script
+    assert "RELEASE_COMMIT_FILE" in script
+    assert "^[0-9a-f]{40}$" in script
 
 
 def test_watchdog_requires_repeated_failures_and_has_recovery_cooldown():

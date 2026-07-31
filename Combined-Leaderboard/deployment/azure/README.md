@@ -49,6 +49,8 @@ cd /srv/ms-vista/app/deployment/azure
 TAG=prod-$(date -u +%Y%m%dT%H%M%SZ)
 sudo env MS_VISTA_IMAGE_TAG="$TAG" \
   docker compose --env-file production.env build api frontend
+git -C /path/to/source rev-parse HEAD | sudo tee /srv/ms-vista/app/.release-commit >/dev/null
+sudo chmod 0644 /srv/ms-vista/app/.release-commit
 sudo ./deploy_release.sh "$TAG"
 curl -fsS https://<hostname>/api/health/live
 curl -fsS https://<hostname>/api/readiness
@@ -59,7 +61,9 @@ protected environment, waits for all containers to become healthy, runs the
 full HTTPS production smoke test, rolls back and verifies the previous release
 on failure, and records the deployed image IDs under
 `/srv/ms-vista/deployment-manifests`. Environment backups and manifests retain
-the 20 newest entries.
+the 20 newest entries. Archive-style deployments without `.git` must write the
+validated 40-character source revision to `/srv/ms-vista/app/.release-commit`
+before deployment so the release manifest remains attributable.
 
 After the first successful deployment, install all host units:
 

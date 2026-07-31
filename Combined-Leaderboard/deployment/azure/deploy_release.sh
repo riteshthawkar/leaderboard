@@ -22,6 +22,7 @@ ENV_FILE="${DEPLOY_DIR}/production.env"
 BACKUP_DIR=/srv/ms-vista/deploy-env-backups
 MANIFEST_DIR=/srv/ms-vista/deployment-manifests
 DEPLOY_LOCK=/run/lock/ms-vista-deployment.lock
+RELEASE_COMMIT_FILE="${APP_DIR}/.release-commit"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 ENV_BACKUP="${BACKUP_DIR}/production.env.${STAMP}"
 COMPOSE=(
@@ -54,6 +55,15 @@ DOMAIN=$(sed -n 's/^MS_VISTA_DOMAIN=//p' "${ENV_FILE}")
 if [[ ! ${DOMAIN} =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]]; then
   echo "MS_VISTA_DOMAIN must be a hostname without a scheme, path, or port." >&2
   exit 1
+fi
+
+RELEASE_COMMIT=""
+if [[ -f ${RELEASE_COMMIT_FILE} ]]; then
+  RELEASE_COMMIT=$(tr -d '\r\n' < "${RELEASE_COMMIT_FILE}")
+  if [[ ! ${RELEASE_COMMIT} =~ ^[0-9a-f]{40}$ ]]; then
+    echo "Invalid release commit marker: ${RELEASE_COMMIT_FILE}" >&2
+    exit 1
+  fi
 fi
 
 REQUIRE_SPATIAL=$(sed -n 's/^REQUIRE_OFFICIAL_SPATIAL=//p' "${ENV_FILE}" | tr '[:upper:]' '[:lower:]')
@@ -150,6 +160,8 @@ if APP_COMMIT=$(git -C "${APP_DIR}" rev-parse HEAD 2>/dev/null); then
   if [[ -n $(git -C "${APP_DIR}" status --porcelain) ]]; then
     SOURCE_DIRTY=true
   fi
+elif [[ -n ${RELEASE_COMMIT} ]]; then
+  APP_COMMIT=${RELEASE_COMMIT}
 else
   APP_COMMIT=unknown
 fi

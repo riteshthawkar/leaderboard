@@ -1,5 +1,6 @@
 .DS_Store
 .git
+.release-commit
 .pytest_cache
 tests
 .venv
