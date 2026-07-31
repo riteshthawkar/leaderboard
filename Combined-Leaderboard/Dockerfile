@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS frontend-build
+FROM node:22.22-bookworm-slim AS frontend-build
 
 WORKDIR /build/frontend
 COPY frontend/package*.json ./
@@ -59,7 +59,7 @@ ENV MAX_CONTENT_LENGTH=52428800
 ENV MAX_FILE_SIZE_PER_SUBMISSION=52428800
 ENV MAX_SPATIAL_ARCHIVE_BYTES=10485760
 ENV MAX_SPATIAL_MULTIPART_BYTES=12582912
-ENV MAX_SPATIAL_SUBMISSION_BYTES=20971520
+ENV MAX_SPATIAL_SUBMISSION_BYTES=67108864
 ENV MAX_SPATIAL_MANIFEST_BYTES=1048576
 ENV MAX_SPATIAL_ZIP_COMPRESSION_RATIO=100
 
@@ -76,7 +76,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=user:user backend ./backend
 COPY --chown=user:user tasks ./tasks
-COPY --chown=user:user evaluation/spatial_reasoning ./evaluation/spatial_reasoning
+COPY --chown=user:user visual_answer_contract.py ./visual_answer_contract.py
+COPY --chown=user:user spatial_harness ./spatial_harness
 COPY --chown=user:user deployment/huggingface ./deployment/huggingface
 COPY --chown=user:user README.md ./README.md
 COPY --chown=user:user --from=frontend-build /build/frontend/dist ./frontend-dist

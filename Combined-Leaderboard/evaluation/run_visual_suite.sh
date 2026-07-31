@@ -12,6 +12,7 @@ HUGGINGFACE_HUB_VERSION="${HUGGINGFACE_HUB_VERSION:-1.23.0}"
 PILLOW_VERSION="12.3.0"
 SCIPY_VERSION="1.15.3"
 TIMM_VERSION="1.0.28"
+SQLALCHEMY_VERSION="2.0.51"
 UV_VERSION="0.11.28"
 DATASET_REPO_ID="amolharsh/visual-intelligence-leaderboard"
 DATASET_REVISION="cc41be90e74679a9d3c9dd295834b2cee9100b9d"
@@ -759,7 +760,7 @@ preflight_host() {
 }
 
 setup_environment() {
-  local marker="$VENV_DIR/.ms-vista-vllm-${VLLM_VERSION}-scipy-${SCIPY_VERSION}-timm-${TIMM_VERSION}-unquantized-bf16-uv-${UV_VERSION}"
+  local marker="$VENV_DIR/.ms-vista-vllm-${VLLM_VERSION}-scipy-${SCIPY_VERSION}-timm-${TIMM_VERSION}-sqlalchemy-${SQLALCHEMY_VERSION}-unquantized-bf16-uv-${UV_VERSION}"
   if [[ ! -x "$VENV_DIR/bin/python" ]]; then
     log "Creating evaluation environment at $VENV_DIR"
     python3 -m venv "$VENV_DIR" \
@@ -779,7 +780,8 @@ setup_environment() {
       "huggingface-hub==$HUGGINGFACE_HUB_VERSION" \
       "pillow==$PILLOW_VERSION" \
       "scipy==$SCIPY_VERSION" \
-      "timm==$TIMM_VERSION"
+      "timm==$TIMM_VERSION" \
+      "sqlalchemy==$SQLALCHEMY_VERSION"
   fi
 
   if [[ -z "${HF_TOKEN:-}" ]]; then

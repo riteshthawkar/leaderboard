@@ -556,13 +556,13 @@ GRADING = {
         "random_baseline": 0.25,
     },
     "spatial": {
-        "method": "judged_jsonl_exact",
+        "method": "paper_judged_public_evidence",
         "paper": "CoT Degrades Visual Spatial Reasoning (arXiv:2604.16060)",
         "judge_model": os.getenv(
             "SPATIAL_JUDGE_REVISION",
             "Qwen3-30B-A3B-Instruct-2507",
         ).strip(),
-        "answer_types": ["mcq"],
+        "answer_types": ["mcq", "vqa"],
         "decoding": {"strategy": "greedy", "temperature": 0.0, "metric": "pass@1"},
         "random_baseline": None,
     },
@@ -572,7 +572,7 @@ GRADING = {
 LEADERBOARD_STORE_FILE = _path_from_env("LEADERBOARD_STORE_FILE", RESULTS_DIR / "leaderboard_store.json")
 
 # Spatial Task-3 harness assets.
-SPATIAL_HARNESS_DIR = COMBINED_ROOT / "evaluation" / "spatial_reasoning"
+SPATIAL_HARNESS_DIR = COMBINED_ROOT / "spatial_harness"
 SPATIAL_MANIFEST_FILE = TASKS["spatial"]["paths"]["dir"] / "manifest.json"
 
 # The 13 public spatial benchmarks combined for Task 3 (paper arXiv:2604.16060,

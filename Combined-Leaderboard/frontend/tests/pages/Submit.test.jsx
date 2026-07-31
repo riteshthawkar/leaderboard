@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
@@ -22,6 +22,11 @@ vi.mock("@/lib/api", () => ({
     authDisabled: false,
   }),
   getJSON: vi.fn().mockImplementation((url) => {
+    if (url === "/api/tasks") {
+      return Promise.resolve({
+        task_ids: ["do_you_see_me", "minds_eye", "spatial"],
+      });
+    }
     if (url === "/api/models/mine") {
       return Promise.resolve({
         models: [{
@@ -52,7 +57,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { Submit, SubmissionResultDialog } from "@/pages/Submit";
-import { postJSON } from "@/lib/api";
+import { getJSON, postJSON } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
@@ -180,7 +185,7 @@ describe("spatial submission contract", () => {
     );
 
     expect((await screen.findAllByText("Registered Test Model")).length).toBeGreaterThan(0);
-    expect(screen.getByText("1 of 3 benchmarks submitted")).toBeInTheDocument();
+    expect(screen.getByText("1 of 3 released benchmarks submitted")).toBeInTheDocument();
     expect(screen.getByText("Scored 50.0%")).toBeInTheDocument();
     const linkedInputs = [...document.querySelectorAll('input[name="model_id"]')];
     expect(linkedInputs).toHaveLength(3);
@@ -243,5 +248,32 @@ describe("spatial submission contract", () => {
     });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("renders only benchmarks advertised by the public task catalog", async () => {
+    vi.mocked(getJSON).mockImplementation((url) => {
+      if (url === "/api/tasks") {
+        return Promise.resolve({
+          task_ids: ["do_you_see_me", "minds_eye"],
+        });
+      }
+      if (url === "/api/models/mine") {
+        return Promise.resolve({ models: [] });
+      }
+      return Promise.resolve({ grading: { method: "jsonl_exact" } });
+    });
+
+    render(
+      <MemoryRouter>
+        <Submit />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("2 tasks")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Do You See Me" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Mind's Eye" })).toBeInTheDocument();
+    expect(document.querySelectorAll('input[name="file"][accept=".jsonl"]')).toHaveLength(2);
+    expect(screen.queryByText("Spatial Reasoning")).not.toBeInTheDocument();
+    expect(document.querySelector('input[name="file"][accept=".zip"]')).not.toBeInTheDocument();
   });
 });

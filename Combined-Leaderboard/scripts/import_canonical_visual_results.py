@@ -36,8 +36,11 @@ from scoring.task_scorer import TaskScorer
 from submission_store import (
     create_registered_model,
     finalize_submission,
+    latest_visible_scored_submission_fingerprints,
+    latest_visible_scored_submission_ids,
     list_registered_models,
     normalize_model_name,
+    set_moderation_status,
     store_submission_answers,
     submission_integrity_status,
     try_consume_quota,
@@ -72,6 +75,27 @@ MODEL_CATALOG: dict[str, dict[str, str]] = {
         "display_name": "Qwen3-VL-8B-Instruct",
         "organization": "Qwen",
         "parameter_count": "8B",
+    },
+    "qwen35-9b": {
+        "repository": "Qwen/Qwen3.5-9B",
+        "display_name": "Qwen3.5-9B (Thinking Disabled)",
+        "organization": "Qwen",
+        "parameter_count": "9B",
+        "reasoning_profile": "nonthinking",
+    },
+    "qwen35-9b-thinking-disabled": {
+        "repository": "Qwen/Qwen3.5-9B",
+        "display_name": "Qwen3.5-9B (Thinking Disabled)",
+        "organization": "Qwen",
+        "parameter_count": "9B",
+        "reasoning_profile": "nonthinking",
+    },
+    "qwen35-9b-thinking-enabled": {
+        "repository": "Qwen/Qwen3.5-9B",
+        "display_name": "Qwen3.5-9B (Thinking Enabled)",
+        "organization": "Qwen",
+        "parameter_count": "9B",
+        "reasoning_profile": "thinking",
     },
     "qwen36-27b": {
         "repository": "Qwen/Qwen3.6-27B",
@@ -169,6 +193,11 @@ def _submission_model_meta(
     prompt_mode = str(track_manifest["generation"]["prompt_mode"])
     organization = model.catalog["organization"]
     access = "open_weights"
+    reasoning_profile = str(model.manifest.get("reasoning_profile") or "nonthinking")
+    extraction_method = str(
+        model.manifest.get("evidence_extraction", {}).get("method")
+        or "unknown"
+    )
     return {
         "organization": organization,
         "org": organization,
@@ -178,7 +207,8 @@ def _submission_model_meta(
         "method_description": (
             "Official MS-VISTA canonical visual evaluation using the pinned model "
             "revision, original unquantized weights, BF16 compute, benchmark prompt, "
-            "and deterministic final-answer contract recorded in the retained manifest."
+            "and the gold-blind final-answer evidence audit recorded in the retained "
+            f"manifest ({extraction_method})."
         ),
         "cot_used": "Yes" if prompt_mode == "cot" else "No",
         "prompt_template": (
@@ -190,6 +220,8 @@ def _submission_model_meta(
         "model_revision": model.manifest["model_revision"],
         "weight_loading": model.manifest["weight_loading"],
         "compute_dtype": model.manifest["compute_dtype"],
+        "reasoning_profile": reasoning_profile,
+        "thinking_mode": reasoning_profile == "thinking",
         "submission_track": task_id,
     }
 
@@ -238,6 +270,12 @@ def build_import_plan(
             raise ValueError(
                 f"Catalog repository mismatch for '{slug}': "
                 f"{catalog['repository']} != {manifest['model_id']}"
+            )
+        expected_profile = catalog.get("reasoning_profile")
+        if expected_profile and manifest.get("reasoning_profile") != expected_profile:
+            raise ValueError(
+                f"Catalog reasoning profile mismatch for '{slug}': "
+                f"{expected_profile} != {manifest.get('reasoning_profile')}"
             )
 
         tracks = {}
@@ -312,21 +350,43 @@ def apply_import_plan(
     *,
     owner_email: str,
     quota_limit: int,
+    replace_existing: bool,
 ) -> dict[str, Any]:
     before = submission_integrity_status()
     if not before["healthy"]:
         raise RuntimeError(
             f"Submission database is unhealthy before import: {before['issue_count']} issue(s)."
         )
+    existing_by_name = _existing_models_by_name()
+    for model in plan:
+        display_name = model.catalog["display_name"]
+        registered = existing_by_name.get(normalize_model_name(display_name))
+        if registered is None:
+            continue
+        if registered["owner_email"] != owner_email:
+            raise RuntimeError(f"Model '{display_name}' belongs to another account.")
+        existing_benchmarks = registered.get("benchmarks") or {}
+        for task_id in TRACKS:
+            existing = existing_benchmarks.get(task_id)
+            if (
+                existing is not None
+                and existing.get("file_sha256") != model.tracks[task_id].file_sha256
+                and not replace_existing
+            ):
+                raise RuntimeError(
+                    f"Model '{display_name}' already has a different {task_id} "
+                    "submission. Pass --replace-existing to supersede it."
+                )
+
     backup_path, backup_manifest = write_backup_archive(
         AUTO_BACKUP_DIR,
         retention_count=AUTO_BACKUP_RETENTION_COUNT,
     )
     leaderboard = LeaderboardStore(LEADERBOARD_STORE_FILE)
-    existing_by_name = _existing_models_by_name()
     imported_models = []
     imported_submissions = []
     skipped_submissions = []
+    replaced_submissions = []
 
     for model in plan:
         normalized_name = normalize_model_name(model.catalog["display_name"])
@@ -354,13 +414,17 @@ def apply_import_plan(
             track = model.tracks[task_id]
             existing = existing_benchmarks.get(task_id)
             if existing is not None:
-                if existing.get("file_sha256") == track.file_sha256:
+                if (
+                    existing.get("file_sha256") == track.file_sha256
+                    and not replace_existing
+                ):
                     skipped_submissions.append(existing["submission_id"])
                     continue
-                raise RuntimeError(
-                    f"Model '{model.catalog['display_name']}' already has a different "
-                    f"{task_id} submission. Refusing to overwrite it."
-                )
+                if not replace_existing:
+                    raise RuntimeError(
+                        f"Model '{model.catalog['display_name']}' already has a different "
+                        f"{task_id} submission. Refusing to overwrite it."
+                    )
 
             reservation = try_consume_quota(
                 owner_email,
@@ -394,18 +458,39 @@ def apply_import_plan(
                 finalize_submission(reservation.submission_id, False)
                 raise
             imported_submissions.append(score.submission_id)
+            if existing is not None and existing.get("submission_id"):
+                replaced = set_moderation_status(
+                    existing["submission_id"],
+                    "deleted",
+                    reason="Superseded by the verified canonical v4 evidence audit",
+                    moderated_by=owner_email,
+                )
+                if replaced is None:
+                    raise RuntimeError(
+                        f"Could not supersede the previous {task_id} submission for "
+                        f"'{model.catalog['display_name']}'."
+                    )
+                leaderboard.remove_submission(existing["submission_id"])
+                replaced_submissions.append(existing["submission_id"])
 
     after = submission_integrity_status()
     if not after["healthy"]:
         raise RuntimeError(
             f"Submission database is unhealthy after import: {after['issue_count']} issue(s)."
         )
+    expected_public_ids = set(latest_visible_scored_submission_ids())
     public_ids = set(leaderboard.public_submission_ids())
-    missing_public_ids = sorted(set(imported_submissions) - public_ids)
-    if missing_public_ids:
+    if public_ids != expected_public_ids:
         raise RuntimeError(
-            "Imported submissions are missing from the public leaderboard: "
-            + ", ".join(missing_public_ids)
+            "Public leaderboard cache differs from the latest visible database "
+            "submissions after import."
+        )
+    expected_fingerprints = latest_visible_scored_submission_fingerprints()
+    public_fingerprints = leaderboard.public_submission_fingerprints()
+    if public_fingerprints != expected_fingerprints:
+        raise RuntimeError(
+            "Public leaderboard scores differ from the latest visible database "
+            "scores after import."
         )
     return {
         "backup": str(backup_path),
@@ -413,6 +498,7 @@ def apply_import_plan(
         "imported_model_count": len(imported_models),
         "imported_submission_count": len(imported_submissions),
         "skipped_submission_count": len(skipped_submissions),
+        "replaced_submission_count": len(replaced_submissions),
         "database_integrity": after,
     }
 
@@ -433,6 +519,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--owner-email", default=DEFAULT_OWNER)
     parser.add_argument("--quota-limit", type=int, default=10_000)
+    parser.add_argument(
+        "--replace-existing",
+        action="store_true",
+        help="Import fresh benchmark submissions and soft-delete the previous visible versions.",
+    )
     parser.add_argument("--apply", action="store_true")
     return parser
 
@@ -444,6 +535,7 @@ def main(argv: list[str] | None = None) -> int:
     plan = build_import_plan(args.result_root, set(args.exclude))
     summary = {
         "mode": "apply" if args.apply else "dry-run",
+        "replace_existing": bool(args.replace_existing),
         "excluded_slugs": sorted(set(args.exclude)),
         "models": [
             {
@@ -467,6 +559,7 @@ def main(argv: list[str] | None = None) -> int:
             plan,
             owner_email=args.owner_email.strip().lower(),
             quota_limit=args.quota_limit,
+            replace_existing=args.replace_existing,
         )
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

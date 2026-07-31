@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronDown, Download, ExternalLink, X } from "lucide-react";
-import { BarChart, CapabilityRadar, ScatterChart, chartPalette } from "@/components/Charts";
+import { BarChart, CapabilityRadar, EmptyChart, ScatterChart, chartPalette } from "@/components/Charts";
 import { TabBar } from "@/components/ui/tabs";
 import { apiUrl, errorMessage, getJSON } from "@/lib/api";
 import { cn, fmtDelta, fmtPct, fmtVci, modelType, prettyLabel } from "@/lib/utils";
@@ -14,6 +14,7 @@ const trackTabs = [
 
 const DEFAULT_COMPARE_MODELS = 4;
 const DEFAULT_CHART_MODELS = 4;
+const COMBINED_CHART_MODEL_CAP = 10;
 
 const mindsEyeArtByCapability = {
   analogical_reasoning: "abstraction",
@@ -411,6 +412,58 @@ function combinedTaskSpread(row) {
     return (perception + cognition) / 2;
   }
   return Number.isFinite(row?.task_spread) ? row.task_spread : null;
+}
+
+function harmonicMean(left, right) {
+  if (!Number.isFinite(left) || !Number.isFinite(right) || left + right <= 0)
+    return null;
+  return (2 * left * right) / (left + right);
+}
+
+function combinedBenchmarkMetricRow(row) {
+  const perception = row?.perception_accuracy;
+  const cognition = cognitionAccuracy(row);
+  if (!Number.isFinite(perception) || !Number.isFinite(cognition)) return null;
+  const gap = perception - cognition;
+  return {
+    ...row,
+    perception,
+    cognition,
+    combinedAverage: (perception + cognition) / 2,
+    balancedScore: harmonicMean(perception, cognition),
+    gap,
+    absGap: Math.abs(gap),
+  };
+}
+
+function completeCombinedBenchmarkRows(rows) {
+  return rows.map(combinedBenchmarkMetricRow).filter(Boolean);
+}
+
+function paretoFrontierKeys(rows) {
+  return new Set(
+    rows
+      .filter(
+        (candidate) =>
+          !rows.some(
+            (other) =>
+              other.model_name !== candidate.model_name &&
+              other.perception >= candidate.perception &&
+              other.cognition >= candidate.cognition &&
+              (other.perception > candidate.perception ||
+                other.cognition > candidate.cognition),
+          ),
+      )
+      .map((row) => row.model_name),
+  );
+}
+
+function percentPosition(value) {
+  return `${Math.max(0, Math.min(1, value)) * 100}%`;
+}
+
+function fmtPointGap(value) {
+  return value == null ? "N/A" : `${(value * 100).toFixed(1)} pts`;
 }
 
 function visualMetricValue(row, metric, capabilityId) {
@@ -1170,6 +1223,216 @@ function PerceptionCognitionChart({ benchmark, rows, selected }) {
   );
 }
 
+function BalancedFrontierChart({ rows }) {
+  const data = rows.filter((row) => finiteNumber(row.balancedScore));
+  if (!data.length) {
+    return (
+      <EmptyChart
+        aspectRatio="16 / 7"
+        message="Combined benchmark profiles appear when models have both Do You See Me and Mind's Eye scores."
+      />
+    );
+  }
+
+  const frontierKeys = paretoFrontierKeys(data);
+  const frontierRows = data
+    .filter((row) => frontierKeys.has(row.model_name))
+    .sort((left, right) =>
+      compareMetricValues(left.balancedScore, right.balancedScore, "desc"),
+    );
+  const nonFrontierRows = data.filter((row) => !frontierKeys.has(row.model_name));
+  const points = [...nonFrontierRows, ...frontierRows].map((row) => ({
+    key: row.model_name,
+    label: row.model_name,
+    color: frontierKeys.has(row.model_name)
+      ? "var(--chart-positive)"
+      : "var(--text-faint)",
+    x: row.perception,
+    y: row.cognition,
+  }));
+  const topBalanced = [...data].sort((left, right) => {
+    const balanced = compareMetricValues(left.balancedScore, right.balancedScore, "desc");
+    if (balanced !== 0) return balanced;
+    return compareMetricValues(left.combinedAverage, right.combinedAverage, "desc");
+  })[0];
+  const frontierNames = frontierRows.slice(0, 6).map((row) => row.model_name).join(", ");
+  const extraFrontierCount = Math.max(0, frontierRows.length - 6);
+
+  return (
+    <>
+      <p className="mt-2 text-sm leading-relaxed text-muted">
+        {frontierRows.length} frontier {frontierRows.length === 1 ? "model is" : "models are"} not dominated on either benchmark. {topBalanced.model_name} has the strongest robust two-task score at {fmtPct(topBalanced.balancedScore)}.
+      </p>
+      <ScatterChart
+        aspectRatio="16 / 7"
+        emptyMessage="Combined benchmark profiles appear when models have both scores."
+        points={points}
+        showLabels={false}
+        xLabel="Do You See Me accuracy"
+        yLabel="Mind's Eye accuracy"
+      />
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="size-2.5 bg-[var(--chart-positive)]" aria-hidden="true" />
+          Pareto frontier
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="size-2.5 bg-[var(--text-faint)]" aria-hidden="true" />
+          Other complete profiles
+        </span>
+      </div>
+      {frontierRows.length > 0 && (
+        <p className="mt-2 text-xs leading-relaxed text-faint">
+          Frontier: {frontierNames}{extraFrontierCount ? `, +${extraFrontierCount} more` : ""}
+        </p>
+      )}
+    </>
+  );
+}
+
+function RobustGeneralistRankingChart({ rows }) {
+  const data = [...rows]
+    .filter((row) => finiteNumber(row.balancedScore))
+    .sort((left, right) => {
+      const balanced = compareMetricValues(left.balancedScore, right.balancedScore, "desc");
+      if (balanced !== 0) return balanced;
+      return compareMetricValues(left.absGap, right.absGap, "asc");
+    });
+  const visibleRows = data.slice(0, COMBINED_CHART_MODEL_CAP);
+
+  if (!visibleRows.length) {
+    return (
+      <EmptyChart
+        aspectRatio="16 / 7"
+        message="Combined benchmark profiles appear when models have both Do You See Me and Mind's Eye scores."
+      />
+    );
+  }
+
+  const leader = visibleRows[0];
+
+  return (
+    <>
+      <p className="mt-2 text-sm leading-relaxed text-muted">
+        Harmonic mean penalizes one-sided models. {leader.model_name} leads this view with {fmtPct(leader.balancedScore)} and a {fmtPointGap(leader.absGap)} benchmark gap.
+      </p>
+      <div className="mt-4 space-y-3" aria-label="Robust generalist ranking">
+        {visibleRows.map((row, index) => (
+          <div key={row.model_name}>
+            <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate font-medium text-foreground">
+                <span className="mr-2 text-xs tabular-nums text-faint">#{index + 1}</span>
+                {row.model_name}
+              </span>
+              <span className="shrink-0 font-semibold tabular-nums text-foreground">{fmtPct(row.balancedScore)}</span>
+            </div>
+            <div className="h-2.5 border border-border bg-surface-subtle" aria-hidden="true">
+              <div className="h-full bg-[var(--chart-positive)]" style={{ width: percentPosition(row.balancedScore) }} />
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-faint">
+              <span>P {fmtPct(row.perception)}</span>
+              <span>C {fmtPct(row.cognition)}</span>
+              <span>Gap {fmtPointGap(row.absGap)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <ChartModelNote shown={visibleRows.length} total={data.length} />
+    </>
+  );
+}
+
+function BenchmarkGapDumbbellChart({ rows }) {
+  const data = [...rows]
+    .filter((row) => finiteNumber(row.combinedAverage))
+    .sort((left, right) => {
+      const average = compareMetricValues(left.combinedAverage, right.combinedAverage, "desc");
+      if (average !== 0) return average;
+      return compareMetricValues(left.absGap, right.absGap, "asc");
+    });
+  const visibleRows = data.slice(0, COMBINED_CHART_MODEL_CAP);
+
+  if (!visibleRows.length) {
+    return (
+      <EmptyChart
+        aspectRatio="16 / 7"
+        message="Combined benchmark profiles appear when models have both Do You See Me and Mind's Eye scores."
+      />
+    );
+  }
+
+  const widestGap = visibleRows.reduce(
+    (largest, row) => (row.absGap > largest.absGap ? row : largest),
+    visibleRows[0],
+  );
+  const widestGapDirection = widestGap.gap >= 0
+    ? "perception leads cognition"
+    : "cognition leads perception";
+
+  return (
+    <>
+      <p className="mt-2 text-sm leading-relaxed text-muted">
+        Short connectors mark balanced models. In the displayed set, {widestGap.model_name} has the largest split: {widestGapDirection} by {fmtPointGap(widestGap.absGap)}.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="size-2.5 bg-[var(--dysm)]" aria-hidden="true" />
+          Do You See Me
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="size-2.5 bg-[var(--me)]" aria-hidden="true" />
+          Mind's Eye
+        </span>
+      </div>
+      <div className="mt-4 space-y-3" aria-label="Benchmark gap dumbbell chart">
+        {visibleRows.map((row) => {
+          const low = Math.min(row.perception, row.cognition);
+          const high = Math.max(row.perception, row.cognition);
+          const gapLabel = row.gap >= 0
+            ? `P +${(row.absGap * 100).toFixed(1)}`
+            : `C +${(row.absGap * 100).toFixed(1)}`;
+          return (
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(150px,2fr)_72px] items-center gap-3 text-xs" key={row.model_name}>
+              <span className="min-w-0 truncate font-medium text-foreground" title={row.model_name}>{row.model_name}</span>
+              <div className="relative h-7" title={`${row.model_name}: Do You See Me ${fmtPct(row.perception)}, Mind's Eye ${fmtPct(row.cognition)}`}>
+                <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-border" />
+                <div
+                  className="absolute top-1/2 h-1 -translate-y-1/2 bg-border-strong"
+                  style={{
+                    left: percentPosition(low),
+                    width: percentPosition(high - low),
+                  }}
+                />
+                <span
+                  className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 border-2 border-background bg-[var(--dysm)]"
+                  style={{ left: percentPosition(row.perception) }}
+                  aria-hidden="true"
+                />
+                <span
+                  className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 border-2 border-background bg-[var(--me)]"
+                  style={{ left: percentPosition(row.cognition) }}
+                  aria-hidden="true"
+                />
+              </div>
+              <span className={cn("text-right font-semibold tabular-nums", row.gap >= 0 ? "text-dysm" : "text-me")}>{gapLabel}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(150px,2fr)_72px] gap-3 text-[0.68rem] text-faint" aria-hidden="true">
+        <span />
+        <div className="flex justify-between tabular-nums">
+          <span>0%</span>
+          <span>50%</span>
+          <span>100%</span>
+        </div>
+        <span />
+      </div>
+      <ChartModelNote shown={visibleRows.length} total={data.length} />
+    </>
+  );
+}
+
 function analysisAccuracy(groups, key) {
   const value = groups?.[key]?.accuracy;
   return Number.isFinite(value) ? value : null;
@@ -1237,7 +1500,10 @@ function DimensionTransferChart({ rows, selected }) {
     <ScatterChart
       aspectRatio="4 / 3"
       emptyMessage="Dimension breakdowns are unavailable for the selected models."
+      pointKeyTitle="Selected models"
       points={points}
+      showLabels={false}
+      showPointKey
       xLabel="2D accuracy"
       yLabel="3D accuracy"
     />
@@ -1323,7 +1589,10 @@ function CapabilityFloorChart({ rows, scope, selected }) {
     <ScatterChart
       aspectRatio="4 / 3"
       emptyMessage="Capability breakdowns are unavailable for the selected models."
+      pointKeyTitle="Selected models"
       points={points}
+      showLabels={false}
+      showPointKey
       xLabel="Average capability accuracy"
       yLabel="Weakest capability accuracy"
     />
@@ -1654,6 +1923,10 @@ export function ResearchLeaderboard() {
     }),
     [filteredVisualRows, visualFilters.benchmark],
   );
+  const combinedBenchmarkRows = useMemo(
+    () => completeCombinedBenchmarkRows(filteredVisualRows),
+    [filteredVisualRows],
+  );
   const perceptionChartSelection = useFilteredModelSelection(perceptionChartRows);
   const capabilityChartSelection = useFilteredModelSelection(capabilityChartRows);
   const paperAnalysisSelection = useFilteredModelSelection(paperAnalysisRows);
@@ -1850,6 +2123,32 @@ export function ResearchLeaderboard() {
   const compareMetaCols = compactTableMetaColumns(compareRows);
   const visualScopeLabel = visualBenchmarkLabel(visualFilters.benchmark);
   const visualIsCombined = visualFilters.benchmark === "all";
+  const visualModelColumnClass = cn(
+    "model-col",
+    !visualIsCombined && "!w-auto !min-w-0 !max-w-none",
+  );
+  const visualOrgColumnClass = visualIsCombined
+    ? "w-28 min-w-28 max-w-28"
+    : "!w-auto !min-w-0 !max-w-none";
+  const visualOverallMetricColumnClass = "num";
+  const visualScopedMetricColumnClass = "num";
+  const visualArtMetricColumnClass = "num";
+  const visualScopedColumnWidths = visualIsCombined
+    ? []
+    : [
+        "6%",
+        visualMetaCols.has("org") ? "34%" : "48%",
+        ...(visualMetaCols.has("org") ? ["20%"] : []),
+        ...(visualMetaCols.has("params") ? ["12%"] : []),
+        ...(showVisualRankColumn ? ["10%"] : []),
+        ...(visualFilters.benchmark === "do_you_see_me"
+          ? showVisualRankColumn
+            ? ["10%", "10%", "10%"]
+            : ["12%", "14%", "14%"]
+          : showVisualRankColumn
+            ? ["10%", "7%", "7%", "7%"]
+            : ["12%", "9%", "9%", "9%"]),
+      ];
   const visualTableColumnCount =
     2 +
     visualMetaCols.size +
@@ -2263,12 +2562,19 @@ export function ResearchLeaderboard() {
                   title={visualTableTitle}
                 />
                 <div className="table-wrap !border-t-0">
-                <table className="lb-table" aria-labelledby="visual-rankings-title">
+                <table className={cn("lb-table", !visualIsCombined && "table-fixed")} aria-labelledby="visual-rankings-title">
+                  {!visualIsCombined && (
+                    <colgroup>
+                      {visualScopedColumnWidths.map((width, index) => (
+                        <col key={`${width}-${index}`} style={{ width }} />
+                      ))}
+                    </colgroup>
+                  )}
                   <thead>
                     <tr>
                       <th className="rank-col !text-center" data-tip={RANK_DESCRIPTION} title={RANK_DESCRIPTION}>##</th>
                       <SortHeader
-                        className="model-col"
+                        className={visualModelColumnClass}
                         label="Model"
                         sortKey="model"
                         sort={visualSort}
@@ -2277,7 +2583,7 @@ export function ResearchLeaderboard() {
                       />
                       {visualMetaCols.has("org") && (
                         <SortHeader
-                          className="w-28 min-w-28 max-w-28"
+                          className={visualOrgColumnClass}
                           label="Org"
                           sortKey="org"
                           sort={visualSort}
@@ -2346,16 +2652,16 @@ export function ResearchLeaderboard() {
                         </>
                       ) : visualFilters.benchmark === "do_you_see_me" ? (
                         <>
-                          <SortHeader label="Overall avg" sortKey="perception" sort={visualSort} onSort={handleVisualSort} className="num" />
-                          <SortHeader label="2D avg" sortKey="perception_2d" sort={visualSort} onSort={handleVisualSort} className="num" />
-                          <SortHeader label="3D avg" sortKey="perception_3d" sort={visualSort} onSort={handleVisualSort} className="num" />
+                          <SortHeader label="Overall avg" sortKey="perception" sort={visualSort} onSort={handleVisualSort} className={visualOverallMetricColumnClass} />
+                          <SortHeader label="2D avg" sortKey="perception_2d" sort={visualSort} onSort={handleVisualSort} className={visualScopedMetricColumnClass} />
+                          <SortHeader label="3D avg" sortKey="perception_3d" sort={visualSort} onSort={handleVisualSort} className={visualScopedMetricColumnClass} />
                         </>
                       ) : (
                         <>
-                          <SortHeader label="Overall avg" sortKey="imagery" sort={visualSort} onSort={handleVisualSort} className="num" />
-                          <SortHeader label="A" sortKey="art_abstraction" sort={visualSort} onSort={handleVisualSort} className="num" />
-                          <SortHeader label="R" sortKey="art_relation" sort={visualSort} onSort={handleVisualSort} className="num" />
-                          <SortHeader label="T" sortKey="art_transformation" sort={visualSort} onSort={handleVisualSort} className="num" />
+                          <SortHeader label="Overall avg" sortKey="imagery" sort={visualSort} onSort={handleVisualSort} className={visualOverallMetricColumnClass} />
+                          <SortHeader label="A" sortKey="art_abstraction" sort={visualSort} onSort={handleVisualSort} className={visualArtMetricColumnClass} />
+                          <SortHeader label="R" sortKey="art_relation" sort={visualSort} onSort={handleVisualSort} className={visualArtMetricColumnClass} />
+                          <SortHeader label="T" sortKey="art_transformation" sort={visualSort} onSort={handleVisualSort} className={visualArtMetricColumnClass} />
                         </>
                       )}
                     </tr>
@@ -2371,7 +2677,7 @@ export function ResearchLeaderboard() {
                           <td className="rank-col">
                             <RankBadge rank={index + 1} />
                           </td>
-                          <td className="model-col">
+                          <td className={visualModelColumnClass}>
                             <button
                               className="w-full text-left font-semibold text-foreground outline-none hover:text-brand-strong focus-visible:underline focus-visible:underline-offset-4"
                               type="button"
@@ -2386,7 +2692,7 @@ export function ResearchLeaderboard() {
                           </td>
                           {visualMetaCols.has("org") && (
                             <td
-                              className="w-28 min-w-28 max-w-28 break-words"
+                              className={cn(visualOrgColumnClass, "break-words")}
                               title={modelOrg(row.model_meta)}
                             >
                               {modelOrg(row.model_meta)}
@@ -2428,16 +2734,16 @@ export function ResearchLeaderboard() {
                             </>
                           ) : visualFilters.benchmark === "do_you_see_me" ? (
                             <>
-                              <td className="num">{fmtPct(row.perception_accuracy)}</td>
-                              <td className="num">{fmtPct(analysisAccuracy(row.perception_dimensions, "2D"))}</td>
-                              <td className="num">{fmtPct(analysisAccuracy(row.perception_dimensions, "3D"))}</td>
+                              <td className={visualOverallMetricColumnClass}>{fmtPct(row.perception_accuracy)}</td>
+                              <td className={visualScopedMetricColumnClass}>{fmtPct(analysisAccuracy(row.perception_dimensions, "2D"))}</td>
+                              <td className={visualScopedMetricColumnClass}>{fmtPct(analysisAccuracy(row.perception_dimensions, "3D"))}</td>
                             </>
                           ) : (
                             <>
-                              <td className="num">{fmtPct(cognitionAccuracy(row))}</td>
-                              <td className="num">{fmtPct(analysisAccuracy(cognitionArtGroups(row), "abstraction"))}</td>
-                              <td className="num">{fmtPct(analysisAccuracy(cognitionArtGroups(row), "relation"))}</td>
-                              <td className="num">{fmtPct(analysisAccuracy(cognitionArtGroups(row), "transformation"))}</td>
+                              <td className={visualOverallMetricColumnClass}>{fmtPct(cognitionAccuracy(row))}</td>
+                              <td className={visualArtMetricColumnClass}>{fmtPct(analysisAccuracy(cognitionArtGroups(row), "abstraction"))}</td>
+                              <td className={visualArtMetricColumnClass}>{fmtPct(analysisAccuracy(cognitionArtGroups(row), "relation"))}</td>
+                              <td className={visualArtMetricColumnClass}>{fmtPct(analysisAccuracy(cognitionArtGroups(row), "transformation"))}</td>
                             </>
                           )}
                         </tr>
@@ -2485,6 +2791,33 @@ export function ResearchLeaderboard() {
                     selected={perceptionChartSelection.selected}
                   />
                 </div>
+                {visualIsCombined && (
+                  <div className="viz-card wide !p-0">
+                    <div className="p-6">
+                      <h3 className="!mb-0">Combined benchmark insights</h3>
+                      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
+                        These views only use models with both Do You See Me and Mind's Eye scores, so they separate robust generalists from benchmark specialists.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 border-t border-border xl:grid-cols-2">
+                      <div className="min-w-0 border-b border-border p-6 xl:col-span-2">
+                        <h4 className="font-display text-base font-semibold text-foreground">Balanced frontier map</h4>
+                        <p className="mt-1 text-sm text-muted">Upper-right frontier models are strong on both benchmark tasks and are not beaten by another model on both axes.</p>
+                        <BalancedFrontierChart rows={combinedBenchmarkRows} />
+                      </div>
+                      <div className="min-w-0 border-b border-border p-6 xl:border-b-0 xl:border-r">
+                        <h4 className="font-display text-base font-semibold text-foreground">Robust generalist ranking</h4>
+                        <p className="mt-1 text-sm text-muted">Harmonic mean rewards consistently high scores across perception and cognition.</p>
+                        <RobustGeneralistRankingChart rows={combinedBenchmarkRows} />
+                      </div>
+                      <div className="min-w-0 p-6">
+                        <h4 className="font-display text-base font-semibold text-foreground">Benchmark gap dumbbell</h4>
+                        <p className="mt-1 text-sm text-muted">Connected dots expose whether a high-ranked model is balanced or tilted toward one benchmark.</p>
+                        <BenchmarkGapDumbbellChart rows={combinedBenchmarkRows} />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="viz-card wide">
                   <div className="mb-3 flex items-start justify-between gap-4 max-sm:flex-col">
                     <h3 className="!mb-0">Model capability trace</h3>

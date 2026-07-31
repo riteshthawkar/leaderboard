@@ -3,13 +3,15 @@ set -euo pipefail
 IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-ENV_PREFIX="${TRACK3_CONDA_ENV:-/share/data/drive_3/conda_envs/track3-v2}"
-VLMEVALKIT_SOURCE="${VLMEVALKIT_SOURCE:-/share/data/drive_3/vendor/VLMEvalKit-7055d301}"
+WORK_ROOT="${TRACK3_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/ms-vista-track3}"
+ENV_PREFIX="${TRACK3_CONDA_ENV:-$WORK_ROOT/conda-env}"
+VLMEVALKIT_SOURCE="${VLMEVALKIT_SOURCE:-$WORK_ROOT/vendor/VLMEvalKit-7055d301}"
 VLMEVALKIT_REPOSITORY="https://github.com/open-compass/VLMEvalKit.git"
 VLMEVALKIT_COMMIT="7055d3010c38ccb5dcae1bc9535ca19c7fe5d79f"
 
 unset HF_HUB_ENABLE_HF_TRANSFER
 export HF_XET_HIGH_PERFORMANCE="${HF_XET_HIGH_PERFORMANCE:-1}"
+mkdir -p "$(dirname -- "$ENV_PREFIX")" "$(dirname -- "$VLMEVALKIT_SOURCE")"
 
 if [[ ! -x "$ENV_PREFIX/bin/python" ]]; then
   conda create -y --prefix "$ENV_PREFIX" --file "$SCRIPT_DIR/conda-linux-64.lock"

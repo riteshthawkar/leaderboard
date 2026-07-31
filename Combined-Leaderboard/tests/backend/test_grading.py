@@ -588,6 +588,14 @@ def test_submission_parser_rejects_more_rows_than_the_benchmark():
 
 def test_missing_spatial_conditions_have_specific_guidance():
     scorer = TaskScorer("spatial")
+    scorer._gt = {
+        "s1": {
+            "answer": "A",
+            "conditions": list(scorer.allowed_conditions),
+            "dataset": "fixture",
+            "group": "fixture",
+        }
+    }
 
     with pytest.raises(SubmissionValidationError) as captured:
         scorer.parse_submission_text_with_records(

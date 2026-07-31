@@ -293,3 +293,61 @@ python scripts/import_canonical_visual_results.py \
 ```
 
 The importer is dry-run only unless `--apply` is supplied. It is the first step in this flow that loads private ground truth, and it requires production scorer invalid-format counts to match each retained manifest exactly.
+
+### Legacy v4 evidence migration
+
+This path is only for operator-owned runs created before the public schema-v14
+inference/extraction workflow. New public evaluations must use the workflow
+above and must not be re-extracted.
+
+Every legacy stored response receives one authoritative response-commitment
+audit. The pinned text-only extractor receives public question text, the answer
+contract, response metadata, and the stored model response, but no image or
+answer key. Unsupported, ambiguous, or truncated-before-commitment responses
+remain unresolved.
+
+```bash
+python -m evaluation.extract_canonical_answers \
+  --canonical-root evaluation/results/final-extracted-v11 \
+  --endpoint http://127.0.0.1:8035/v1 \
+  --endpoint http://127.0.0.1:8036/v1 \
+  --model Qwen/Qwen3-8B \
+  --revision b968826d9c46dd6066d109eabc6255188de91218 \
+  --policy all \
+  --concurrency 64 \
+  --max-tokens 256 \
+  --output /share/data/visual-answer-extraction/qwen3-8b-evidence-v4/audit.jsonl
+
+python -m evaluation.build_production_visual_results \
+  --source-root evaluation/results/final-extracted-v11 \
+  --audit /share/data/visual-answer-extraction/qwen3-8b-evidence-v4/audit.jsonl \
+  --output-root evaluation/results/final-extracted-v12
+```
+
+When verified models come from separate v4 audits, assemble and verify one
+contract-consistent tree before importing it:
+
+```bash
+python -m evaluation.assemble_v4_ranking_bundle \
+  --base-root evaluation/results/final-extracted-v12 \
+  --additional-source-dir /path/to/additional-model-source \
+  --additional-audit /path/to/additional-model-v4-audit.jsonl \
+  --output-root evaluation/results/ms-vista-ranking-final-evidence-v4-v15
+
+PYTHONPATH="$PWD:$PWD/backend" \
+  GROUND_TRUTHS_DIR="$PWD/Ground_truths" \
+  python -m evaluation.package_v4_ranking_bundle \
+  evaluation/results/ms-vista-ranking-final-evidence-v4-v15
+
+python -m evaluation.finalize_visual_results \
+  --verify-only \
+  --output-root evaluation/results/ms-vista-ranking-final-evidence-v4-v15
+
+PYTHONPATH="$PWD:$PWD/backend" \
+  GROUND_TRUTHS_DIR="$PWD/Ground_truths" \
+  python scripts/import_canonical_visual_results.py \
+  --result-root evaluation/results/ms-vista-ranking-final-evidence-v4-v15
+```
+
+The packager and importer are the only steps in this legacy migration that load
+private ground truth. The source tree and extractor audit remain immutable.

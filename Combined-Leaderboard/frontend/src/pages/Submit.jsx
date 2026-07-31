@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Box, CircleAlert, CircleCheck, ExternalLink, Plus } from "lucide-react";
 import { WorkspacePage } from "@/components/WorkspacePage";
 import { Button } from "@/components/ui/button";
@@ -247,6 +247,7 @@ export function Submit() {
   };
   useEffect(() => { refreshAuth(); }, []);
   const [taskInfo, setTaskInfo] = useState({});
+  const [availableTaskIds, setAvailableTaskIds] = useState(null);
   const [taskInfoError, setTaskInfoError] = useState("");
   const [accountNotice, setAccountNotice] = useState("");
   const [messages, setMessages] = useState({});
@@ -263,6 +264,10 @@ export function Submit() {
   const [modelErrors, setModelErrors] = useState({});
   const [registeringModel, setRegisteringModel] = useState(false);
   const selectedModel = models.find((model) => model.model_id === selectedModelId) || null;
+  const availableSubmitTasks = availableTaskIds === null
+    ? []
+    : submitTasks.filter((task) => availableTaskIds.includes(task.id));
+  const hasSpatialTask = availableSubmitTasks.some((task) => task.harness);
 
   const refreshModels = async () => {
     setModelsStatus("loading");
@@ -379,20 +384,42 @@ export function Submit() {
     });
   };
   useEffect(() => {
-    Promise.allSettled(
-      submitTasks.map((task) => getJSON(`/api/tasks/${task.id}/info`)),
-    ).then((results) => {
-      const failures = results.filter((result) => result.status === "rejected");
-      const infos = results.map((result) => result.status === "fulfilled" ? result.value : {});
-      setTaskInfo(
-        Object.fromEntries(submitTasks.map((task, i) => [task.id, infos[i]])),
-      );
-      setTaskInfoError(
-        failures.length
-          ? `${failures.length} benchmark description${failures.length > 1 ? "s" : ""} could not be loaded. Downloads and submissions remain available. ${errorMessage(failures[0].reason)}`
-          : "",
-      );
-    });
+    let active = true;
+    const loadTasks = async () => {
+      try {
+        const catalog = await getJSON("/api/tasks");
+        const taskIds = Array.isArray(catalog.task_ids)
+          ? catalog.task_ids.filter((taskId) => submitTasks.some((task) => task.id === taskId))
+          : [];
+        const tasks = submitTasks.filter((task) => taskIds.includes(task.id));
+        const results = await Promise.allSettled(
+          tasks.map((task) => getJSON(`/api/tasks/${task.id}/info`)),
+        );
+        if (!active) return;
+        const failures = results.filter((result) => result.status === "rejected");
+        const infos = results.map((result) => result.status === "fulfilled" ? result.value : {});
+        setAvailableTaskIds(taskIds);
+        setTaskInfo(
+          Object.fromEntries(tasks.map((task, i) => [task.id, infos[i]])),
+        );
+        setTaskInfoError(
+          failures.length
+            ? `${failures.length} released benchmark description${failures.length > 1 ? "s" : ""} could not be loaded. ${errorMessage(failures[0].reason)}`
+            : "",
+        );
+      } catch (error) {
+        if (!active) return;
+        setAvailableTaskIds([]);
+        setTaskInfo({});
+        setTaskInfoError(
+          `Released benchmarks could not be loaded, so uploads are disabled. ${errorMessage(error)}`,
+        );
+      }
+    };
+    loadTasks();
+    return () => {
+      active = false;
+    };
   }, []);
   const submit = async (event, task) => {
     event.preventDefault();
@@ -491,11 +518,15 @@ export function Submit() {
     ],
     [
       "Run your model",
-      "Produce one final answer per question_id. The spatial harness runs all six required conditions and creates one upload package.",
+      hasSpatialTask
+        ? "Produce one final answer per question_id. The spatial harness runs all six required conditions and creates one upload package."
+        : "Produce one final answer per question_id using the released benchmark prompt and evaluation settings.",
     ],
     [
       "Upload and rank",
-      "Submit one file per benchmark. Spatial provenance, per sample results, and the aggregate report remain bundled and are published for audit.",
+      hasSpatialTask
+        ? "Submit one file per benchmark. Spatial provenance, per sample results, and the aggregate report remain bundled and are published for audit."
+        : "Submit one JSONL response file per benchmark. Each accepted result is attached to the selected model identity.",
     ],
   ];
 
@@ -530,7 +561,7 @@ export function Submit() {
           )}
           <p className="mb-6 max-w-[70ch] leading-relaxed text-muted">
             Submit one benchmark at a time so each model keeps separate
-            perception, visual cognition, and spatial reasoning evidence.
+            evaluation evidence and a traceable score for every released track.
           </p>
           <div className="mb-8 border-y border-border-strong">
             <div className="flex items-start justify-between gap-6 border-b border-border py-5 max-md:flex-col">
@@ -539,8 +570,10 @@ export function Submit() {
                 <h3 className={ui.heading3}>Prepare, upload, and score</h3>
               </div>
               <div className="flex flex-wrap gap-2">
-                <span className={ui.badge}>{submitTasks.length} tasks</span>
-                <span className={ui.badge}>JSONL / ZIP</span>
+                <span className={ui.badge}>
+                  {availableTaskIds === null ? "Loading tasks" : `${availableSubmitTasks.length} tasks`}
+                </span>
+                <span className={ui.badge}>{hasSpatialTask ? "JSONL / ZIP" : "JSONL"}</span>
                 <span className={ui.badge}>{authDisabled ? "Open test uploads" : "Authenticated uploads"}</span>
               </div>
             </div>
@@ -605,7 +638,9 @@ export function Submit() {
                       <div className="min-w-0">
                         <h3 className={ui.heading3}>{selectedModel.model_name}</h3>
                         <p className="mt-1 text-sm text-muted">{selectedModel.organization} · {selectedModel.access.replaceAll("_", " ")}</p>
-                        <p className="mt-2 text-xs text-faint">{Object.keys(selectedModel.benchmarks || {}).length} of {submitTasks.length} benchmarks submitted</p>
+                        <p className="mt-2 text-xs text-faint">
+                          {availableSubmitTasks.filter((task) => selectedModel.benchmarks?.[task.id]).length} of {availableSubmitTasks.length} released benchmarks submitted
+                        </p>
                       </div>
                     </div>
                   ) : (
@@ -685,7 +720,17 @@ export function Submit() {
             </section>
           )}
           <div className="grid gap-7 lg:gap-9">
-            {submitTasks.map((task) => {
+            {availableTaskIds === null && (
+              <div className="border-y border-border-strong py-8 text-sm text-muted" role="status">
+                Loading released benchmarks...
+              </div>
+            )}
+            {availableTaskIds !== null && availableSubmitTasks.length === 0 && (
+              <div className={cn(ui.message, ui.messageError)} role="alert">
+                No benchmark submission contracts are currently available.
+              </div>
+            )}
+            {availableSubmitTasks.map((task) => {
               const grading = taskInfo[task.id]?.grading;
               const submissionReady = taskInfo[task.id]?.submission_ready;
               const message = messages[task.id];
@@ -739,7 +784,7 @@ export function Submit() {
                   </div>
                   {task.harness && (
                     <p className="text-sm text-muted">
-                      Run <code>spatial_reasoning/run_eval.sh</code>, then upload the generated <code>spatial_reasoning_submission.zip</code> package unchanged. Its final answer evidence, aggregate report, manifest, and original ZIP are retained and made public with the leaderboard result.
+                      Run <code>spatial_harness/run_eval.sh</code>, then upload the generated <code>spatial_reasoning_submission.zip</code> package unchanged. Its final answer evidence, aggregate report, manifest, and original ZIP are retained and made public with the leaderboard result.
                     </p>
                   )}
                   {task.harness && submissionReady === false && (

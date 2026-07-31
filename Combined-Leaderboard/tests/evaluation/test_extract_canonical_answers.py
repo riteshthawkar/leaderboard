@@ -12,6 +12,7 @@ from evaluation.extract_canonical_answers import (
     contract_exact,
     evidence_supports,
     EXTRACTOR_RESPONSE_FORMAT,
+    FAIL_CLOSED_FALLBACK_METHOD,
     extractor_contract_sha256,
     extractor_payload,
     finalize_audit_checkpoint,
@@ -647,6 +648,28 @@ def test_terminal_fallback_requires_prior_retry_history():
     assert result["terminal_fallback_method"] == (
         "deterministic-terminal-response-classifier-v1"
     )
+
+
+def test_terminal_fallback_fail_closes_nonterminal_extractor_failure():
+    candidate = {
+        "answer_type": "mcq_letter",
+        "task": "mental_rotation",
+        "response": "Option A seems plausible, but I still need to inspect B and C.",
+    }
+    result = finalize_persistent_extractor_failure(
+        candidate,
+        {
+            "status": "invalid_extractor_output",
+            "extractor_attempts": [{"status": "invalid_extractor_output"}],
+        },
+    )
+
+    assert result is not None
+    assert result["status"] == "unresolved"
+    assert result["extractor_verdict"] == "UNRESOLVED"
+    assert result["answer"] == ""
+    assert result["evidence"] == ""
+    assert result["terminal_fallback_method"] == FAIL_CLOSED_FALLBACK_METHOD
 
 
 def test_blind_extractor_prompt_contains_no_gold_contract():

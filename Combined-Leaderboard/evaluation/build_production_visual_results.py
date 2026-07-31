@@ -18,6 +18,7 @@ from evaluation.extract_canonical_answers import (
     DEFAULT_EXCLUDED_VARIANTS,
     DEFAULT_EXTRACTOR_MODEL,
     DEFAULT_EXTRACTOR_REVISION,
+    FAIL_CLOSED_FALLBACK_METHOD,
     METHOD,
     TERMINAL_FALLBACK_METHOD,
     candidate_key,
@@ -160,7 +161,10 @@ def load_completed_audit(
         )
         fallback_method = row.get("terminal_fallback_method")
         if fallback_method:
-            if fallback_method != TERMINAL_FALLBACK_METHOD:
+            if fallback_method not in {
+                TERMINAL_FALLBACK_METHOD,
+                FAIL_CLOSED_FALLBACK_METHOD,
+            }:
                 raise ProductionBuildError(
                     f"Terminal fallback method mismatch for {key}."
                 )
@@ -178,6 +182,10 @@ def load_completed_audit(
             if recomputed is None:
                 raise ProductionBuildError(
                     f"Terminal fallback is not reproducible for {key}."
+                )
+            if recomputed.get("terminal_fallback_method") != fallback_method:
+                raise ProductionBuildError(
+                    f"Terminal fallback classification changed for {key}."
                 )
         elif row.get("terminal_fallback_from_status"):
             raise ProductionBuildError(
@@ -418,6 +426,40 @@ def build_track(
     }
 
 
+def reasoning_profile_for_variant(
+    source_root: Path,
+    variant: dict[str, Any],
+) -> str:
+    configured = str(variant.get("reasoning_profile") or "").strip().lower()
+    profiles = {
+        str(
+            read_json(
+                source_root
+                / str(variant["tracks"][track]["relative_dir"])
+                / f"{track}.run_config.json"
+            ).get("reasoning_profile")
+            or ""
+        )
+        .strip()
+        .lower()
+        for track in TRACKS
+    }
+    profiles.discard("")
+    if configured:
+        profiles.add(configured)
+    if len(profiles) > 1:
+        raise ProductionBuildError(
+            f"Variant {variant.get('variant_id')} has conflicting reasoning profiles."
+        )
+    profile = next(iter(profiles), "nonthinking")
+    if profile not in {"nonthinking", "thinking"}:
+        raise ProductionBuildError(
+            f"Variant {variant.get('variant_id')} has unsupported reasoning profile "
+            f"{profile!r}."
+        )
+    return profile
+
+
 def build_production_results(
     project_root: Path,
     source_root: Path,
@@ -454,6 +496,7 @@ def build_production_results(
             slug = str(variant["variant_id"])
             destination = staging / slug
             destination.mkdir()
+            reasoning_profile = reasoning_profile_for_variant(source_root, variant)
             track_records = {
                 track: build_track(
                     source_root=source_root,
@@ -478,6 +521,7 @@ def build_production_results(
                 },
                 "model_id": str(variant["model_id"]),
                 "model_revision": str(variant["model_revision"]),
+                "reasoning_profile": reasoning_profile,
                 "weight_loading": "unquantized",
                 "compute_dtype": "bfloat16",
                 "evidence_extraction": {
@@ -499,6 +543,7 @@ def build_production_results(
                     "slug": slug,
                     "model_id": manifest["model_id"],
                     "model_revision": manifest["model_revision"],
+                    "reasoning_profile": reasoning_profile,
                     "manifest": f"{slug}/final_manifest.json",
                     "manifest_sha256": sha256(manifest_path),
                     "tracks": {

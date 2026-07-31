@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -246,19 +246,25 @@ export function SpecList({ items }) {
   return <ul className="mt-4 grid list-none gap-2 p-0">{items.map(([k, v]) => <li className="flex gap-4 border-b border-border py-2 text-sm max-sm:flex-col max-sm:gap-1" key={k}><span className="min-w-36 font-semibold text-faint">{k}</span><span className="text-muted">{v}</span></li>)}</ul>;
 }
 
-export function ScoringBlock({ scoring, className }) {
+export function ScoringBlock({ scoring, className, cardBottomBorders = false }) {
   return (
     <section className={className}>
       <div className={cn(ui.sectionFrame, "!border-page-accent-border")}>
         <SectionHead tag={scoring.tag} title={scoring.title} body={scoring.body} accented banded />
         <dl className="grid border-b border-page-accent-border sm:grid-cols-2 xl:grid-cols-4">
           {scoring.specs.map(([label, value], index) => (
-            <div className="min-w-0 border-b border-r border-page-accent-border p-6 sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 lg:p-8" key={label}>
+            <div
+              className={cn(
+                "min-w-0 border-b border-r border-page-accent-border p-6 lg:p-8",
+                !cardBottomBorders && "sm:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0",
+              )}
+              key={label}
+            >
               <dt className="flex items-center justify-between gap-3 text-xs font-semibold uppercase text-page-accent">
                 <span>{label}</span>
                 <span className="tabular-nums text-faint">[{String(index + 1).padStart(2, "0")}]</span>
               </dt>
-              <dd className="mt-5 text-lg font-medium leading-relaxed text-muted">{value}</dd>
+              <dd className="mt-5 text-base font-medium leading-relaxed text-muted">{value}</dd>
             </div>
           ))}
         </dl>

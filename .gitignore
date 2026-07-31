@@ -13,6 +13,7 @@ ENV/
 /uploads/
 Combined-Leaderboard/results/
 Combined-Leaderboard/uploads/
+Combined-Leaderboard/.local-data/
 /FInal_model_output_files/
 
 # --- Private benchmark answer keys (never commit) ---
@@ -27,6 +28,7 @@ Combined-Leaderboard/sample_submission_correct.json
 *.env
 .env.*
 !.env.example
+*.pem
 
 # --- Logs ---
 logs/
@@ -61,8 +63,12 @@ Combined-Leaderboard/frontend/dist/
 **/_gray_cache/
 **/_dryrun_*.json
 Combined-Leaderboard/evaluation/**/results/
-Combined-Leaderboard/evaluation/spatial_reasoning/LMUData/
+Combined-Leaderboard/analysis/results/
+Combined-Leaderboard/evaluation/closed-source-models-evals/
 Combined-Leaderboard/evaluation/.runtime/
+Combined-Leaderboard/spatial_harness/LMUData/
+Combined-Leaderboard/spatial_harness/track3_cache/
+Combined-Leaderboard/spatial_harness/.track3/
 
 # --- Database (contains user credentials — never commit) ---
 *.db

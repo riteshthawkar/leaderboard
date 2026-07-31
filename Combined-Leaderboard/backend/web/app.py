@@ -24,12 +24,13 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode, urlparse
 from typing import Dict, Optional
 
-# Ensure the backend package directory is importable when running this file
-# directly (e.g. `python backend/web/app.py`) so that `from config import ...`
-# and the other top-level module imports below resolve correctly.
+# Ensure both the backend package and shared project modules are importable when
+# this file is run directly (for example, `python backend/web/app.py`).
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-if str(BACKEND_DIR) not in sys.path:
-    sys.path.insert(0, str(BACKEND_DIR))
+PROJECT_ROOT = BACKEND_DIR.parent
+for import_root in (BACKEND_DIR, PROJECT_ROOT):
+    if str(import_root) not in sys.path:
+        sys.path.insert(0, str(import_root))
 
 from flask import (
     Flask,
@@ -3027,9 +3028,12 @@ def get_available_tasks():
         elif benchmark_str == "spatial":
             legacy_groups = {}
 
+        public_task_ids = _public_task_ids()
         submission_tasks = []
         for task in sorted(TASKS.values(), key=lambda item: item.get("order", 999)):
             if benchmark_str and task["task_id"] != benchmark_str:
+                continue
+            if task["task_id"] not in public_task_ids:
                 continue
             submission_tasks.append({
                 "task_id": task["task_id"],
@@ -3139,14 +3143,28 @@ def _task_or_404(task_id):
     return TASKS.get(task_id)
 
 
+def _public_task_ids() -> set[str]:
+    """Return tasks whose complete public submission contract is available."""
+    task_ids = set(TASKS)
+    if _spatial_bundle_health()[0] != "healthy":
+        task_ids.discard("spatial")
+    return task_ids
+
+
 @app.route("/api/sections", methods=["GET"])
 @limiter.limit("60 per minute")
 def api_sections():
     """UI layout: the two sections, their tasks, layers and VCI weights."""
     request_id = getattr(g, "request_id", None)
     try:
+        public_task_ids = _public_task_ids()
         sections = []
         for sec in SECTIONS.values():
+            section_task_ids = [
+                task_id for task_id in sec["tasks"] if task_id in public_task_ids
+            ]
+            if not section_task_ids:
+                continue
             sections.append({
                 "id": sec["id"],
                 "label": sec["label"],
@@ -3160,7 +3178,7 @@ def api_sections():
                         "supports_diagnostics": TASKS[t]["supports_diagnostics"],
                         "description": TASKS[t]["description"],
                     }
-                    for t in sec["tasks"]
+                    for t in section_task_ids
                 ],
             })
         return jsonify({
@@ -3361,7 +3379,7 @@ def spatial_harness():
                 continue
             if path.suffix.lower() in excluded_suffixes or path.name == ".DS_Store":
                 continue
-            bundle.write(path, Path("spatial_reasoning") / relative)
+            bundle.write(path, Path("spatial_harness") / relative)
     archive.seek(0)
     return send_file(
         archive,

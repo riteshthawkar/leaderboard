@@ -1,0 +1,22 @@
+[Unit]
+Description=MS-VISTA leaderboard containers
+Requires=docker.service
+After=docker.service network-online.target remote-fs.target
+Wants=network-online.target remote-fs.target
+RequiresMountsFor=/srv/ms-vista /mnt/ms-vista-backups
+ConditionPathExists=/srv/ms-vista/app/deployment/azure/production.env
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/ms-vista/app/deployment/azure
+ExecStartPre=/usr/bin/docker compose --env-file production.env config -q
+ExecStart=/usr/bin/docker compose --env-file production.env up -d --no-build --remove-orphans --wait --wait-timeout 180
+ExecReload=/usr/bin/docker compose --env-file production.env up -d --no-build --remove-orphans --wait --wait-timeout 180
+ExecStop=/usr/bin/docker compose --env-file production.env stop -t 45
+TimeoutStartSec=240
+TimeoutStopSec=90
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

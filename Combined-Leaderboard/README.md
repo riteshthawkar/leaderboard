@@ -21,12 +21,19 @@ React + Flask application for the MSR visual cognition and spatial reasoning lea
 - `backend/scoring/task_scorer.py` - per-task scoring and spatial diagnostics.
 - `tasks/` - public question bundles, manifests, and JSONL submission templates.
 - `Ground_truths/` - ignored local mount point for private answer keys; only its README is committed.
-- `evaluation/` - isolated, benchmark-specific evaluation packages for Do You See Me, Mind's Eye, and Spatial Reasoning.
+- `evaluation/` - visual-suite evaluation, extraction, packaging, and research-analysis tooling.
+- `spatial_harness/` - canonical Track 3 preparation, evaluation, judging, and submission contract.
 - `tests/` - backend, evaluation, integration, and opt-in live E2E verification.
-- `deployment/` - standalone API and Hugging Face deployment configuration.
+- `deployment/` - Azure, standalone API, frontend, and Hugging Face deployment configuration.
 - `docs/` - architecture, deployment, and operating documentation.
 
 Flask does not render pages or expose frontend static files. The frontend calls the public API origin configured through `VITE_API_BASE_URL`.
+
+## Prerequisites
+
+- Python 3.12
+- Node.js 22.22 or newer
+- Docker for container builds and production deployment
 
 ## Quick Start
 
@@ -46,7 +53,7 @@ In another terminal:
 
 ```bash
 cd Combined-Leaderboard/frontend
-npm install
+npm ci
 cp .env.example .env.development.local
 npm run dev
 ```
@@ -70,8 +77,8 @@ Use SQLite for local development and the intended low-concurrency,
 single-instance production deployment.
 
 ```env
-LEADERBOARD_DATA_DIR=.
-DATABASE_URL=sqlite:///leaderboard.db
+LEADERBOARD_DATA_DIR=.local-data
+DATABASE_URL=
 AUTH_DATABASE_URL=
 SUBMISSION_DATABASE_URL=
 LIMITER_STORAGE_URI=memory://
@@ -264,17 +271,35 @@ backend.backup_cli verify <archive>` and `python -m backend.backup_cli restore
 `backend/build_tasks.py` creates a small synthetic spatial bundle so the app can boot. The API always rejects submissions against this demo bundle. Build a versioned official bundle on a trusted administrator machine after preparing all 13 normalized datasets:
 
 ```bash
-cd evaluation/spatial_reasoning
-python3 prepare_data.py --lmudata ./LMUData --hf-token "$HF_TOKEN"
-python3 build_server_bundle.py \
-  --lmudata ./LMUData \
+cd Combined-Leaderboard
+python3 -m spatial_harness.prepare_data \
+  --lmudata /secure/track3/LMUData \
+  --cache /secure/track3/cache \
+  --hf-token "$HF_TOKEN"
+python3 -m spatial_harness.build_public_contract \
+  --lmudata /secure/track3/LMUData \
+  --output tasks/spatial \
   --benchmark-version 2026-07-12 \
-  --ground-truth-output ../../Ground_truths/spatial_v1/ground_truth.json
+  --private-ground-truth /secure/track3/private/ground_truth.json
 ```
 
-This writes the public manifest, identifier-only questions, six-condition template, and a private administrator QA key under the ignored `Ground_truths/` directory. The backend does not use that private key to grade Spatial uploads. Restart the API and confirm `/api/health` reports `spatial_bundle: healthy` before opening submissions.
+This writes the public manifest, identifier-only questions, and six-condition
+template under `tasks/spatial`. The private administrator QA key is written to
+the explicit secure path and must remain outside the repository. The backend
+does not use that private key to grade Spatial uploads. Restart the API and
+confirm `/api/health` reports `spatial_bundle: healthy` before opening
+submissions.
 
-The spatial harness produces one user-facing upload, `spatial_reasoning_submission.zip`, containing `submission.jsonl`, `run_manifest.json`, and `leaderboard.json`. The API validates the package in memory, confirms the per-sample correctness evidence agrees with the aggregate report, and stores the exact ZIP and all three members in SQLite. It also retains each official public benchmark contract once, links every Spatial submission to its manifest hash, and uses that immutable version for future rescoring. Visible spatial results expose public evidence metadata, hashes, per-sample results, and the original package under `/api/public/submissions/<submission_id>/`.
+The canonical `spatial_harness/` produces one user-facing upload,
+`spatial_reasoning_submission.zip`, containing `submission.jsonl`,
+`run_manifest.json`, and `leaderboard.json`. The API validates the package in
+memory, confirms the per-sample correctness evidence agrees with the aggregate
+report, and stores the exact ZIP and all three members in SQLite. It also
+retains each official public benchmark contract once, links every Spatial
+submission to its manifest hash, and uses that immutable version for future
+rescoring. Visible spatial results expose public evidence metadata, hashes,
+per-sample results, and the original package under
+`/api/public/submissions/<submission_id>/`.
 
 The checked-in spatial bundle is intentionally small. Treat spatial launch as blocked until the official bundle has been generated from the pinned TSV files and all dataset preparation checks pass.
 
@@ -284,8 +309,8 @@ The checked-in spatial bundle is intentionally small. Treat spatial launch as bl
 
 ```bash
 cd Combined-Leaderboard
-python3 -m venv venv
-source venv/bin/activate
+python3.12 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 gunicorn --workers 1 --bind 0.0.0.0:5050 --timeout 180 backend.web:app
 ```

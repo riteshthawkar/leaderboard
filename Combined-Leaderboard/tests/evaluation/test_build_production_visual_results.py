@@ -27,9 +27,10 @@ def _write_json(path: Path, value: dict) -> None:
 def test_qwen35_production_catalog_identity_is_pinned():
     assert MODEL_CATALOG["qwen35-9b"] == {
         "repository": "Qwen/Qwen3.5-9B",
-        "display_name": "Qwen3.5-9B",
+        "display_name": "Qwen3.5-9B (Thinking Disabled)",
         "organization": "Qwen",
         "parameter_count": "9B",
+        "reasoning_profile": "nonthinking",
     }
 
 
@@ -135,6 +136,7 @@ def test_builds_verified_v12_tree_from_complete_evidence_audit(tmp_path):
                 "model_revision": revision,
                 "weight_loading": "unquantized",
                 "compute_dtype": "bfloat16",
+                "reasoning_profile": "thinking",
                 "pipeline_revision": "unquantized-bf16-mandatory-extraction-v11",
                 "generation": {track: {"temperature": 0.0}},
                 "serving_engine": {"name": "vllm", "version": "test"},
@@ -181,6 +183,7 @@ def test_builds_verified_v12_tree_from_complete_evidence_audit(tmp_path):
                     "model_id": "org/model-a",
                     "model_revision": revision,
                     "mode": "nonthinking",
+                    "reasoning_profile": "thinking",
                     "tracks": variant_tracks,
                 }
             ],
@@ -217,8 +220,10 @@ def test_builds_verified_v12_tree_from_complete_evidence_audit(tmp_path):
     assert manifest["tracks"]["minds_eye"]["strict_answer_count"] == 0
     assert manifest["tracks"]["minds_eye"]["invalid_commitment_count"] == 1
     assert manifest["tracks"]["minds_eye"]["invalid_format_count"] == 1
+    assert manifest["reasoning_profile"] == "thinking"
     assert manifest["evidence_extraction"]["extractor_model"] == DEFAULT_EXTRACTOR_MODEL
     assert manifest["evidence_extraction"]["ground_truth_loaded"] is False
+    assert index["models"][0]["reasoning_profile"] == "thinking"
 
 
 def test_completed_audit_rejects_spoofed_terminal_fallback_method(tmp_path):

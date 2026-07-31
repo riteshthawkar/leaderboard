@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { cleanup, render, screen } from "@testing-library/react";
 import { Login } from "@/pages/Login";
 

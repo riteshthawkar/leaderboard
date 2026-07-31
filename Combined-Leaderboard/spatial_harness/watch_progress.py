@@ -10,7 +10,14 @@ from pathlib import Path
 from spatial_harness.run_track3_vllm import build_records
 
 
-SLICES = ("main_noncot", "main_cot", "noimgpp_noncot", "noimgpp_cot")
+SLICES = (
+    "main_noncot",
+    "main_cot",
+    "noimage_noncot",
+    "noimage_cot",
+    "noimgpp_noncot",
+    "noimgpp_cot",
+)
 
 
 def keyed_rows(path: Path) -> dict[tuple[str, str, str, str], dict]:
@@ -38,18 +45,23 @@ def main() -> None:
     result_dir = args.result_dir.expanduser().resolve()
     config_path = result_dir / "run_config.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    expected = {
-        f"{mode}_{prompt_mode}": sum(
+    expected_by_mode = {
+        mode: sum(
             len(
                 build_records(
                     config["lmudata"],
                     dataset,
                     mode,
                     int(config.get("limit") or 0),
+                    include_payload=False,
                 )
             )
             for dataset in config["datasets"]
         )
+        for mode in config["modes"]
+    }
+    expected = {
+        f"{mode}_{prompt_mode}": expected_by_mode[mode]
         for mode in config["modes"]
         for prompt_mode in config["prompt_modes"]
     }

@@ -7,6 +7,9 @@ MS-VISTA supports two deployment topologies:
 
 In both topologies Flask remains API only. It does not render frontend routes or expose `frontend/static`.
 
+Direct builds require Python 3.12 and Node.js 22.22 or newer. Container builds
+carry those runtime versions in their images.
+
 ## Production Origins
 
 Use explicit HTTPS origins for both services. Same-site subdomains are preferred
@@ -69,6 +72,7 @@ docker run --rm -p 5050:7860 \
   -e CORS_ORIGINS=http://localhost:8080 \
   -e SESSION_COOKIE_SECURE=false \
   -e DISABLE_SUBMISSION_AUTH=true \
+  -e REQUIRE_OFFSITE_BACKUP=false \
   -e GROUND_TRUTHS_SOURCE=local \
   -e GROUND_TRUTHS_DIR=/run/ground-truths \
   -v "$PWD/.data:/data" \
@@ -114,8 +118,8 @@ platforms.
 
 The checked-in spatial bundle is a demo and the API will not accept submissions
 against it. Before enabling the spatial track, generate the official public
-manifest and template with `evaluation/spatial_reasoning/build_server_bundle.py`. Keep the
-generated administrator QA key outside source control and configure:
+manifest and template with `python -m spatial_harness.build_public_contract`.
+Keep the generated administrator QA key outside source control and configure:
 
 ```env
 REQUIRE_OFFICIAL_SPATIAL=true

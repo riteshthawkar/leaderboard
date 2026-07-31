@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ClipboardList, Send, UserRound } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { WorkspacePage } from "@/components/WorkspacePage";
 import { Button } from "@/components/ui/button";
 import { errorMessage, fetchMe } from "@/lib/api";

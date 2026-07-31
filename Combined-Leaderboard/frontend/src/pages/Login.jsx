@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { WorkspacePage } from "@/components/WorkspacePage";
 import { Button } from "@/components/ui/button";
 import { apiUrl, postJSON, saveUser, getJSON, fetchMe, errorMessage, IS_STATIC_DEMO } from "@/lib/api";

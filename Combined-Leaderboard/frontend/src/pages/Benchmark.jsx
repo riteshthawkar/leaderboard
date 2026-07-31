@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { PageHero } from "@/components/Hero";
 import { BenchmarkModelChart, BarChart } from "@/components/Charts";
 import { Citation } from "@/components/Citation";
@@ -225,7 +225,10 @@ function EvaluationSection({ page }) {
   if (!page.evaluation) return null;
   return (
     <BenchmarkSection head={page.evaluation}>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] border-l border-t border-border">
+      <div className={cn(
+        "grid border-l border-t border-border",
+        page.id === "spatial" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-[repeat(auto-fit,minmax(150px,1fr))]",
+      )}>
         {page.evaluation.steps.map(([label, body], index) => (
           <div className="min-w-0 border-b border-r border-border p-5" key={label}>
             <span className="mb-4 block text-xs font-semibold text-faint">[{String(index + 1).padStart(2, "0")}]</span>
@@ -366,7 +369,7 @@ function EffectMatrix({ chart }) {
 function FigureChart({ chart }) {
   const scale = chart.scale ?? 1;
   const suffix = chart.suffix ?? (chart.kind === "diverging" ? " pts" : "%");
-  const aspect = chart.wide ? "24 / 8" : "16 / 11";
+  const aspect = chart.aspectRatio ?? (chart.wide ? "24 / 8" : "16 / 11");
   const digits = chart.digits ?? (chart.kind === "diverging" ? 1 : 0);
   if (chart.kind === "matrix") return <AccuracyMatrix chart={chart} />;
   if (chart.kind === "effectMatrix") return <EffectMatrix chart={chart} />;
@@ -374,10 +377,12 @@ function FigureChart({ chart }) {
     return (
       <BarChart
         aspectRatio={aspect}
-        bottomMargin={80}
+        minHeight={chart.minHeight}
+        bottomMargin={chart.bottomMargin ?? 80}
         categories={chart.categories.map((label) => ({ label }))}
         compactXLabels={chart.compactXLabels}
         forceHorizontalLabels={chart.forceHorizontalLabels}
+        xLabelAngle={chart.xLabelAngle}
         series={chart.series.map((entry, seriesIndex) => ({ key: entry.key || `s${seriesIndex}`, label: entry.label, color: entry.color, valueFor: (_category, index) => entry.values[index] }))}
         valueScale={scale}
         valueSuffix={suffix}
@@ -390,8 +395,11 @@ function FigureChart({ chart }) {
   return (
     <BarChart
       aspectRatio={aspect}
-      bottomMargin={80}
+      minHeight={chart.minHeight}
+      bottomMargin={chart.bottomMargin ?? 80}
       categories={chart.bars.map(([label]) => ({ label }))}
+      compactXLabels={chart.compactXLabels}
+      xLabelAngle={chart.xLabelAngle}
       series={[{
         key: "v",
         label: chart.unit || "",
@@ -508,7 +516,7 @@ function BenchmarkContent({ page }) {
       <FindingsSection page={page} />
       <FindingsFiguresSection page={page} />
       {page.id === "spatial" && <SpatialDataSection datasets={datasets} />}
-      <ScoringBlock scoring={page.scoring} />
+      <ScoringBlock scoring={page.scoring} cardBottomBorders={page.id === "dysm" || page.id === "minds_eye"} />
       <Citation citation={page.citation} />
     </>
   );

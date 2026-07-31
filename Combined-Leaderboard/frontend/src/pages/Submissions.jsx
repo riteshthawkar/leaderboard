@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { CircleCheck, Download, Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { WorkspacePage } from "@/components/WorkspacePage";
 import { Button } from "@/components/ui/button";
 import {

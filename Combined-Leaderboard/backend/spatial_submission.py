@@ -62,6 +62,50 @@ _SPATIAL_EVIDENCE_FIELDS = {
     "judge_method",
     "judge_attempts",
 }
+_SPATIAL_V3_BENCHMARK_SCHEMA = "ms-vista-spatial-benchmark/v3"
+_SPATIAL_V3_SUBMISSION_SCHEMA = "ms-vista-spatial-submission/v3"
+_SPATIAL_V3_RUN_SCHEMA = "ms-vista-spatial-run/v3"
+_SPATIAL_V3_REPORT_SCHEMA = "ms-vista-spatial-report/v3"
+_SPATIAL_V3_HARNESS_CONTRACT = "ms-vista-track3-paper-aligned-v5"
+_SPATIAL_V3_HARNESS_VERSION = "2.0.0"
+_SPATIAL_V3_JUDGE_MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507"
+_SPATIAL_V3_JUDGE_REVISION = "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe"
+_SPATIAL_V3_EVIDENCE_FIELDS = {
+    *_SPATIAL_EVIDENCE_FIELDS,
+    "answer_type",
+}
+_SPATIAL_V3_JUDGE_METHODS = {
+    "paper_mcq_llm_judge",
+    "paper_vqa_llm_judge",
+    "explicit_abstention",
+    "inference_failure",
+}
+_SPATIAL_V3_INFERENCE_FAILURE_SCHEMA = "ms-vista-track3-inference-failure/v1"
+_SPATIAL_V3_INFERENCE_FAILURE_POLICY = "context-limit-terminal-failure-v1"
+_SPATIAL_V3_INFERENCE_FAILURE_DISPOSITION = (
+    "scored_incorrect_without_judge"
+)
+_SPATIAL_V3_EVALUATION_POLICY = {
+    "answer_type": {
+        "main": "mcq_and_vqa",
+        "noimage": "mcq_and_vqa",
+        "noimgpp": "text_mcq_only",
+    },
+    "noimage_image": "same_size_gray",
+    "noimgpp_image": "same_size_gray",
+    "noimgpp_answer": "Cannot determine from the image",
+    "circular_modes": ["main"],
+    "circular_datasets": ["SAT-Real", "SpatialBench"],
+    "scoring": "all_rotations_correct_within_evaluation_group",
+}
+_SPATIAL_V3_JUDGE_DECODING = {
+    "strategy": "greedy",
+    "temperature": 0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "repetition_penalty": 1.0,
+    "max_tokens": 4,
+}
 
 ContractSource = Path | bytes
 
@@ -249,8 +293,166 @@ def _load_json_object(source: ContractSource, label: str) -> dict:
     return value
 
 
+def _load_official_benchmark_manifest_v3(manifest: dict) -> dict:
+    if manifest.get("demo") is not False:
+        raise ValueError("Spatial benchmark manifest is a demo bundle")
+    if manifest.get("harness_contract") != _SPATIAL_V3_HARNESS_CONTRACT:
+        raise ValueError("Spatial benchmark manifest uses an unsupported protocol")
+    if manifest.get("harness_version") != _SPATIAL_V3_HARNESS_VERSION:
+        raise ValueError("Spatial benchmark manifest uses an unsupported harness version")
+    if manifest.get("datasets") != SPATIAL_DATASET_KEYS:
+        raise ValueError("Spatial benchmark manifest does not contain the canonical 13 datasets")
+    if manifest.get("dataset_count") != len(SPATIAL_DATASET_KEYS):
+        raise ValueError("Spatial benchmark manifest dataset_count is incorrect")
+    if manifest.get("required_conditions") != EVAL_CONDITIONS:
+        raise ValueError("Spatial benchmark manifest does not contain the six required conditions")
+    if manifest.get("primary_condition") != "main_noncot":
+        raise ValueError("Spatial benchmark manifest primary_condition must be main_noncot")
+    if manifest.get("evaluation_policy") != _SPATIAL_V3_EVALUATION_POLICY:
+        raise ValueError("Spatial benchmark manifest evaluation policy is invalid")
+    if not str(manifest.get("benchmark_version") or "").strip():
+        raise ValueError("Spatial benchmark manifest is missing benchmark_version")
+
+    condition_counts = manifest.get("condition_counts")
+    condition_group_counts = manifest.get("condition_group_counts")
+    for label, counts in (
+        ("condition_counts", condition_counts),
+        ("condition_group_counts", condition_group_counts),
+    ):
+        if (
+            not isinstance(counts, dict)
+            or set(counts) != set(EVAL_CONDITIONS)
+            or any(
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value <= 0
+                for value in counts.values()
+            )
+        ):
+            raise ValueError(f"Spatial benchmark manifest {label} are incomplete")
+    for field in ("dataset_condition_counts", "dataset_condition_group_counts"):
+        by_dataset = manifest.get(field)
+        if not isinstance(by_dataset, dict) or set(by_dataset) != set(
+            SPATIAL_DATASET_KEYS
+        ):
+            raise ValueError(f"Spatial benchmark manifest {field} are incomplete")
+        for dataset, counts in by_dataset.items():
+            if (
+                not isinstance(counts, dict)
+                or set(counts) != set(EVAL_CONDITIONS)
+                or any(
+                    not isinstance(value, int)
+                    or isinstance(value, bool)
+                    or value <= 0
+                    for value in counts.values()
+                )
+            ):
+                raise ValueError(
+                    f"Spatial benchmark manifest {field} are invalid for {dataset}"
+                )
+
+    dataset_files = manifest.get("dataset_files")
+    if not isinstance(dataset_files, dict) or set(dataset_files) != set(
+        SPATIAL_DATASET_KEYS
+    ):
+        raise ValueError("Spatial benchmark manifest dataset provenance is incomplete")
+    for dataset, artifact in dataset_files.items():
+        answer_types = artifact.get("answer_types") if isinstance(artifact, dict) else None
+        if (
+            not isinstance(artifact, dict)
+            or artifact.get("filename") != f"{dataset}.tsv"
+            or not isinstance(artifact.get("size_bytes"), int)
+            or artifact["size_bytes"] <= 0
+            or not isinstance(artifact.get("rows"), int)
+            or artifact["rows"] <= 0
+            or not re.fullmatch(r"[0-9a-f]{64}", str(artifact.get("sha256") or ""))
+            or not isinstance(answer_types, dict)
+            or not answer_types
+            or any(
+                answer_type not in {"mcq", "vqa"}
+                or not isinstance(count, int)
+                or isinstance(count, bool)
+                or count <= 0
+                for answer_type, count in answer_types.items()
+            )
+            or sum(answer_types.values()) != artifact["rows"]
+        ):
+            raise ValueError(
+                f"Spatial benchmark manifest has invalid provenance for {dataset}"
+            )
+
+    data_manifest = manifest.get("data_manifest")
+    if (
+        not isinstance(data_manifest, dict)
+        or data_manifest.get("filename") != "track3_data_manifest.json"
+        or not re.fullmatch(
+            r"[0-9a-f]{64}",
+            str(data_manifest.get("sha256") or ""),
+        )
+    ):
+        raise ValueError("Spatial benchmark manifest data provenance is incomplete")
+    prompts = manifest.get("prompts")
+    if not isinstance(prompts, dict) or set(prompts) != {"noncot", "cot"}:
+        raise ValueError("Spatial benchmark manifest prompt provenance is incomplete")
+    if any(
+        not isinstance(artifact, dict)
+        or not re.fullmatch(r"[0-9a-f]{64}", str(artifact.get("sha256") or ""))
+        for artifact in prompts.values()
+    ):
+        raise ValueError("Spatial benchmark manifest prompt hashes are invalid")
+    if manifest.get("decoding") != {
+        "strategy": "greedy",
+        "temperature": 0,
+        "top_p": 1.0,
+        "seed": 0,
+        "completion_budget": "server_context_remainder",
+    }:
+        raise ValueError("Spatial benchmark manifest decoding contract is invalid")
+
+    judge = manifest.get("judge")
+    prompt_hashes = judge.get("system_prompt_sha256") if isinstance(judge, dict) else None
+    if (
+        not isinstance(judge, dict)
+        or judge.get("model") != _SPATIAL_V3_JUDGE_MODEL
+        or judge.get("revision") != _SPATIAL_V3_JUDGE_REVISION
+        or not isinstance(prompt_hashes, dict)
+        or set(prompt_hashes) != {"mcq", "vqa"}
+        or any(
+            not re.fullmatch(r"[0-9a-f]{64}", str(value or ""))
+            for value in prompt_hashes.values()
+        )
+        or judge.get("decoding") != _SPATIAL_V3_JUDGE_DECODING
+    ):
+        raise ValueError("Spatial benchmark manifest judge provenance is incomplete")
+
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, dict) or set(artifacts) != {
+        "questions",
+        "submission_template",
+    }:
+        raise ValueError("Spatial benchmark manifest public artifacts are incomplete")
+    for name, expected_filename in (
+        ("questions", "questions.jsonl"),
+        ("submission_template", "submission_template.jsonl"),
+    ):
+        artifact = artifacts[name]
+        if (
+            not isinstance(artifact, dict)
+            or artifact.get("filename") != expected_filename
+            or not isinstance(artifact.get("rows"), int)
+            or artifact["rows"] <= 0
+            or not re.fullmatch(r"[0-9a-f]{64}", str(artifact.get("sha256") or ""))
+        ):
+            raise ValueError(
+                f"Spatial benchmark manifest {name} artifact is invalid"
+            )
+    return manifest
+
+
 def load_official_benchmark_manifest(source: ContractSource) -> dict:
     manifest = _load_json_object(source, "Spatial benchmark manifest")
+    if manifest.get("schema_version") == _SPATIAL_V3_BENCHMARK_SCHEMA:
+        return _load_official_benchmark_manifest_v3(manifest)
     if manifest.get("schema_version") != SPATIAL_BENCHMARK_SCHEMA_VERSION:
         raise ValueError("Spatial benchmark manifest has an unsupported schema_version")
     if manifest.get("demo") is not False:
@@ -385,6 +587,7 @@ def _load_public_spatial_contract(
 ) -> tuple[dict, dict[str, dict], set[tuple[str, str]]]:
     """Load and cross-check the public contract without reading ground truth."""
     manifest = load_official_benchmark_manifest(manifest_path)
+    is_v3 = manifest.get("schema_version") == _SPATIAL_V3_BENCHMARK_SCHEMA
 
     questions_artifact = (manifest.get("artifacts") or {}).get("questions") or {}
     if questions_artifact.get("sha256") != _contract_sha256(
@@ -406,6 +609,7 @@ def _load_public_spatial_contract(
         question_id = str(row.get("question_id") or "").strip()
         dataset = str(row.get("dataset_key") or "").strip()
         evaluation_group = str(row.get("evaluation_group") or "").strip()
+        answer_type = str(row.get("answer_type") or ("mcq" if not is_v3 else "")).strip()
         conditions = row.get("conditions")
         if not question_id:
             raise ValueError(
@@ -421,6 +625,10 @@ def _load_public_spatial_contract(
             raise ValueError(
                 f"Spatial public question identifier line {line_number} has no evaluation_group"
             )
+        if answer_type not in {"mcq", "vqa"}:
+            raise ValueError(
+                f"Spatial public question identifier line {line_number} has an invalid answer_type"
+            )
         if (
             not isinstance(conditions, list)
             or not conditions
@@ -431,9 +639,16 @@ def _load_public_spatial_contract(
             raise ValueError(
                 f"Spatial public question identifier line {line_number} has invalid conditions"
             )
+        if is_v3 and answer_type == "vqa" and any(
+            condition.startswith("no_image_plus_") for condition in conditions
+        ):
+            raise ValueError(
+                f"Spatial public VQA identifier line {line_number} cannot include No-Image++"
+            )
         questions[question_id] = {
             "dataset": dataset,
             "evaluation_group": evaluation_group,
+            "answer_type": answer_type,
             "conditions": conditions,
         }
         for condition in conditions:
@@ -625,6 +840,10 @@ def parse_spatial_evidence(
         template_path,
         questions_path,
     )
+    is_v3 = manifest.get("schema_version") == _SPATIAL_V3_BENCHMARK_SCHEMA
+    evidence_fields = (
+        _SPATIAL_V3_EVIDENCE_FIELDS if is_v3 else _SPATIAL_EVIDENCE_FIELDS
+    )
     records: list[dict] = []
     seen: set[tuple[str, str]] = set()
     condition_counts = Counter()
@@ -652,8 +871,8 @@ def parse_spatial_evidence(
                 f"submission.jsonl line {line_number} must be one JSON object.",
                 line_number=line_number,
             )
-        missing_fields = sorted(_SPATIAL_EVIDENCE_FIELDS - set(row))
-        unexpected_fields = sorted(set(row) - _SPATIAL_EVIDENCE_FIELDS)
+        missing_fields = sorted(evidence_fields - set(row))
+        unexpected_fields = sorted(set(row) - evidence_fields)
         if missing_fields or unexpected_fields:
             _manifest_error(
                 "invalid_spatial_evidence_fields",
@@ -668,6 +887,9 @@ def parse_spatial_evidence(
         dataset = str(row.get("dataset") or "").strip()
         evaluation_group = str(row.get("evaluation_group") or "").strip()
         answer = row.get("answer")
+        answer_type = str(
+            row.get("answer_type") or ("mcq" if not is_v3 else "")
+        ).strip()
         judge_method = str(row.get("judge_method") or "").strip()
         judge_attempts = row.get("judge_attempts")
         correct = row.get("correct")
@@ -697,10 +919,34 @@ def parse_spatial_evidence(
                 line_number=line_number,
                 question_id=question_id,
             )
-        if not isinstance(answer, str) or not re.fullmatch(r"[A-Z0]", answer):
+        if answer_type != question["answer_type"]:
+            _manifest_error(
+                "spatial_evidence_answer_type_mismatch",
+                f"submission.jsonl line {line_number} has an answer_type that does not match the public benchmark contract.",
+                line_number=line_number,
+                question_id=question_id,
+            )
+        if answer_type == "mcq" and (
+            not isinstance(answer, str) or not re.fullmatch(r"[A-Z0]", answer)
+        ):
             _manifest_error(
                 "invalid_spatial_evidence_answer",
                 f"submission.jsonl line {line_number} must contain one uppercase option letter or 0 in answer.",
+                line_number=line_number,
+                question_id=question_id,
+            )
+        if answer_type == "vqa" and (
+            not isinstance(answer, str)
+            or not answer.strip()
+            or len(answer) > 2_048
+            or any(
+                ord(character) < 32 and character not in "\t\n\r"
+                for character in answer
+            )
+        ):
+            _manifest_error(
+                "invalid_spatial_vqa_evidence_answer",
+                f"submission.jsonl line {line_number} must contain a compact non-empty final VQA answer.",
                 line_number=line_number,
                 question_id=question_id,
             )
@@ -711,12 +957,39 @@ def parse_spatial_evidence(
                 line_number=line_number,
                 question_id=question_id,
             )
-        if judge_method not in {"qwen_llm_judge", "explicit_abstention"}:
+        allowed_judge_methods = (
+            _SPATIAL_V3_JUDGE_METHODS
+            if is_v3
+            else {"qwen_llm_judge", "explicit_abstention"}
+        )
+        if judge_method not in allowed_judge_methods:
             _manifest_error(
                 "invalid_spatial_judge_method",
                 f"submission.jsonl line {line_number} has an unsupported judge_method. Rerun the current harness.",
                 line_number=line_number,
                 judge_method=judge_method,
+            )
+        if is_v3 and judge_method != "inference_failure" and (
+            (
+                answer_type == "vqa"
+                and judge_method != "paper_vqa_llm_judge"
+            )
+            or (
+                answer_type == "mcq"
+                and judge_method == "paper_vqa_llm_judge"
+            )
+            or (
+                judge_method == "explicit_abstention"
+                and not condition.startswith("no_image_plus_")
+            )
+        ):
+            _manifest_error(
+                "inconsistent_spatial_judge_method",
+                f"submission.jsonl line {line_number} uses a judge method that is inconsistent with its answer type or condition.",
+                line_number=line_number,
+                judge_method=judge_method,
+                answer_type=answer_type,
+                condition=condition,
             )
         if (
             not isinstance(judge_attempts, int)
@@ -730,13 +1003,43 @@ def parse_spatial_evidence(
                 line_number=line_number,
             )
         if (
-            (judge_method == "explicit_abstention" and judge_attempts != 0)
-            or (judge_method == "qwen_llm_judge" and judge_attempts < 1)
+            (
+                judge_method in {"explicit_abstention", "inference_failure"}
+                and judge_attempts != 0
+            )
+            or (
+                judge_method
+                in {
+                    "qwen_llm_judge",
+                    "paper_mcq_llm_judge",
+                    "paper_vqa_llm_judge",
+                }
+                and judge_attempts < 1
+            )
         ):
             _manifest_error(
                 "inconsistent_spatial_judge_evidence",
                 f"submission.jsonl line {line_number} has inconsistent judge method and attempt metadata.",
                 line_number=line_number,
+            )
+        if judge_method == "inference_failure" and (
+            correct is not False
+            or (
+                answer_type == "mcq"
+                and answer != "0"
+            )
+            or (
+                answer_type == "vqa"
+                and answer != "INFERENCE_FAILED"
+            )
+        ):
+            _manifest_error(
+                "inconsistent_spatial_inference_failure",
+                f"submission.jsonl line {line_number} does not encode a failed inference as an incorrect sentinel answer.",
+                line_number=line_number,
+                answer_type=answer_type,
+                answer=answer,
+                correct=correct,
             )
 
         seen.add(key)
@@ -754,6 +1057,7 @@ def parse_spatial_evidence(
                 "question_id": question_id,
                 "condition": condition,
                 "answer": answer,
+                "answer_type": answer_type,
                 "dataset": dataset,
                 "evaluation_group": evaluation_group,
                 "correct": correct,
@@ -826,6 +1130,7 @@ def parse_spatial_evidence(
         6,
     )
     computed_report = {"datasets": dataset_rows, "summary": summary}
+    computed_report["_contract_schema_version"] = manifest["schema_version"]
     return records, computed_report, manifest
 
 
@@ -844,6 +1149,12 @@ def validate_spatial_report(
     computed_report: dict,
 ) -> dict:
     """Validate the submitted aggregate against the public per-sample evidence."""
+    expected_report_schema = (
+        _SPATIAL_V3_REPORT_SCHEMA
+        if computed_report.get("_contract_schema_version")
+        == _SPATIAL_V3_BENCHMARK_SCHEMA
+        else SPATIAL_REPORT_SCHEMA_VERSION
+    )
     try:
         report_text = report_bytes.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -863,10 +1174,10 @@ def validate_spatial_report(
             "invalid_spatial_report_shape",
             "The packaged leaderboard.json must contain one JSON object.",
         )
-    if report.get("schema_version") != SPATIAL_REPORT_SCHEMA_VERSION:
+    if report.get("schema_version") != expected_report_schema:
         _manifest_error(
             "unsupported_spatial_report_version",
-            f"The aggregate report schema is unsupported. Expected {SPATIAL_REPORT_SCHEMA_VERSION}; rerun the current harness.",
+            f"The aggregate report schema is unsupported. Expected {expected_report_schema}; rerun the current harness.",
             received=report.get("schema_version"),
         )
     report_model = str((report.get("model") or {}).get("name") or "").strip()
@@ -1053,6 +1364,302 @@ def build_spatial_task_score(
     )
 
 
+def _validate_run_manifest_v3(
+    run_manifest: dict,
+    manifest_bytes: bytes,
+    submission_bytes: bytes,
+    report_bytes: bytes,
+    model_name: str,
+    records: list[dict],
+    benchmark_manifest_path: ContractSource,
+) -> dict:
+    if run_manifest.get("schema_version") != _SPATIAL_V3_RUN_SCHEMA:
+        _manifest_error(
+            "unsupported_run_manifest_version",
+            f"The run manifest schema is unsupported. Expected {_SPATIAL_V3_RUN_SCHEMA}; rerun the current paper-aligned harness.",
+            received=run_manifest.get("schema_version"),
+        )
+    if run_manifest.get("submission_schema_version") != _SPATIAL_V3_SUBMISSION_SCHEMA:
+        _manifest_error(
+            "unsupported_spatial_submission_version",
+            "The spatial evidence was produced by an incompatible harness version.",
+        )
+    if (
+        run_manifest.get("harness_contract") != _SPATIAL_V3_HARNESS_CONTRACT
+        or run_manifest.get("harness_version") != _SPATIAL_V3_HARNESS_VERSION
+    ):
+        _manifest_error(
+            "spatial_harness_version_mismatch",
+            "The run manifest does not use the current paper-aligned Track-3 protocol.",
+        )
+    if run_manifest.get("debug") is not False:
+        _manifest_error(
+            "debug_spatial_run_not_allowed",
+            "Debug or limited Track-3 runs cannot be submitted.",
+        )
+    manifest_model = str((run_manifest.get("model") or {}).get("name") or "").strip()
+    model_revision = str(
+        (run_manifest.get("model") or {}).get("revision") or ""
+    ).strip()
+    if manifest_model != model_name or not model_revision:
+        _manifest_error(
+            "spatial_model_name_mismatch",
+            "The registered model name must exactly match the package, and the package must record an immutable model revision.",
+            form_model_name=model_name,
+            manifest_model_name=manifest_model,
+        )
+    if run_manifest.get("datasets") != SPATIAL_DATASET_KEYS:
+        _manifest_error(
+            "spatial_dataset_set_mismatch",
+            "The run manifest does not contain all 13 datasets in canonical order.",
+        )
+    if run_manifest.get("conditions") != EVAL_CONDITIONS:
+        _manifest_error(
+            "spatial_condition_set_mismatch",
+            "The run manifest does not contain all six conditions in canonical order.",
+        )
+    if run_manifest.get("evaluation_policy") != _SPATIAL_V3_EVALUATION_POLICY:
+        _manifest_error(
+            "spatial_evaluation_policy_mismatch",
+            "The run manifest uses a different Track-3 evaluation policy.",
+        )
+
+    inference_failure_rows = [
+        row for row in records if row.get("judge_method") == "inference_failure"
+    ]
+    inference_failure_count = len(inference_failure_rows)
+    inference_failure_samples = {
+        str(row.get("question_id") or "") for row in inference_failure_rows
+    }
+    error_counts = run_manifest.get("error_counts")
+    expected_error_counts = {
+        "inference": inference_failure_count,
+        "judge": 0,
+        "missing_outputs": inference_failure_count,
+    }
+    if (
+        not isinstance(error_counts, dict)
+        or set(error_counts) != {"inference", "judge", "missing_outputs"}
+        or error_counts != expected_error_counts
+    ):
+        _manifest_error(
+            "spatial_run_contains_errors",
+            "The Track-3 error counts do not match its explicit scored-incorrect inference failures.",
+            error_counts=error_counts,
+            expected_error_counts=expected_error_counts,
+        )
+    failure_policy = run_manifest.get("inference_failure_policy")
+    if inference_failure_count:
+        if (
+            not isinstance(failure_policy, dict)
+            or failure_policy.get("schema_version")
+            != _SPATIAL_V3_INFERENCE_FAILURE_SCHEMA
+            or failure_policy.get("policy")
+            != _SPATIAL_V3_INFERENCE_FAILURE_POLICY
+            or failure_policy.get("disposition")
+            != _SPATIAL_V3_INFERENCE_FAILURE_DISPOSITION
+            or failure_policy.get("eligible_category")
+            != "input_context_exceeded"
+            or failure_policy.get("condition_rows")
+            != inference_failure_count
+            or failure_policy.get("unique_samples")
+            != len(inference_failure_samples)
+            or set(failure_policy.get("sample_ids") or [])
+            != inference_failure_samples
+        ):
+            _manifest_error(
+                "spatial_inference_failure_policy_mismatch",
+                "The run manifest does not describe the exact explicit inference-failure set.",
+            )
+    elif failure_policy is not None:
+        _manifest_error(
+            "spatial_inference_failure_policy_mismatch",
+            "The run manifest declares inference failures but the evidence contains none.",
+        )
+
+    actual_counts = dict(
+        Counter(str(row.get("condition") or "") for row in records)
+    )
+    declared_counts = run_manifest.get("condition_counts")
+    if declared_counts != actual_counts:
+        _manifest_error(
+            "spatial_condition_count_mismatch",
+            "The evidence row counts do not match run_manifest.json.",
+            response_counts=actual_counts,
+            manifest_counts=declared_counts,
+        )
+    artifacts = run_manifest.get("artifacts")
+    if not isinstance(artifacts, dict):
+        _manifest_error(
+            "missing_spatial_run_artifacts",
+            "The run manifest is missing artifact provenance.",
+        )
+    submission_artifact = artifacts.get("submission") or {}
+    if (
+        submission_artifact.get("filename") != SPATIAL_SUBMISSION_MEMBER
+        or submission_artifact.get("sha256") != _sha256_bytes(submission_bytes)
+        or submission_artifact.get("rows") != len(records)
+        or submission_artifact.get("size_bytes") != len(submission_bytes)
+    ):
+        _manifest_error(
+            "spatial_submission_hash_mismatch",
+            "submission.jsonl does not match the run manifest.",
+        )
+    report_artifact = artifacts.get("leaderboard_report") or {}
+    actual_report_hash = _sha256_bytes(report_bytes)
+    if (
+        report_artifact.get("filename") != SPATIAL_REPORT_MEMBER
+        or report_artifact.get("sha256") != actual_report_hash
+        or report_artifact.get("size_bytes") != len(report_bytes)
+        or report_artifact.get("dataset_count") != len(SPATIAL_DATASET_KEYS)
+    ):
+        _manifest_error(
+            "spatial_report_artifact_mismatch",
+            "leaderboard.json does not match the run manifest.",
+        )
+
+    benchmark_manifest = load_official_benchmark_manifest(benchmark_manifest_path)
+    if benchmark_manifest.get("schema_version") != _SPATIAL_V3_BENCHMARK_SCHEMA:
+        _manifest_error(
+            "spatial_benchmark_version_mismatch",
+            "The package uses the paper-aligned protocol but the server has a different benchmark contract.",
+        )
+    expected_benchmark_hash = _contract_sha256(
+        benchmark_manifest_path,
+        "Spatial benchmark manifest",
+    )
+    if run_manifest.get("benchmark_manifest_sha256") != expected_benchmark_hash:
+        _manifest_error(
+            "spatial_benchmark_version_mismatch",
+            "The run used a different public benchmark manifest than the server.",
+            expected_manifest_sha256=expected_benchmark_hash,
+        )
+    if declared_counts != benchmark_manifest["condition_counts"]:
+        _manifest_error(
+            "spatial_official_count_mismatch",
+            "The run row counts do not match the official Track-3 contract.",
+        )
+    for field, label in (
+        ("evaluation_policy", "evaluation policy"),
+        ("dataset_files", "dataset files"),
+        ("data_manifest", "data manifest"),
+        ("prompts", "prompt files"),
+    ):
+        if run_manifest.get(field) != benchmark_manifest.get(field):
+            _manifest_error(
+                "spatial_provenance_mismatch",
+                f"The run's {label} do not match the official benchmark contract.",
+                provenance_field=field,
+            )
+
+    expected_judge = benchmark_manifest["judge"]
+    actual_judge = run_manifest.get("judge")
+    if (
+        not isinstance(actual_judge, dict)
+        or actual_judge.get("model") != _SPATIAL_V3_JUDGE_MODEL
+        or actual_judge.get("revision") != _SPATIAL_V3_JUDGE_REVISION
+        or actual_judge.get("system_prompt_sha256")
+        != expected_judge.get("system_prompt_sha256")
+        or actual_judge.get("decoding") != _SPATIAL_V3_JUDGE_DECODING
+    ):
+        _manifest_error(
+            "spatial_judge_mismatch",
+            "The package was not scored by the pinned paper MCQ and VQA judge.",
+        )
+    method_counts = actual_judge.get("method_counts")
+    evidence_method_counts = dict(
+        Counter(str(row.get("judge_method") or "") for row in records)
+    )
+    if (
+        not isinstance(method_counts, dict)
+        or method_counts != evidence_method_counts
+        or sum(method_counts.values()) != len(records)
+    ):
+        _manifest_error(
+            "spatial_judge_count_mismatch",
+            "The judge provenance does not cover every public evidence row.",
+        )
+
+    decoding = run_manifest.get("decoding")
+    server_metadata = decoding.get("server_metadata") if isinstance(decoding, dict) else None
+    chat_template_kwargs = (
+        decoding.get("chat_template_kwargs") if isinstance(decoding, dict) else None
+    )
+    if (
+        not isinstance(decoding, dict)
+        or decoding.get("strategy") != "greedy"
+        or decoding.get("temperature") != 0
+        or decoding.get("top_p") != 1
+        or decoding.get("seed") != 0
+        or decoding.get("max_tokens_noncot") != 0
+        or decoding.get("max_tokens_cot") != 0
+        or not isinstance(chat_template_kwargs, dict)
+        or set(chat_template_kwargs) != {"noncot", "cot"}
+        or not isinstance(server_metadata, dict)
+        or server_metadata.get("dtype") != "bfloat16"
+        or server_metadata.get("quantization") is not None
+    ):
+        _manifest_error(
+            "spatial_decoding_mismatch",
+            "The run did not use unquantized BF16 greedy decoding with the full context-remainder answer budget.",
+        )
+    public_evidence_policy = run_manifest.get("public_evidence_policy")
+    legacy_public_evidence_policy = {
+        "mcq": "paper_judge_option_letter",
+        "vqa": "last_answer_tag_or_complete_direct_response",
+        "reasoning_traces_included": False,
+        "private_ground_truth_included": False,
+    }
+    failure_aware_public_evidence_policy = {
+        **legacy_public_evidence_policy,
+        "inference_failure": _SPATIAL_V3_INFERENCE_FAILURE_DISPOSITION,
+    }
+    commitment_public_evidence_policy = {
+        **failure_aware_public_evidence_policy,
+        "vqa": (
+            "last_answer_tag_or_complete_direct_response_with_"
+            "sha256_commitment_above_2048_chars"
+        ),
+        "oversized_vqa_commitment": (
+            "sha256_utf8_with_byte_and_character_counts"
+        ),
+    }
+    if (
+        json.dumps(public_evidence_policy, sort_keys=True)
+        not in {
+            json.dumps(legacy_public_evidence_policy, sort_keys=True),
+            json.dumps(failure_aware_public_evidence_policy, sort_keys=True),
+            json.dumps(commitment_public_evidence_policy, sort_keys=True),
+        }
+        or (
+            inference_failure_count
+            and public_evidence_policy
+            not in (
+                failure_aware_public_evidence_policy,
+                commitment_public_evidence_policy,
+            )
+        )
+    ):
+        _manifest_error(
+            "spatial_public_evidence_policy_mismatch",
+            "The package public evidence policy is unsupported.",
+        )
+    return {
+        "schema_version": run_manifest["schema_version"],
+        "harness_contract": run_manifest["harness_contract"],
+        "harness_version": run_manifest["harness_version"],
+        "run_manifest_sha256": _sha256_bytes(manifest_bytes),
+        "report_sha256": actual_report_hash,
+        "benchmark_manifest_sha256": expected_benchmark_hash,
+        "benchmark_version": benchmark_manifest["benchmark_version"],
+        "judge_revision": actual_judge["revision"],
+        "judge_method_counts": method_counts,
+        "condition_counts": declared_counts,
+        "verification_mode": "public_evidence",
+        "server_ground_truth_evaluation": False,
+    }
+
+
 def validate_run_manifest(
     manifest_bytes: bytes,
     submission_bytes: bytes,
@@ -1087,6 +1694,16 @@ def validate_run_manifest(
         _manifest_error(
             "invalid_run_manifest_shape",
             "The run manifest must be one JSON object, not an array or scalar value.",
+        )
+    if run_manifest.get("schema_version") == _SPATIAL_V3_RUN_SCHEMA:
+        return _validate_run_manifest_v3(
+            run_manifest,
+            manifest_bytes,
+            submission_bytes,
+            report_bytes,
+            model_name,
+            list(records),
+            benchmark_manifest_path,
         )
 
     if run_manifest.get("schema_version") != SPATIAL_RUN_SCHEMA_VERSION:

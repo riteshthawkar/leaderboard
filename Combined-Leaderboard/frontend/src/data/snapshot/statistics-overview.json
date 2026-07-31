@@ -1,8 +1,8 @@
 {
   "best_spatial_accuracy": 0.0,
-  "best_vci": 0.5321,
+  "best_vci": 0.4443,
   "ranked_models": 14,
-  "request_id": "68e0c1f1-b373-4dd1-9dbe-1a778a5e8779",
+  "request_id": "bef4797a-0553-49af-883d-cbcba70e33db",
   "spatial_models": 0,
   "total_models": 14,
   "visual_cognition_models": 14,

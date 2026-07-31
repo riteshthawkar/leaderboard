@@ -13,7 +13,8 @@ Tasks:
   spatial        - the 13 public spatial benchmarks (Task 3). We do NOT
                    redistribute those datasets; instead we write a manifest +
                    a small illustrative SAMPLE set so the pipeline is testable.
-                   Real ground truth is produced by evaluation/spatial_reasoning/build_server_bundle.py.
+                   Real ground truth is produced by
+                   spatial_harness/build_public_contract.py.
 
 Run:  python backend/build_tasks.py
 """
@@ -102,7 +103,7 @@ def build_visual_cognition_task(task_id, benchmark, loader):
 def build_spatial_task(sample_per_dataset=3):
     """Write the spatial manifest + a small illustrative SAMPLE bundle.
 
-    The real Task-3 ground truth is generated offline by evaluation/spatial_reasoning from
+    The real Task-3 ground truth is generated offline by spatial_harness from
     each dataset's official source; this sample only exercises the pipeline.
     """
     # Manifest (the public spec users run the harness against).

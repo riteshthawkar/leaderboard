@@ -13,8 +13,8 @@ evaluation harnesses, tests, and deployment documentation.
 
 ## Local runtime data
 
-The workspace root also contains ignored local runtime state such as SQLite
-backups, leaderboard cache files, private model outputs, and development logs.
-These files are not application source and must not be included in a deployment
-image. The active SQLite database is stored under `Combined-Leaderboard/` in the
-current local configuration.
+The example local configuration writes SQLite, backups, cache files, and logs
+under the ignored `Combined-Leaderboard/.local-data/` directory. Private answer
+keys, model outputs, and research results must remain outside source control.
+Production deployments must use the persistent paths documented in the
+[deployment guide](Combined-Leaderboard/docs/deployment.md).

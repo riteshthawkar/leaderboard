@@ -11,7 +11,7 @@ export default {
         lg: "2rem",
       },
       screens: {
-        "2xl": "1180px",
+        "2xl": "1240px",
       },
     },
     extend: {
@@ -69,7 +69,7 @@ export default {
         lg: "var(--radius-lg)",
       },
       maxWidth: {
-        content: "1180px",
+        content: "1240px",
         copy: "68ch",
       },
     },

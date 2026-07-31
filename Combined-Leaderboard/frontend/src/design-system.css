@@ -48,8 +48,8 @@
   --invert-text: #ffffff;
   --invert-border: #161618;
   --header-h: 66px;
-  --hero-section-h: 560px;
-  --maxw: 1180px;
+  --hero-section-h: 600px;
+  --maxw: 1240px;
 }
 
 [data-theme="dark"] {
@@ -112,9 +112,9 @@ body[data-page="spatial"] {
 body:is([data-page="dysm"], [data-page="minds_eye"], [data-page="spatial"]) {
   --page-accent-hero: color-mix(in srgb, var(--page-accent) 4%, var(--bg));
   --page-accent-stat: color-mix(in srgb, var(--page-accent) 2.5%, var(--bg));
-  --page-accent-border: color-mix(in srgb, var(--page-accent) 30%, var(--border));
+  --page-accent-border: var(--border);
   --page-accent-chip: color-mix(in srgb, var(--page-accent) 6%, var(--surface-2));
-  --page-accent-chip-border: color-mix(in srgb, var(--page-accent) 26%, var(--border));
+  --page-accent-chip-border: var(--border);
   --page-accent-muted: color-mix(in srgb, var(--page-accent) 70%, var(--text-faint));
   --page-accent-line: color-mix(in srgb, var(--page-accent) 40%, transparent);
 }

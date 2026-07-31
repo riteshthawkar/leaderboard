@@ -38,6 +38,7 @@ DEFAULT_EXCLUDED_VARIANTS = (
     "qwen35-thinking-enabled",
 )
 TERMINAL_FALLBACK_METHOD = "deterministic-terminal-response-classifier-v1"
+FAIL_CLOSED_FALLBACK_METHOD = "persistent-extractor-failure-fail-closed-v1"
 VERDICTS = {"COMMITTED", "UNRESOLVED"}
 BLOCKING_EXTRACTOR_STATUSES = {
     "request_error",
@@ -697,7 +698,15 @@ def finalize_persistent_extractor_failure(
         return None
     classification = terminal_source_classification(candidate)
     if classification is None:
-        return None
+        classification = {
+            "extractor_verdict": "UNRESOLVED",
+            "answer": "",
+            "evidence": "",
+            "status": "unresolved",
+        }
+        fallback_method = FAIL_CLOSED_FALLBACK_METHOD
+    else:
+        fallback_method = TERMINAL_FALLBACK_METHOD
     return {
         **row,
         "extractor_attempts": [
@@ -705,7 +714,7 @@ def finalize_persistent_extractor_failure(
             _checkpoint_attempt(row),
         ],
         **classification,
-        "terminal_fallback_method": TERMINAL_FALLBACK_METHOD,
+        "terminal_fallback_method": fallback_method,
         "terminal_fallback_from_status": str(row.get("status") or ""),
     }
 

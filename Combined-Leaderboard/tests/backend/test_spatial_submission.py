@@ -13,23 +13,36 @@ from config import (  # noqa: E402
     GRADING,
     SPATIAL_BENCHMARK_SCHEMA_VERSION,
     SPATIAL_DATASET_KEYS,
+    SPATIAL_REPORT_SCHEMA_VERSION,
     SPATIAL_RUN_SCHEMA_VERSION,
     SPATIAL_SUBMISSION_SCHEMA_VERSION,
 )
 from scoring.task_scorer import SubmissionValidationError  # noqa: E402
-import spatial_contract  # noqa: E402
+from spatial_harness import submission_contract  # noqa: E402
+
+
+LEGACY_HARNESS_VERSION = "1.1.0"
 
 
 def _sha(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def test_backend_and_harness_contract_constants_match():
-    assert list(spatial_contract.DATASETS) == SPATIAL_DATASET_KEYS
-    assert list(spatial_contract.REQUIRED_CONDITIONS) == EVAL_CONDITIONS
-    assert spatial_contract.BENCHMARK_MANIFEST_SCHEMA_VERSION == SPATIAL_BENCHMARK_SCHEMA_VERSION
-    assert spatial_contract.RUN_MANIFEST_SCHEMA_VERSION == SPATIAL_RUN_SCHEMA_VERSION
-    assert spatial_contract.SUBMISSION_SCHEMA_VERSION == SPATIAL_SUBMISSION_SCHEMA_VERSION
+def test_backend_supports_the_current_harness_contract():
+    assert list(submission_contract.DATASETS) == SPATIAL_DATASET_KEYS
+    assert list(submission_contract.REQUIRED_CONDITIONS) == EVAL_CONDITIONS
+    assert (
+        submission_contract.BENCHMARK_MANIFEST_SCHEMA_VERSION
+        == spatial_submission._SPATIAL_V3_BENCHMARK_SCHEMA
+    )
+    assert (
+        submission_contract.RUN_MANIFEST_SCHEMA_VERSION
+        == spatial_submission._SPATIAL_V3_RUN_SCHEMA
+    )
+    assert (
+        submission_contract.SUBMISSION_SCHEMA_VERSION
+        == spatial_submission._SPATIAL_V3_SUBMISSION_SCHEMA
+    )
 
 
 def _official_fixture(tmp_path: Path):
@@ -129,7 +142,7 @@ def _official_fixture(tmp_path: Path):
         "schema_version": SPATIAL_BENCHMARK_SCHEMA_VERSION,
         "task_id": "spatial",
         "benchmark_version": "test-v1",
-        "harness_version": spatial_contract.HARNESS_VERSION,
+        "harness_version": LEGACY_HARNESS_VERSION,
         "demo": False,
         "datasets": SPATIAL_DATASET_KEYS,
         "dataset_count": len(SPATIAL_DATASET_KEYS),
@@ -173,7 +186,7 @@ def _official_fixture(tmp_path: Path):
     run_manifest = {
         "schema_version": SPATIAL_RUN_SCHEMA_VERSION,
         "submission_schema_version": SPATIAL_SUBMISSION_SCHEMA_VERSION,
-        "harness_version": spatial_contract.HARNESS_VERSION,
+        "harness_version": LEGACY_HARNESS_VERSION,
         "debug": False,
         "model": {"name": "Test Model"},
         "datasets": SPATIAL_DATASET_KEYS,
@@ -201,7 +214,7 @@ def _official_fixture(tmp_path: Path):
         for row in submission_rows
     ]
     report = {
-        "schema_version": spatial_contract.REPORT_SCHEMA_VERSION,
+        "schema_version": SPATIAL_REPORT_SCHEMA_VERSION,
         "model": {"name": "Test Model"},
         "conditions": EVAL_CONDITIONS,
         "datasets": [

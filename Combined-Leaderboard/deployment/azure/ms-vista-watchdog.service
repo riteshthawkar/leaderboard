@@ -1,0 +1,35 @@
+[Unit]
+Description=MS-VISTA container and HTTPS liveness watchdog
+Requires=ms-vista.service
+After=ms-vista.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/srv/ms-vista/app/deployment/azure/production.env
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ms-vista-watchdog
+StateDirectory=ms-vista-watchdog
+StateDirectoryMode=0700
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH
+ReadWritePaths=/var/lib/ms-vista-watchdog /run/lock
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=180

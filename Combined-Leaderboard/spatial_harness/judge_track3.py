@@ -1,4 +1,4 @@
-"""Judge Track-3 v2 predictions with the paper's Appendix A.3 prompts."""
+"""Judge standardized Track-3 predictions with the paper's prompts."""
 
 from __future__ import annotations
 
@@ -7,14 +7,29 @@ import asyncio
 import collections
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 from openai import AsyncOpenAI
 
-from spatial_harness.run_track3_vllm import DATASETS, normalize_endpoint
+from spatial_harness.run_track3_vllm import (
+    DATASETS,
+    HARNESS_CONTRACT,
+    MODES,
+    PROMPT_MODES,
+    normalize_endpoint,
+)
+from spatial_harness.submission_contract import (
+    INFERENCE_FAILURE_DISPOSITION,
+    INFERENCE_FAILURE_JUDGE_METHOD,
+    INFERENCE_FAILURE_POLICY,
+    INFERENCE_FAILURE_SCHEMA_VERSION,
+)
 
 
+PAPER_JUDGE_MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507"
+PAPER_JUDGE_REVISION = "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe"
 JUDGE_SYS = (
     "You are a helpful assistant.\n\n Your task: given (1) a free-form \"Response\" and (2) a list "
     "of \"Options\", decide which option the response most likely corresponds to and return the option "
@@ -37,6 +52,29 @@ JUDGE_SYS = (
     "unclear, output \"0\".\n 8) If the response says \"I don't know\", \"Cannot determine\", or "
     "similar, output \"0\"."
 )
+
+ABSTENTION_PHRASES = {
+    "cannot determine",
+    "cannot determine from the image",
+    "can not determine",
+    "can not determine from the image",
+    "cannot tell",
+    "cannot tell from the image",
+    "i cannot determine",
+    "i cannot determine from the image",
+    "i cannot tell",
+    "i cannot tell from the image",
+    "it cannot be determined",
+    "it cannot be determined from the image",
+    "insufficient information",
+    "insufficient visual information",
+    "there is insufficient information",
+    "not enough information",
+    "not enough visual information",
+    "there is not enough information",
+    "unknown",
+    "unanswerable",
+}
 
 JUDGE_VQA = (
     "You are a helpful assistant.\n\n Task: Given a short free-form \"Response\" and a gold-standard \"Gold\", "
@@ -76,12 +114,62 @@ def judge_user_vqa(item: dict[str, Any]) -> str:
 
 def parse_letter(value: str | None) -> str | None:
     value = (value or "").strip().upper()
-    return value[0] if value and value[0] in "0ABCDEFGHIJKLMNOPQRSTUVWXYZ" else None
+    return value if re.fullmatch(r"[0A-Z]", value) else None
 
 
 def parse_bit(value: str | None) -> str | None:
     value = (value or "").strip()
-    return value[0] if value and value[0] in "01" else None
+    return value if re.fullmatch(r"[01]", value) else None
+
+
+def _normalized_answer_text(value: str | None) -> str:
+    text = str(value or "").strip().lower()
+    text = re.sub(
+        r"^\s*(final\s+answer|answer|option|choice)\s*(?:is|=)?\s*[:\-]?\s*",
+        "",
+        text,
+    )
+    text = text.strip().strip("<>()[]{}.,:;!?\"'")
+    return re.sub(r"\s+", " ", text)
+
+
+def explicit_abstention_letter(item: dict[str, Any]) -> str | None:
+    """Map a clear No-Image++ abstention to its injected option letter."""
+    if item.get("mode") != "noimgpp" or not item.get("cannot_label"):
+        return None
+    output = str(item.get("output") or "").strip()
+    answer_tags = re.findall(
+        r"<answer>(.*?)</answer>",
+        output,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    candidate = answer_tags[-1] if answer_tags else output if len(output) <= 240 else ""
+    return (
+        str(item["cannot_label"]).upper()
+        if _normalized_answer_text(candidate) in ABSTENTION_PHRASES
+        else None
+    )
+
+
+def is_terminal_inference_failure(item: dict[str, Any]) -> bool:
+    marker = item.get("terminal_failure")
+    if not isinstance(marker, dict):
+        return False
+    try:
+        input_length = int(marker.get("input_length") or 0)
+        max_model_len = int(marker.get("max_model_len") or 0)
+    except (TypeError, ValueError):
+        return False
+    return (
+        marker.get("schema_version") == INFERENCE_FAILURE_SCHEMA_VERSION
+        and marker.get("policy") == INFERENCE_FAILURE_POLICY
+        and marker.get("category") == "input_context_exceeded"
+        and marker.get("disposition") == INFERENCE_FAILURE_DISPOSITION
+        and input_length > max_model_len > 0
+        and not str(item.get("output") or "").strip()
+        and bool(str(item.get("error") or "").strip())
+        and item.get("finish_reason") == "inference_error"
+    )
 
 
 async def judge_one(
@@ -89,32 +177,69 @@ async def judge_one(
     semaphore: asyncio.Semaphore,
     item: dict[str, Any],
     model: str,
+    retries: int,
 ):
+    if is_terminal_inference_failure(item):
+        item["judged"] = "0"
+        item["judge_method"] = INFERENCE_FAILURE_JUDGE_METHOD
+        item["judge_attempts"] = 0
+        item.pop("jerr", None)
+        return item
     vqa = item.get("answer_type") == "vqa"
-    async with semaphore:
+    abstention = explicit_abstention_letter(item)
+    if abstention:
+        item["judged"] = abstention
+        item["judge_method"] = "explicit_abstention"
+        item["judge_attempts"] = 0
+        item.pop("jerr", None)
+        return item
+    last_error = ""
+    for attempt in range(retries + 1):
         try:
-            response = await client.chat.completions.create(
-                model=model,
-                temperature=0,
-                max_tokens=4,
-                messages=[
-                    {"role": "system", "content": JUDGE_VQA if vqa else JUDGE_SYS},
-                    {
-                        "role": "user",
-                        "content": judge_user_vqa(item) if vqa else judge_user(item),
-                    },
-                ],
+            allowed = (
+                {"0", "1"}
+                if vqa
+                else set((item.get("options") or {}).keys()) | {"0"}
             )
+            async with semaphore:
+                response = await client.chat.completions.create(
+                    model=model,
+                    temperature=0,
+                    max_tokens=4,
+                    messages=[
+                        {"role": "system", "content": JUDGE_VQA if vqa else JUDGE_SYS},
+                        {
+                            "role": "user",
+                            "content": judge_user_vqa(item) if vqa else judge_user(item),
+                        },
+                    ],
+                    extra_body={
+                        "structured_outputs": {"choice": sorted(allowed)}
+                    },
+                )
             content = response.choices[0].message.content
-            item["judged"] = parse_bit(content) if vqa else parse_letter(content)
+            judged = parse_bit(content) if vqa else parse_letter(content)
+            if judged is None or (not vqa and judged not in allowed):
+                raise RuntimeError(f"judge returned invalid value: {content!r}")
+            item["judged"] = judged
+            item["judge_method"] = "paper_llm_judge"
+            item["judge_attempts"] = attempt + 1
             item.pop("jerr", None)
+            return item
         except Exception as exc:  # noqa: BLE001 - preserve judge failure
-            item["judged"] = None
-            item["jerr"] = f"{type(exc).__name__}: {exc}"[:500]
+            last_error = f"{type(exc).__name__}: {exc}"[:500]
+            if attempt < retries:
+                await asyncio.sleep(min(2**attempt, 8))
+    item["judged"] = None
+    item["judge_method"] = "paper_llm_judge"
+    item["judge_attempts"] = retries + 1
+    item["jerr"] = last_error
     return item
 
 
 def correct(item: dict[str, Any]) -> bool | None:
+    if item.get("judge_method") == INFERENCE_FAILURE_JUDGE_METHOD:
+        return False
     judged = item.get("judged")
     if judged is None:
         return None
@@ -149,9 +274,9 @@ def aggregate(items: list[dict[str, Any]]) -> dict[str, Any]:
     datasets: dict[str, dict[str, Any]] = {}
     for dataset in DATASETS:
         result: dict[str, Any] = {}
-        for mode, prefix in (("main", "main"), ("noimgpp", "npp")):
+        for mode in ("main", "noimage", "noimgpp"):
             for prompt_mode in ("noncot", "cot"):
-                metric = f"{prefix}_{prompt_mode}"
+                metric = f"{mode}_{prompt_mode}"
                 stats = per_slice.get((dataset, mode, prompt_mode), {})
                 total = int(stats.get("total", 0))
                 result[metric] = (
@@ -170,11 +295,19 @@ def aggregate(items: list[dict[str, Any]]) -> dict[str, Any]:
         return sum(values) / len(values) if values else None
 
     return {
-        "schema_version": 2,
+        "schema_version": 5,
         "datasets": datasets,
         "macro": {
             metric: macro(metric)
-            for metric in ("main_noncot", "main_cot", "main_delta", "npp_noncot", "npp_cot")
+            for metric in (
+                "main_noncot",
+                "main_cot",
+                "main_delta",
+                "noimage_noncot",
+                "noimage_cot",
+                "noimgpp_noncot",
+                "noimgpp_cot",
+            )
         },
     }
 
@@ -204,10 +337,63 @@ def _atomic_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 async def run_judge(args: argparse.Namespace) -> None:
     input_root = Path(args.input)
-    prediction_files = sorted(input_root.glob("pred_*.jsonl"))
-    if not prediction_files:
-        raise SystemExit(f"No pred_*.jsonl files found under {input_root}.")
+    expected_names = {
+        f"pred_{mode}_{prompt_mode}.jsonl"
+        for mode in MODES
+        for prompt_mode in PROMPT_MODES
+    }
+    actual_names = {path.name for path in input_root.glob("pred_*.jsonl")}
+    if actual_names != expected_names:
+        missing = ", ".join(sorted(expected_names - actual_names)) or "none"
+        extra = ", ".join(sorted(actual_names - expected_names)) or "none"
+        raise SystemExit(
+            f"Track-3 prediction set is incomplete or mixed; missing: {missing}; extra: {extra}."
+        )
+    config_path = input_root / "run_config.json"
+    if not config_path.is_file():
+        raise SystemExit("Track-3 run_config.json is missing.")
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    if (
+        config.get("schema_version") != 5
+        or config.get("harness_contract") != HARNESS_CONTRACT
+        or config.get("modes") != list(MODES)
+        or config.get("prompt_modes") != list(PROMPT_MODES)
+    ):
+        raise SystemExit("Track-3 run_config.json does not match the v5 six-condition contract.")
+    prediction_files = [input_root / name for name in sorted(expected_names)]
     items = [item for path in prediction_files for item in _read_jsonl(path)]
+    unexpected = [
+        item
+        for item in items
+        if item.get("answer_type") not in {"mcq", "vqa"}
+        or (item.get("answer_type") == "vqa" and item.get("mode") == "noimgpp")
+        or item.get("mode") not in {"main", "noimage", "noimgpp"}
+        or item.get("pmode") not in {"noncot", "cot"}
+    ]
+    if unexpected:
+        raise SystemExit(
+            "Prediction set violates the standardized mixed MCQ/VQA six-condition contract."
+        )
+    invalid_failures = []
+    for item in items:
+        terminal = item.get("terminal_failure") is not None
+        has_inference_failure = bool(item.get("error")) or not str(
+            item.get("output") or ""
+        ).strip()
+        if terminal and not is_terminal_inference_failure(item):
+            invalid_failures.append((*_item_key(item), "invalid terminal marker"))
+        elif has_inference_failure and not is_terminal_inference_failure(item):
+            invalid_failures.append(
+                (*_item_key(item), "unfinalized inference failure")
+            )
+    if invalid_failures:
+        raise SystemExit(
+            "Prediction set contains unapproved inference failures; "
+            f"examples={invalid_failures[:5]}"
+        )
+    item_keys = [_item_key(item) for item in items]
+    if len(item_keys) != len(set(item_keys)):
+        raise SystemExit("Track-3 prediction set contains duplicate sample-condition keys.")
     existing = {
         _item_key(item): item
         for item in (_read_jsonl(args.judged) if args.judged.is_file() else [])
@@ -215,7 +401,11 @@ async def run_judge(args: argparse.Namespace) -> None:
     for item in items:
         old = existing.get(_item_key(item))
         if old and old.get("judged") is not None:
-            item["judged"] = old["judged"]
+            for field in ("judged", "judge_method", "judge_attempts"):
+                if old.get(field) is not None:
+                    item[field] = old[field]
+            item.setdefault("judge_method", "paper_llm_judge")
+            item.setdefault("judge_attempts", 1)
     endpoint = normalize_endpoint(args.endpoint)
     client = AsyncOpenAI(base_url=endpoint, api_key=args.api_key, timeout=args.timeout)
     served = {entry.id for entry in (await client.models.list()).data}
@@ -227,12 +417,45 @@ async def run_judge(args: argparse.Namespace) -> None:
     for offset in range(0, len(pending), args.checkpoint_every):
         batch = pending[offset : offset + args.checkpoint_every]
         await asyncio.gather(
-            *(judge_one(client, semaphore, item, args.model) for item in batch)
+            *(
+                judge_one(
+                    client,
+                    semaphore,
+                    item,
+                    args.model,
+                    args.request_retries,
+                )
+                for item in batch
+            )
         )
         _atomic_jsonl(args.judged, items)
         print(f"Judge: {min(offset + len(batch), len(pending))}/{len(pending)} new")
     leaderboard = aggregate(items)
-    leaderboard["judge"] = {"model": args.model, "endpoint": endpoint, "temperature": 0}
+    leaderboard["judge"] = {
+        "model": args.model,
+        "model_revision": args.model_revision,
+        "endpoint": endpoint,
+        "temperature": 0,
+        "max_tokens": 4,
+        "decoding_constraint": "structured_choice",
+        "method_counts": dict(
+            collections.Counter(
+                str(item.get("judge_method") or "")
+                for item in items
+                if item.get("judged") is not None
+            )
+        ),
+        "attempt_count": sum(
+            int(item.get("judge_attempts") or 0)
+            for item in items
+            if item.get("judged") is not None
+        ),
+        "terminal_inference_failures": sum(
+            is_terminal_inference_failure(item) for item in items
+        ),
+    }
+    if args.server_max_model_len is not None:
+        leaderboard["judge"]["server_max_model_len"] = args.server_max_model_len
     _atomic_json(args.leaderboard, leaderboard)
     unresolved = sum(item.get("judged") is None for item in items)
     if unresolved:
@@ -243,18 +466,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Track-3 v2 paper-faithful judge")
     parser.add_argument("--input", type=Path, default=Path("track3_results"))
     parser.add_argument("--endpoint", required=True)
-    parser.add_argument("--model", required=True)
+    parser.add_argument("--model", default=PAPER_JUDGE_MODEL)
+    parser.add_argument("--model-revision", default=PAPER_JUDGE_REVISION)
     parser.add_argument("--api-key", default="EMPTY")
     parser.add_argument("--judged", type=Path)
     parser.add_argument("--leaderboard", type=Path)
     parser.add_argument("--concurrency", type=int, default=16)
     parser.add_argument("--checkpoint-every", type=int, default=100)
+    parser.add_argument("--request-retries", type=int, default=2)
     parser.add_argument("--timeout", type=float, default=120)
+    parser.add_argument("--server-max-model-len", type=int)
     args = parser.parse_args(argv)
     args.judged = args.judged or args.input / "judged.jsonl"
     args.leaderboard = args.leaderboard or args.input / "leaderboard.json"
-    if args.concurrency < 1 or args.checkpoint_every < 1:
-        parser.error("concurrency and checkpoint-every must be positive")
+    if args.concurrency < 1 or args.checkpoint_every < 1 or args.request_retries < 0:
+        parser.error(
+            "concurrency and checkpoint-every must be positive; request-retries cannot be negative"
+        )
+    if args.model != PAPER_JUDGE_MODEL:
+        parser.error(
+            f"Track-3 requires the fixed paper judge {PAPER_JUDGE_MODEL!r}"
+        )
+    if args.model_revision != PAPER_JUDGE_REVISION:
+        parser.error(
+            f"Track-3 requires judge revision {PAPER_JUDGE_REVISION}"
+        )
     return args
 
 

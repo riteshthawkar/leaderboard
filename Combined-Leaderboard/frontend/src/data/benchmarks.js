@@ -101,6 +101,11 @@ export const benchmarkPages = {
         {
           kind: "diverging",
           wide: true,
+          aspectRatio: "24 / 9",
+          minHeight: 200,
+          bottomMargin: 110,
+          compactXLabels: true,
+          xLabelAngle: -55,
           title: "Chain of Thought helps talkable tasks and hurts holistic ones",
           caption: "All nine task rows from Table 10. Positive bars indicate improvement from sequential reasoning; negative bars indicate degradation.",
           unit: "Δ accuracy (pts)",
@@ -388,7 +393,7 @@ export const benchmarkPages = {
         },
       ],
     },
-    scoring: { tag: "Scoring on this leaderboard", title: "How submissions are verified", body: "Upload the single spatial submission ZIP package. The backend verifies its official harness provenance, complete public sample evidence, package hashes, and score arithmetic, then publishes the retained evidence for independent review. It does not independently compare the answers with private ground truth.", specs: [["Upload", "spatial_reasoning_submission.zip"], ["Metric", "Macro average across 13 datasets"], ["Coverage", "All six conditions required"], ["Evidence", "Public per sample results and package hashes"]], taskId: "spatial", getStarted: "Run spatial_reasoning/run_eval.sh, then upload the generated ZIP package unchanged." },
+    scoring: { tag: "Scoring on this leaderboard", title: "How submissions are verified", body: "Upload the single spatial submission ZIP package. The backend verifies its official harness provenance, complete public sample evidence, package hashes, and score arithmetic, then publishes the retained evidence for independent review. It does not independently compare the answers with private ground truth.", specs: [["Upload", "spatial_reasoning_submission.zip"], ["Metric", "Macro average across 13 datasets"], ["Coverage", "All six conditions required"], ["Evidence", "Public per sample results and package hashes"]], taskId: "spatial", getStarted: "Run spatial_harness/run_eval.sh, then upload the generated ZIP package unchanged." },
     citation: { title: "Chain-of-Thought Degrades Visual Spatial Reasoning Capabilities of Multimodal LLMs", id: "cite-sp", authors: "Sai Srinivas Kancheti, Aditya Kanade, Vineeth N. Balasubramanian, and Tanuja Ganu", venue: "arXiv", arxiv: "2604.16060", year: "2026", paperUrl: "https://arxiv.org/abs/2604.16060", reference: "Kancheti, S. S., Kanade, A., Balasubramanian, V. N., and Ganu, T. (2026). Chain-of-Thought Degrades Visual Spatial Reasoning Capabilities of Multimodal LLMs. arXiv:2604.16060.", bibtex: `@article{cotspatial2026,
   title   = {Chain-of-Thought Degrades Visual
              Spatial Reasoning Capabilities of

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { DatabaseBackup, Download, EyeOff, RotateCcw, Shield, Trash2, Undo2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { WorkspacePage } from "@/components/WorkspacePage";
 import { Button } from "@/components/ui/button";
 import { downloadFile, errorMessage, fetchMe, getJSON, postJSON } from "@/lib/api";

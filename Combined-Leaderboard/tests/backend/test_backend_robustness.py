@@ -956,6 +956,53 @@ def test_spatial_submit_rejects_demo_bundle_before_accepting_files(monkeypatch):
     assert response.get_json()["code"] == "spatial_benchmark_not_ready"
 
 
+def test_public_task_discovery_hides_unavailable_spatial_bundle(monkeypatch):
+    web_app_module = importlib.import_module("web.app")
+    monkeypatch.setattr(
+        web_app_module,
+        "_spatial_bundle_health",
+        lambda: ("unhealthy", {"error": "demo bundle"}),
+    )
+    web_app_module.app.config["TESTING"] = True
+
+    with web_app_module.app.test_client() as client:
+        tasks_response = client.get("/api/tasks")
+        sections_response = client.get("/api/sections")
+
+    assert tasks_response.status_code == 200
+    assert tasks_response.get_json()["task_ids"] == [
+        "do_you_see_me",
+        "minds_eye",
+    ]
+    assert [
+        section["id"] for section in sections_response.get_json()["sections"]
+    ] == ["visual_cognition"]
+
+
+def test_public_task_discovery_includes_verified_spatial_bundle(monkeypatch):
+    web_app_module = importlib.import_module("web.app")
+    monkeypatch.setattr(
+        web_app_module,
+        "_spatial_bundle_health",
+        lambda: ("healthy", {"production_ready": True}),
+    )
+    web_app_module.app.config["TESTING"] = True
+
+    with web_app_module.app.test_client() as client:
+        tasks_response = client.get("/api/tasks")
+        sections_response = client.get("/api/sections")
+
+    assert tasks_response.status_code == 200
+    assert tasks_response.get_json()["task_ids"] == [
+        "do_you_see_me",
+        "minds_eye",
+        "spatial",
+    ]
+    assert [
+        section["id"] for section in sections_response.get_json()["sections"]
+    ] == ["visual_cognition", "spatial"]
+
+
 def test_spatial_demo_bundle_does_not_publish_question_or_template_files(monkeypatch):
     web_app_module = importlib.import_module("web.app")
     monkeypatch.setattr(
@@ -1086,8 +1133,8 @@ def test_spatial_harness_download_excludes_runtime_data():
     assert response.status_code == 200
     with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
         names = archive.namelist()
-    assert "spatial_reasoning/run_eval.sh" in names
-    assert "spatial_reasoning/spatial_contract.py" in names
+    assert "spatial_harness/run_eval.sh" in names
+    assert "spatial_harness/submission_contract.py" in names
     assert all("__pycache__" not in name for name in names)
     assert all("/LMUData/" not in name and "/results/" not in name for name in names)
 

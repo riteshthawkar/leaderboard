@@ -7,8 +7,14 @@ import pandas as pd
 import pytest
 
 from spatial_harness.run_track3_vllm import (
+    BASE_SYSTEM_PROMPT,
+    COT_SYSTEM_PROMPT,
+    MODES,
     _append_jsonl,
+    _import_compatible_reuse,
+    _infer_one,
     _load_existing,
+    _message_content,
     build_question,
     build_records,
     circular_rotations,
@@ -16,6 +22,7 @@ from spatial_harness.run_track3_vllm import (
     parse_args,
     prediction_payload,
     run_inference,
+    system_prompt,
 )
 
 
@@ -42,7 +49,7 @@ def test_circular_rotations_move_correct_text_through_every_letter():
     assert all(options[correct] == "blue" for options, correct in rotations)
 
 
-def test_build_records_routes_vqa_and_circular_mcq(tmp_path: Path):
+def test_build_records_routes_vqa_and_all_three_image_modes(tmp_path: Path):
     encoded_image = "a" * 80
     _write_tsv(
         tmp_path / "SpatialBench.tsv",
@@ -67,16 +74,52 @@ def test_build_records_routes_vqa_and_circular_mcq(tmp_path: Path):
     )
 
     main = build_records(tmp_path, "SpatialBench", "main")
+    noimage = build_records(tmp_path, "SpatialBench", "noimage")
     noimgpp = build_records(tmp_path, "SpatialBench", "noimgpp")
 
+    assert MODES == ("main", "noimage", "noimgpp")
     assert len(main) == 3
-    assert [record["answer_type"] for record in main].count("vqa") == 1
+    assert {record["answer_type"] for record in main} == {"mcq", "vqa"}
     assert {record["group"] for record in main if record["answer_type"] == "mcq"} == {"1"}
-    assert main[-1]["imgs"] == [encoded_image]
+    assert main[0]["imgs"] == [encoded_image]
+    assert main[2]["imgs"] == [encoded_image]
+    assert main[2]["gt"] == "3"
+    assert len(noimage) == 2
+    assert all(record["gray"] is True for record in noimage)
+    assert noimage[0]["gt"] == "A"
+    assert noimage[0]["options"] == {"A": "left", "B": "right"}
+    assert noimage[1]["answer_type"] == "vqa"
+    assert noimage[1]["gt"] == "3"
     assert len(noimgpp) == 1
     assert noimgpp[0]["answer_type"] == "mcq"
     assert noimgpp[0]["options"]["C"] == "Cannot determine from the image"
     assert noimgpp[0]["cannot_label"] == "C"
+
+    metadata_only = build_records(
+        tmp_path,
+        "SpatialBench",
+        "main",
+        include_payload=False,
+    )
+    assert len(metadata_only) == len(main)
+    assert all(
+        "question" not in record
+        and "options" not in record
+        and "imgs" not in record
+        and "gray" not in record
+        for record in metadata_only
+    )
+
+
+def test_published_system_prompts_are_not_user_suffixes():
+    assert system_prompt("noncot") == BASE_SYSTEM_PROMPT
+    assert system_prompt("cot") == COT_SYSTEM_PROMPT
+    assert "<think> </think>" in COT_SYSTEM_PROMPT
+    content = _message_content(
+        {"imgs": [], "gray": False, "question": "Question:Where?"},
+        "cot",
+    )
+    assert content == [{"type": "text", "text": "Question:Where?"}]
 
 
 def test_3dsr_base_only_deduplicates_flip_rows(tmp_path: Path):
@@ -162,10 +205,124 @@ def test_append_checkpoint_is_resume_readable_and_last_write_wins(tmp_path: Path
     assert loaded[("BLINK", "1", "main", "noncot")]["output"] == "A"
 
 
-def test_token_budgets_default_to_16384_for_both_modes():
+def test_token_budgets_default_to_server_context_remainder_for_both_modes():
     args = parse_args(["--model", "model", "--endpoints", "http://localhost:8000/v1"])
-    assert args.max_tokens_noncot == 16384
-    assert args.max_tokens_cot == 16384
+    assert args.max_tokens_noncot == 0
+    assert args.max_tokens_cot == 0
+
+
+def test_context_remainder_omits_max_tokens_from_request():
+    captured = {}
+
+    class Completions:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+            choice = type(
+                "Choice",
+                (),
+                {
+                    "message": type("Message", (), {"content": "A"})(),
+                    "finish_reason": "stop",
+                },
+            )()
+            return type(
+                "Response",
+                (),
+                {
+                    "choices": [choice],
+                    "usage": type("Usage", (), {"completion_tokens": 1})(),
+                },
+            )()
+
+    client = type(
+        "Client",
+        (),
+        {"chat": type("Chat", (), {"completions": Completions()})()},
+    )()
+    item = {
+        "imgs": [],
+        "gray": False,
+        "question": "Question:Where?",
+    }
+    asyncio.run(
+        _infer_one(
+            client,
+            asyncio.Semaphore(1),
+            item,
+            "test/model",
+            "noncot",
+            0,
+            0,
+            1,
+            0,
+            0,
+            {},
+        )
+    )
+    assert "max_tokens" not in captured
+    assert item["finish_reason"] == "stop"
+
+
+def test_compatible_reuse_imports_only_naturally_stopped_rows(tmp_path: Path):
+    source = tmp_path / "v4"
+    target = tmp_path / "v5"
+    source.mkdir()
+    target.mkdir()
+    target_contract = {
+        "model": "test/model",
+        "model_revision": "revision",
+        "temperature": 0,
+        "top_p": 1,
+        "seed": 0,
+        "chat_template_kwargs": {"noncot": {}, "cot": {}},
+        "prompt_sha256": {"noncot": "a", "cot": "b"},
+        "dataset_sha256": {"BLINK": "c"},
+        "datasets": ["BLINK"],
+        "modes": ["main"],
+        "prompt_modes": ["noncot"],
+        "limit": 0,
+    }
+    source_config = {
+        **target_contract,
+        "schema_version": 4,
+        "harness_contract": "ms-vista-track3-paper-aligned-v4",
+        "max_tokens_noncot": 16384,
+        "max_tokens_cot": 16384,
+    }
+    (source / "run_config.json").write_text(
+        json.dumps(source_config),
+        encoding="utf-8",
+    )
+    source_rows = [
+        {
+            "dataset": "BLINK",
+            "index": "stop",
+            "mode": "main",
+            "pmode": "noncot",
+            "output": "A",
+            "finish_reason": "stop",
+        },
+        {
+            "dataset": "BLINK",
+            "index": "length",
+            "mode": "main",
+            "pmode": "noncot",
+            "output": "reasoning",
+            "finish_reason": "length",
+        },
+    ]
+    (source / "pred_main_noncot.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in source_rows),
+        encoding="utf-8",
+    )
+
+    counts = _import_compatible_reuse(source, target, target_contract)
+    imported = _load_existing(target / "pred_main_noncot.checkpoint.jsonl")
+
+    assert counts == {"main_noncot": 1}
+    assert set(imported) == {("BLINK", "stop", "main", "noncot")}
+    row = next(iter(imported.values()))
+    assert row["reuse_provenance"]["eligibility"] == "greedy_natural_stop"
 
 
 def test_prompt_modes_parse_separate_thinking_kwargs():
@@ -183,6 +340,71 @@ def test_prompt_modes_parse_separate_thinking_kwargs():
     )
     assert args.chat_template_kwargs_noncot == {"enable_thinking": False}
     assert args.chat_template_kwargs_cot == {"enable_thinking": True}
+
+
+def test_records_are_prepared_before_endpoint_validation(tmp_path: Path, monkeypatch):
+    _write_tsv(
+        tmp_path / "BLINK.tsv",
+        [
+            {
+                "index": 0,
+                "image": "a" * 80,
+                "question": "Where?",
+                "A": "left",
+                "B": "right",
+                "answer": "A",
+            }
+        ],
+    )
+    args = parse_args(
+        [
+            "--model",
+            "test/model",
+            "--endpoints",
+            "http://localhost:8031/v1",
+            "--datasets",
+            "BLINK",
+            "--lmudata",
+            str(tmp_path),
+            "--out",
+            str(tmp_path / "results"),
+            "--modes",
+            "main",
+            "--prompt-modes",
+            "noncot",
+        ]
+    )
+    events = []
+
+    class Client:
+        pass
+
+    monkeypatch.setattr(
+        "spatial_harness.run_track3_vllm.AsyncOpenAI", lambda **_kwargs: Client()
+    )
+    original_build_records = build_records
+
+    def tracked_build_records(*build_args, **build_kwargs):
+        events.append("build_records")
+        return original_build_records(*build_args, **build_kwargs)
+
+    async def tracked_wait(_clients, _model, _startup_timeout):
+        events.append("validate_endpoints")
+
+    async def fake_infer(_client, _semaphore, item, *_args, **_kwargs):
+        item["output"] = "A"
+
+    monkeypatch.setattr(
+        "spatial_harness.run_track3_vllm.build_records", tracked_build_records
+    )
+    monkeypatch.setattr(
+        "spatial_harness.run_track3_vllm._wait_for_endpoints", tracked_wait
+    )
+    monkeypatch.setattr("spatial_harness.run_track3_vllm._infer_one", fake_infer)
+
+    asyncio.run(run_inference(args))
+
+    assert events == ["build_records", "validate_endpoints"]
 
 
 def test_run_contract_refuses_changed_resume(tmp_path: Path, monkeypatch):

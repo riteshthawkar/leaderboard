@@ -142,6 +142,22 @@ function ChartLegend({ series }) {
   );
 }
 
+function PointKey({ points, title }) {
+  return (
+    <div className="mt-3.5 border-t border-border pt-3" aria-label={title}>
+      <div className="mb-2 text-xs font-semibold uppercase text-faint">{title}</div>
+      <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+        {points.map((point) => (
+          <span className="flex min-w-0 items-center gap-2 text-xs text-muted" key={point.key || point.label}>
+            <span className="size-2.5 shrink-0 border border-background" style={{ background: point.color }} aria-hidden="true" />
+            <span className="min-w-0 truncate" title={point.label}>{point.label}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_BARS = [0.42, 0.6, 0.34, 0.7, 0.5, 0.58, 0.46];
 
 export function EmptyChart({ message, aspectRatio = "16 / 9" }) {
@@ -195,6 +211,7 @@ export function BarChart({
   categories,
   series,
   aspectRatio = "16 / 9",
+  minHeight,
   bottomMargin,
   compactXLabels = false,
   valueScale = 100,
@@ -203,6 +220,7 @@ export function BarChart({
   emptyMessage = "No data available yet.",
   forceHorizontalLabels = false,
   showLegend = true,
+  xLabelAngle = -32,
 }) {
   const [tip, setTip] = useState(null);
   const clearTip = useCallback(() => setTip(null), []);
@@ -243,7 +261,7 @@ export function BarChart({
 
   return (
     <div className="relative mt-3.5 w-full [&_svg]:overflow-visible">
-      <div className="relative w-full [&_svg]:block [&_svg]:overflow-visible" onMouseLeave={clearTip} style={{ aspectRatio }}>
+      <div className="relative w-full [&_svg]:block [&_svg]:overflow-visible" onMouseLeave={clearTip} style={{ aspectRatio, minHeight }}>
         <ParentSize debounceTime={10}>
           {({ width, height }) => (
             <BarChartSvg
@@ -261,6 +279,7 @@ export function BarChart({
               valueSuffix={valueSuffix}
               valueDigits={valueDigits}
               width={width}
+              xLabelAngle={xLabelAngle}
             />
           )}
         </ParentSize>
@@ -273,7 +292,7 @@ export function BarChart({
 
 /**
  * Compact two-variable comparison with a diagonal parity reference.
- * Points are directly labelled so the primary values do not depend on hover.
+ * Direct labels can be replaced by a point key when nearby labels would collide.
  */
 export function ScatterChart({
   points,
@@ -281,10 +300,16 @@ export function ScatterChart({
   yLabel,
   aspectRatio = "4 / 3",
   emptyMessage = "No data available yet.",
+  showLabels = true,
+  showPointKey = false,
+  pointKeyTitle = "Models",
 }) {
   const [tip, setTip] = useState(null);
   const clearTip = useCallback(() => setTip(null), []);
   const ready = points?.some(
+    (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
+  );
+  const visiblePoints = (points || []).filter(
     (point) => Number.isFinite(point.x) && Number.isFinite(point.y),
   );
 
@@ -299,8 +324,9 @@ export function ScatterChart({
           {({ width, height }) => (
             <ScatterChartSvg
               height={height}
-              points={points}
+              points={visiblePoints}
               setTip={setTip}
+              showLabels={showLabels}
               width={width}
               xLabel={xLabel}
               yLabel={yLabel}
@@ -309,11 +335,12 @@ export function ScatterChart({
         </ParentSize>
         <ChartTip tip={tip} />
       </div>
+      {showPointKey && <PointKey points={visiblePoints} title={pointKeyTitle} />}
     </div>
   );
 }
 
-function ScatterChartSvg({ height, points, setTip, width, xLabel, yLabel }) {
+function ScatterChartSvg({ height, points, setTip, showLabels, width, xLabel, yLabel }) {
   if (width < 10 || height < 10) return null;
   const left = 48;
   const right = 22;
@@ -355,7 +382,7 @@ function ScatterChartSvg({ height, points, setTip, width, xLabel, yLabel }) {
           const onHover = () => setTip({ left: left + x, top: top + y - 10, title: point.label, rows: tipRows });
           return (
             <g key={point.key || point.label}>
-              {Math.abs(point.labelY - y) > 4 && (
+              {showLabels && Math.abs(point.labelY - y) > 4 && (
                 <line className="stroke-[var(--text-faint)] opacity-60" x1={x} x2={point.labelX} y1={y} y2={point.labelY} />
               )}
               <circle
@@ -367,9 +394,11 @@ function ScatterChartSvg({ height, points, setTip, width, xLabel, yLabel }) {
                 onMouseMove={onHover}
                 r={5}
               />
-              <text className="fill-foreground text-xs font-medium" dominantBaseline="middle" textAnchor={point.alignRight ? "end" : "start"} x={point.labelX} y={point.labelY}>
-                {point.label}
-              </text>
+              {showLabels && (
+                <text className="fill-foreground text-xs font-medium" dominantBaseline="middle" textAnchor={point.alignRight ? "end" : "start"} x={point.labelX} y={point.labelY}>
+                  {point.label}
+                </text>
+              )}
             </g>
           );
         })}
@@ -380,7 +409,7 @@ function ScatterChartSvg({ height, points, setTip, width, xLabel, yLabel }) {
   );
 }
 
-function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontalLabels, grouped, height, maxValue, minValue = 0, series, setTip, valueScale, valueSuffix, valueDigits = 0, width }) {
+function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontalLabels, grouped, height, maxValue, minValue = 0, series, setTip, valueScale, valueSuffix, valueDigits = 0, width, xLabelAngle }) {
   const gradientPrefix = useId().replace(/[^A-Za-z0-9_-]/g, "");
   if (width < 10 || height < 10) return null;
   const labels = categories.map((category) => String(category.label ?? ""));
@@ -405,7 +434,7 @@ function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontal
   const zeroY = yScale(0);
   const yTicks = yScale.ticks(minValue < 0 ? 6 : 4);
   const totalBars = categories.length * series.length;
-  const showValueLabels = totalBars <= 9;
+  const showValueLabels = totalBars <= 9 && width >= 520;
   const xLabelClassName = compactXLabels ? "fill-muted text-[0.68rem]" : "fill-muted text-xs";
   const tickFmt = (value) => `${+(value * valueScale).toFixed(1)}${valueSuffix}`;
   const tooltipRows = (category, index) =>
@@ -484,7 +513,7 @@ function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontal
                 className={xLabelClassName}
                 key={index}
                 textAnchor="end"
-                transform={`translate(${centerX},${innerHeight + 12}) rotate(-32)`}
+                transform={`translate(${centerX},${innerHeight + 12}) rotate(${xLabelAngle})`}
               >
                 {category.label}
               </text>

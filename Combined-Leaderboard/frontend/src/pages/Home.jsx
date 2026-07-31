@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
@@ -17,9 +17,9 @@ const overviewBenchmarks = [
     body: "7 perceptual skills in 2D and 3D: shape, color, figure ground, closure, and spatial relations. Drawn from a benchmark containing 2,612 questions with parametric difficulty.",
     meta: ["7 skills", "2D & 3D", "2,612 questions"],
     theme: {
-      art: "!border-[color-mix(in_srgb,var(--dysm)_28%,var(--border))] !bg-[color-mix(in_srgb,var(--dysm)_5%,var(--surface))] !text-dysm group-hover:!border-dysm",
+      art: "!border-border !bg-[color-mix(in_srgb,var(--dysm)_5%,var(--surface))] !text-dysm group-hover:!border-border-strong",
       label: "!text-dysm",
-      meta: "!border-[color-mix(in_srgb,var(--dysm)_25%,var(--border))] !bg-dysm-soft",
+      meta: "!border-border !bg-dysm-soft",
       arrow: "!text-dysm",
     },
   },
@@ -32,9 +32,9 @@ const overviewBenchmarks = [
     body: "8 visual cognition tasks covering mental rotation, paper folding, and composition while probing fluid intelligence beyond surface perception.",
     meta: ["8 tasks", "Rotation · Folding", "Fluid reasoning"],
     theme: {
-      art: "!border-[color-mix(in_srgb,var(--me)_28%,var(--border))] !bg-[color-mix(in_srgb,var(--me)_5%,var(--surface))] !text-me group-hover:!border-me",
+      art: "!border-border !bg-[color-mix(in_srgb,var(--me)_5%,var(--surface))] !text-me group-hover:!border-border-strong",
       label: "!text-me",
-      meta: "!border-[color-mix(in_srgb,var(--me)_25%,var(--border))] !bg-me-soft",
+      meta: "!border-border !bg-me-soft",
       arrow: "!text-me",
     },
   },
@@ -47,9 +47,9 @@ const overviewBenchmarks = [
     body: "13 spatial datasets, one policy. CoT, shortcut, and hallucination diagnostics expose how reasoning shortcuts distort spatial scores.",
     meta: ["13 datasets", "CoT diagnostics", "4 conditions"],
     theme: {
-      art: "!border-[color-mix(in_srgb,var(--spatial)_28%,var(--border))] !bg-[color-mix(in_srgb,var(--spatial)_5%,var(--surface))] !text-spatial group-hover:!border-spatial",
+      art: "!border-border !bg-[color-mix(in_srgb,var(--spatial)_5%,var(--surface))] !text-spatial group-hover:!border-border-strong",
       label: "!text-spatial",
-      meta: "!border-[color-mix(in_srgb,var(--spatial)_25%,var(--border))] !bg-spatial-soft",
+      meta: "!border-border !bg-spatial-soft",
       arrow: "!text-spatial",
     },
   },
