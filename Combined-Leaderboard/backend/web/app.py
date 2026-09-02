@@ -78,6 +78,8 @@ from auth_db import (
     reset_password,
     get_user,
     get_verified_admin_emails,
+    anonymize_user,
+    export_user_data,
     is_valid_email,
     normalize_email,
     password_policy_status,
@@ -2361,6 +2363,86 @@ def auth_logout():
     """Clear the session."""
     session.clear()
     return jsonify({"status": "ok"}), 200
+
+
+@app.route("/api/auth/me/export", methods=["GET"])
+@limiter.limit("5 per minute", key_func=_identity_key)
+def auth_me_export():
+    """Data subject access request: return everything stored about the signed-in account."""
+    if SUBMISSION_AUTH_DISABLED:
+        return _error_response(
+            "Data export is unavailable while authentication is disabled.",
+            "auth_disabled", 400,
+        )
+    email = current_user_email()
+    if not email:
+        return _error_response(
+            "Sign in to export your account data.", "authentication_required", 401,
+        )
+    try:
+        payload = export_user_data(email)
+    except Exception as exc:
+        logger.error(
+            "Account data export failed: %s", exc,
+            extra={"request_id": getattr(g, "request_id", None)}, exc_info=True,
+        )
+        return _error_response(
+            "Your account data could not be exported right now. Try again shortly.",
+            "account_export_unavailable", 503, retryable=True,
+        )
+    if payload is None:
+        return _error_response("Account not found.", "account_not_found", 404)
+    response = jsonify(payload)
+    response.headers["Content-Disposition"] = 'attachment; filename="account-data.json"'
+    response.headers["Cache-Control"] = "no-store"
+    return response, 200
+
+
+@app.route("/api/auth/me", methods=["DELETE"])
+@limiter.limit("5 per minute", key_func=_identity_key)
+def auth_me_delete():
+    """Right to erasure, implemented as anonymisation.
+
+    Published leaderboard results are research output that must stay reproducible, so the rows
+    are kept but detached from the person: the email is replaced everywhere it is stored
+    (including registered_models.owner_email, which the public board renders as "submitted_by"),
+    credentials and OAuth linkage are cleared, and all sessions are invalidated. This is
+    irreversible -- the original address is not retained anywhere.
+    """
+    if SUBMISSION_AUTH_DISABLED:
+        return _error_response(
+            "Account deletion is unavailable while authentication is disabled.",
+            "auth_disabled", 400,
+        )
+    email = current_user_email()
+    if not email:
+        return _error_response(
+            "Sign in to delete your account.", "authentication_required", 401,
+        )
+    try:
+        replacement = anonymize_user(email)
+    except Exception as exc:
+        logger.error(
+            "Account anonymisation failed: %s", exc,
+            extra={"request_id": getattr(g, "request_id", None)}, exc_info=True,
+        )
+        return _error_response(
+            "Your account could not be deleted right now. Try again shortly.",
+            "account_delete_unavailable", 503, retryable=True,
+        )
+    if replacement is None:
+        return _error_response("Account not found.", "account_not_found", 404)
+    logger.info(
+        "Account anonymised on user request",
+        extra={"request_id": getattr(g, "request_id", None)},
+    )
+    session.clear()
+    return jsonify({
+        "status": "ok",
+        "anonymized": True,
+        "detail": "Your account identity has been removed. Previously published results remain "
+                  "on the leaderboard but are no longer linked to you.",
+    }), 200
 
 
 @app.route("/api/auth/me", methods=["GET"])

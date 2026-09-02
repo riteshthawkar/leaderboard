@@ -610,3 +610,93 @@ def get_verified_admin_emails(emails) -> list[str]:
             .all()
         )
     return sorted(row[0] for row in rows)
+
+
+# --- data subject rights -----------------------------------------------------------------
+# The account tables key submissions to a user by EMAIL STRING, not by user id, and the public
+# leaderboard renders registered_models.owner_email as "submitted_by". Erasure therefore has to
+# rewrite the address in every table that holds it, or the person stays identifiable on the
+# published board after they asked to be removed.
+EMAIL_OWNER_COLUMNS = (
+    ("submissions", "user_email"),
+    ("registered_models", "owner_email"),
+)
+ANONYMIZED_EMAIL_DOMAIN = "anonymized.invalid"   # .invalid is reserved (RFC 2606): never routable
+
+
+def _anonymized_email() -> str:
+    return f"deleted-user-{secrets.token_hex(6)}@{ANONYMIZED_EMAIL_DOMAIN}"
+
+
+def export_user_data(email: str) -> Optional[dict]:
+    """Everything held about one account, for a data subject access request."""
+    email = normalize_email(email)
+    with _Session() as session:
+        user = session.query(User).filter_by(email=email).first()
+        if not user:
+            return None
+        account = {
+            "email": user.email,
+            "email_verified": bool(user.email_verified),
+            "auth_provider": user.auth_provider,
+            "oauth_provider": user.oauth_provider,
+            "oauth_subject": user.oauth_subject,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        }
+        owned = {}
+        for table, column in EMAIL_OWNER_COLUMNS:
+            try:
+                rows = session.execute(
+                    text(f"SELECT * FROM {table} WHERE lower({column}) = :email"),
+                    {"email": email},
+                ).mappings().all()
+            except Exception:
+                rows = []                      # table absent in this deployment
+            owned[table] = [
+                {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row.items()}
+                for row in rows
+            ]
+        # Credentials are deliberately excluded: password hashes and reset tokens are secrets,
+        # not personal data the subject is entitled to receive back.
+        return {"account": account, "records": owned}
+
+
+def anonymize_user(email: str) -> Optional[str]:
+    """Erase the identity behind an account while preserving its published results.
+
+    Replaces the email everywhere it is stored, clears credentials and OAuth linkage, and bumps
+    session_version so existing sessions stop working. Scores and submissions survive, detached
+    from the person -- the leaderboard stays reproducible without naming them. Returns the
+    replacement address, or None if no such account.
+    """
+    email = normalize_email(email)
+    with _Session() as session:
+        user = session.query(User).filter_by(email=email).first()
+        if not user:
+            return None
+        replacement = _anonymized_email()
+        while session.query(User).filter_by(email=replacement).first():
+            replacement = _anonymized_email()
+
+        for table, column in EMAIL_OWNER_COLUMNS:
+            try:
+                session.execute(
+                    text(f"UPDATE {table} SET {column} = :new WHERE lower({column}) = :old"),
+                    {"new": replacement, "old": email},
+                )
+            except Exception:
+                pass                           # table absent in this deployment
+
+        user.email = replacement
+        user.password_hash = generate_password_hash(secrets.token_urlsafe(32))
+        user.email_verified = False
+        user.auth_provider = "anonymized"
+        user.oauth_provider = None
+        user.oauth_subject = None
+        user.verification_token = None
+        user.verification_expires_at = None
+        user.password_reset_token = None
+        user.password_reset_expires_at = None
+        user.session_version = int(user.session_version or 0) + 1
+        session.commit()
+        return replacement
