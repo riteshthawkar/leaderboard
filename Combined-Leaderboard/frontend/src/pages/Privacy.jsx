@@ -22,6 +22,10 @@ const sections = [
     body: "Hugging Face provides application hosting and private storage. Microsoft or Google may process identity information when their sign in option is selected. Azure Communication Services may deliver verification and password reset email.",
   },
   {
+    title: "Children and minimum age",
+    body: "This leaderboard is a research tool intended for researchers and practitioners. It is not directed to children. You must be at least 16 years old to create an account or make a submission, and we do not knowingly collect personal information from anyone under 16. Where a sign in provider is used, that provider verifies the account holder; we receive only an email address and a provider identifier. If you believe someone under 16 has created an account, contact the project administrator and it will be removed.",
+  },
+  {
     title: "Cookies and security",
     body: "The application uses an essential secure session cookie and browser storage for cross site request protection, theme preference, and session recovery. Operational safeguards include access controls, request limits, encrypted transport, restricted backups, and audit records.",
   },
@@ -56,7 +60,7 @@ export function Privacy() {
       </div>
       <div className="border-b border-border-strong px-6 py-8 lg:px-8">
         <p className="m-0 max-w-4xl leading-7 text-muted">
-          You may review your account and submission history through the application. Requests concerning correction, removal, or privacy should be directed to the project administrator. This notice was last updated on 14 July 2026.
+          You may review your account and submission history through the application. You can download a copy of your account data, and you can delete your account at any time from your profile: deleting removes your identity from our records, while results already published on the leaderboard are retained in anonymised form so that the research record stays reproducible. Any other request concerning correction, removal, or privacy should be directed to the project administrator. This notice was last updated on 2 September 2026.
         </p>
       </div>
     </WorkspacePage>
