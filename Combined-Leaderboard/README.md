@@ -357,3 +357,11 @@ python3 -m pytest -q
 python3 -m py_compile backend/web/app.py backend/leaderboard_store.py backend/auth_db.py backend/submission_store.py
 curl -fsS http://localhost:5050/api/health
 ```
+
+## Privacy
+
+[Privacy & Cookies](https://go.microsoft.com/fwlink/?LinkId=521839) — the Microsoft Privacy
+Statement applies to this release.
+
+The leaderboard additionally publishes a service-specific notice describing the account and
+submission data this application stores, available at `/privacy` in the running application.
