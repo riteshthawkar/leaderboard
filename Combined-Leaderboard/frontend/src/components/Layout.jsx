@@ -42,6 +42,11 @@ const navAccentClass = {
   spatial: "!text-spatial",
 };
 
+// Microsoft Privacy Statement (required on releases intended for people outside Microsoft).
+// The label must read exactly "Privacy & Cookies" and the href must be this forward link.
+const MICROSOFT_PRIVACY_STATEMENT_URL = "https://go.microsoft.com/fwlink/?LinkId=521839";
+// Separate, service-specific notice describing what THIS leaderboard stores. It supplements the
+// Microsoft Privacy Statement above; it does not replace it.
 const privacyPolicyUrl = (import.meta.env.VITE_PRIVACY_POLICY_URL || "/privacy").trim();
 
 function pageId(pathname) {
@@ -613,6 +618,14 @@ export function Layout() {
               research use.
             </span>
             <div className="flex flex-wrap items-center gap-2.5">
+              <a
+                className="px-2 text-xs font-medium text-muted hover:text-foreground"
+                href={MICROSOFT_PRIVACY_STATEMENT_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Privacy &amp; Cookies
+              </a>
               {privacyPolicyUrl && (
                 <a
                   className="px-2 text-xs font-medium text-muted hover:text-foreground"
@@ -620,7 +633,7 @@ export function Layout() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Privacy
+                  Leaderboard Data Notice
                 </a>
               )}
               <span

@@ -18,3 +18,11 @@ under the ignored `Combined-Leaderboard/.local-data/` directory. Private answer
 keys, model outputs, and research results must remain outside source control.
 Production deployments must use the persistent paths documented in the
 [deployment guide](Combined-Leaderboard/docs/deployment.md).
+
+## Privacy
+
+[Privacy & Cookies](https://go.microsoft.com/fwlink/?LinkId=521839) — the Microsoft Privacy
+Statement applies to this release.
+
+The leaderboard additionally publishes a service-specific notice describing the account and
+submission data this application stores, available at `/privacy` in the running application.
