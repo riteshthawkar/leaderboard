@@ -78,6 +78,7 @@ from auth_db import (
     reset_password,
     get_user,
     get_verified_admin_emails,
+    allocate_anonymized_email,
     anonymize_user,
     export_user_data,
     is_valid_email,
@@ -127,6 +128,8 @@ from submission_store import (
     latest_visible_scored_submission_ids,
     latest_visible_scored_submission_fingerprints,
     submission_integrity_status,
+    export_user_submission_data,
+    rewrite_user_identity,
 )
 from data_handlers.ground_truth import GroundTruthManager
 from request_models import HealthCheckResponse
@@ -2381,6 +2384,8 @@ def auth_me_export():
         )
     try:
         payload = export_user_data(email)
+        if payload is not None:
+            payload["records"].update(export_user_submission_data(email))
     except Exception as exc:
         logger.error(
             "Account data export failed: %s", exc,
@@ -2419,9 +2424,24 @@ def auth_me_delete():
         return _error_response(
             "Sign in to delete your account.", "authentication_required", 401,
         )
+    replacement = None
+    submission_rewritten = False
     try:
-        replacement = anonymize_user(email)
+        replacement = allocate_anonymized_email()
+        rewrite_user_identity(email, replacement)
+        submission_rewritten = True
+        account_replacement = anonymize_user(email, replacement)
     except Exception as exc:
+        if submission_rewritten and replacement:
+            try:
+                rewrite_user_identity(replacement, email)
+            except Exception as rollback_exc:
+                logger.critical(
+                    "Account anonymisation rollback failed: %s",
+                    rollback_exc,
+                    extra={"request_id": getattr(g, "request_id", None)},
+                    exc_info=True,
+                )
         logger.error(
             "Account anonymisation failed: %s", exc,
             extra={"request_id": getattr(g, "request_id", None)}, exc_info=True,
@@ -2430,7 +2450,22 @@ def auth_me_delete():
             "Your account could not be deleted right now. Try again shortly.",
             "account_delete_unavailable", 503, retryable=True,
         )
-    if replacement is None:
+    if account_replacement is None:
+        try:
+            rewrite_user_identity(replacement, email)
+        except Exception as exc:
+            logger.critical(
+                "Missing account could not restore submission ownership: %s",
+                exc,
+                extra={"request_id": getattr(g, "request_id", None)},
+                exc_info=True,
+            )
+            return _error_response(
+                "Account deletion could not be completed safely. Contact the administrator.",
+                "account_delete_inconsistent",
+                503,
+                retryable=False,
+            )
         return _error_response("Account not found.", "account_not_found", 404)
     logger.info(
         "Account anonymised on user request",

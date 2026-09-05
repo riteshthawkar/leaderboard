@@ -964,6 +964,65 @@ def _submission_summary(row: Submission) -> Dict:
     }
 
 
+def export_user_submission_data(user_email: str) -> Dict:
+    """Export submission metadata associated with an account without artifact blobs."""
+    normalized_email = str(user_email or "").strip().lower()
+    if not normalized_email:
+        return {"submissions": [], "registered_models": []}
+    with _Session() as session:
+        submission_rows = session.query(Submission).filter(
+            func.lower(Submission.user_email) == normalized_email,
+        ).order_by(Submission.created_at.asc(), Submission.id.asc()).all()
+        model_rows = session.query(RegisteredModel).filter(
+            func.lower(RegisteredModel.owner_email) == normalized_email,
+        ).order_by(RegisteredModel.created_at.asc(), RegisteredModel.id.asc()).all()
+
+        submissions = []
+        for row in submission_rows:
+            summary = _submission_summary(row)
+            # Moderation staff identity is third-party data and is not part of
+            # the submitter's export.
+            summary.pop("moderated_by", None)
+            summary.update({
+                "database_id": row.id,
+                "request_id": row.request_id,
+                "source_ip": row.ip,
+            })
+            submissions.append(summary)
+        return {
+            "submissions": submissions,
+            "registered_models": [_registered_model_summary(row) for row in model_rows],
+        }
+
+
+def rewrite_user_identity(old_email: str, new_email: str) -> Dict[str, int]:
+    """Rewrite account ownership fields in the submission database atomically."""
+    old_email = str(old_email or "").strip().lower()
+    new_email = str(new_email or "").strip().lower()
+    if not old_email or not new_email:
+        raise ValueError("both old and new email values are required")
+    if old_email == new_email:
+        return {"submissions": 0, "registered_models": 0}
+    with _lock, _Session() as session:
+        submission_count = session.query(Submission).filter(
+            func.lower(Submission.user_email) == old_email,
+        ).update(
+            {Submission.user_email: new_email},
+            synchronize_session=False,
+        )
+        model_count = session.query(RegisteredModel).filter(
+            func.lower(RegisteredModel.owner_email) == old_email,
+        ).update(
+            {RegisteredModel.owner_email: new_email},
+            synchronize_session=False,
+        )
+        session.commit()
+        return {
+            "submissions": int(submission_count or 0),
+            "registered_models": int(model_count or 0),
+        }
+
+
 def _answer_hash(answer: str) -> str:
     return hashlib.sha256(str(answer or "").encode("utf-8")).hexdigest()
 

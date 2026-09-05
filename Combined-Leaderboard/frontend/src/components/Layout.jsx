@@ -45,9 +45,14 @@ const navAccentClass = {
 // Microsoft Privacy Statement (required on releases intended for people outside Microsoft).
 // The label must read exactly "Privacy & Cookies" and the href must be this forward link.
 const MICROSOFT_PRIVACY_STATEMENT_URL = "https://go.microsoft.com/fwlink/?LinkId=521839";
+const CONSUMER_HEALTH_PRIVACY_URL = "https://go.microsoft.com/fwlink/?linkid=2259814";
+const MICROSOFT_TRADEMARKS_URL = "https://www.microsoft.com/trademarks";
+const MICROSOFT_TERMS_OF_USE_URL = "https://go.microsoft.com/fwlink/?LinkID=206977";
+const CURRENT_YEAR = new Date().getUTCFullYear();
 // Separate, service-specific notice describing what THIS leaderboard stores. It supplements the
 // Microsoft Privacy Statement above; it does not replace it.
 const privacyPolicyUrl = (import.meta.env.VITE_PRIVACY_POLICY_URL || "/privacy").trim();
+const privacyPolicyIsExternal = /^https?:\/\//i.test(privacyPolicyUrl);
 
 function pageId(pathname) {
   if (pathname === "/") return "home";
@@ -612,14 +617,13 @@ export function Layout() {
               </a>
             </div>
           </div>
-          <div className="w-full mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-border py-4 text-xs text-faint max-sm:flex-col max-sm:items-start">
-            <span>
-              Benchmarks © Microsoft Research. Leaderboard for noncommercial
-              research use.
-            </span>
-            <div className="flex flex-wrap items-center gap-2.5">
+          <div className="mt-7 grid w-full gap-3 border-t border-border py-4 text-xs text-faint">
+            <nav
+              aria-label="Legal and privacy disclosures"
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-2"
+            >
               <a
-                className="px-2 text-xs font-medium text-muted hover:text-foreground"
+                className="text-xs font-medium text-muted hover:text-foreground"
                 href={MICROSOFT_PRIVACY_STATEMENT_URL}
                 target="_blank"
                 rel="noreferrer"
@@ -627,63 +631,107 @@ export function Layout() {
                 Privacy &amp; Cookies
               </a>
               {privacyPolicyUrl && (
-                <a
-                  className="px-2 text-xs font-medium text-muted hover:text-foreground"
-                  href={privacyPolicyUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Leaderboard Data Notice
-                </a>
-              )}
-              <span
-                className="inline-flex h-10 items-center gap-2 border border-solid border-border-strong bg-surface px-3 text-xs font-semibold text-muted"
-                title={IS_STATIC_DEMO ? "Static data status" : "Backend status"}
-              >
-                <span
-                  className={cn(
-                    "size-2 bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.16)]",
-                    serviceStatus === "online" &&
-                    "bg-green-500 shadow-[0_0_0_3px_rgba(34,197,94,0.18)]",
-                    serviceStatus === "snapshot" && "bg-faint shadow-none",
-                  )}
-                />
-                <span>
-                  {serviceStatus === "online"
-                    ? "Online"
-                    : serviceStatus === "snapshot"
-                      ? "Snapshot"
-                    : serviceStatus === "degraded"
-                      ? "Degraded"
-                      : serviceStatus === "checking"
-                        ? "Checking"
-                        : "Offline"}
-                </span>
-              </span>
-              <button
-                className="grid size-10 cursor-pointer place-items-center border border-border-strong bg-surface text-foreground transition-colors hover:bg-surface-subtle"
-                id="theme_toggle"
-                type="button"
-                aria-label={
-                  theme === "dark"
-                    ? "Switch to light theme"
-                    : "Switch to dark theme"
-                }
-                title={
-                  theme === "dark"
-                    ? "Switch to light theme"
-                    : "Switch to dark theme"
-                }
-                onClick={() =>
-                  setTheme((value) => (value === "dark" ? "light" : "dark"))
-                }
-              >
-                {theme === "dark" ? (
-                  <Sun size={16} aria-hidden="true" />
+                privacyPolicyIsExternal ? (
+                  <a
+                    className="text-xs font-medium text-muted hover:text-foreground"
+                    href={privacyPolicyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Leaderboard Data Notice
+                  </a>
                 ) : (
-                  <Moon size={16} aria-hidden="true" />
-                )}
-              </button>
+                  <Link
+                    className="text-xs font-medium text-muted hover:text-foreground"
+                    to={privacyPolicyUrl}
+                  >
+                    Leaderboard Data Notice
+                  </Link>
+                )
+              )}
+              <a
+                className="text-xs font-medium text-muted hover:text-foreground"
+                href={CONSUMER_HEALTH_PRIVACY_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Consumer Health Privacy
+              </a>
+              <a
+                className="text-xs font-medium text-muted hover:text-foreground"
+                href={MICROSOFT_TRADEMARKS_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Trademarks
+              </a>
+              <a
+                className="text-xs font-medium text-muted hover:text-foreground"
+                href={MICROSOFT_TERMS_OF_USE_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Terms of Use
+              </a>
+              <span aria-label={`Copyright ${CURRENT_YEAR} Microsoft`}>
+                © {CURRENT_YEAR} Microsoft
+              </span>
+            </nav>
+            <div className="flex flex-wrap items-center justify-between gap-3 max-sm:items-start">
+              <span>
+                Benchmarks © Microsoft Research. Leaderboard for noncommercial
+                research use.
+              </span>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="inline-flex h-10 items-center gap-2 border border-solid border-border-strong bg-surface px-3 text-xs font-semibold text-muted"
+                  title={IS_STATIC_DEMO ? "Static data status" : "Backend status"}
+                >
+                  <span
+                    className={cn(
+                      "size-2 bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.16)]",
+                      serviceStatus === "online" &&
+                      "bg-green-500 shadow-[0_0_0_3px_rgba(34,197,94,0.18)]",
+                      serviceStatus === "snapshot" && "bg-faint shadow-none",
+                    )}
+                  />
+                  <span>
+                    {serviceStatus === "online"
+                      ? "Online"
+                      : serviceStatus === "snapshot"
+                        ? "Snapshot"
+                        : serviceStatus === "degraded"
+                          ? "Degraded"
+                          : serviceStatus === "checking"
+                            ? "Checking"
+                            : "Offline"}
+                  </span>
+                </span>
+                <button
+                  className="grid size-10 cursor-pointer place-items-center border border-border-strong bg-surface text-foreground transition-colors hover:bg-surface-subtle"
+                  id="theme_toggle"
+                  type="button"
+                  aria-label={
+                    theme === "dark"
+                      ? "Switch to light theme"
+                      : "Switch to dark theme"
+                  }
+                  title={
+                    theme === "dark"
+                      ? "Switch to light theme"
+                      : "Switch to dark theme"
+                  }
+                  onClick={() =>
+                    setTheme((value) => (value === "dark" ? "light" : "dark"))
+                  }
+                >
+                  {theme === "dark" ? (
+                    <Sun size={16} aria-hidden="true" />
+                  ) : (
+                    <Moon size={16} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

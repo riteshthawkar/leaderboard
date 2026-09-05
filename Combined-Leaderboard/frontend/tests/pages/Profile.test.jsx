@@ -1,16 +1,21 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
+  clearUser: vi.fn(),
+  deleteJSON: vi.fn(),
+  downloadFile: vi.fn(),
   errorMessage: (error, fallback) => error?.message || fallback,
   fetchMe: vi.fn(),
 }));
 
-import { fetchMe } from "@/lib/api";
+import { clearUser, deleteJSON, downloadFile, fetchMe } from "@/lib/api";
 import { Profile } from "@/pages/Profile";
 
 beforeEach(() => {
+  vi.clearAllMocks();
   fetchMe.mockResolvedValue({
     email: "member@example.com",
     emailVerified: true,
@@ -24,6 +29,8 @@ beforeEach(() => {
       per_benchmark_limit: 1,
     },
   });
+  downloadFile.mockResolvedValue("account-data.json");
+  deleteJSON.mockResolvedValue({ status: "ok", anonymized: true });
 });
 
 afterEach(() => cleanup());
@@ -41,5 +48,46 @@ describe("profile quota summary", () => {
         "1 per benchmark every 24 hours · 1 quota slot remaining across all tracks. Track availability is shown on the submission page.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("downloads the signed-in user's account data", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Profile />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Download account data" }));
+
+    expect(downloadFile).toHaveBeenCalledWith(
+      "/api/auth/me/export",
+      "ms-vista-account-data.json",
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Your account data was downloaded as account-data.json.",
+    );
+  });
+
+  it("requires explicit confirmation before deleting an account", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Profile />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Delete account" }));
+    const dialog = screen.getByRole("dialog");
+    const confirmButton = within(dialog).getByRole("button", { name: "Delete account" });
+    expect(confirmButton).toBeDisabled();
+
+    await user.type(within(dialog).getByLabelText("Type DELETE to confirm"), "DELETE");
+    expect(confirmButton).toBeEnabled();
+    await user.click(confirmButton);
+
+    expect(deleteJSON).toHaveBeenCalledWith("/api/auth/me");
+    expect(clearUser).toHaveBeenCalledOnce();
+    expect(await within(dialog).findByText("Account deleted")).toBeInTheDocument();
   });
 });

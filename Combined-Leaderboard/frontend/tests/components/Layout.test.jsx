@@ -60,7 +60,14 @@ describe("service warning relevance", () => {
     expect(await screen.findByText("Online")).toBeVisible();
     expect(screen.getByText("Overview content")).toBeVisible();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: "Privacy & Cookies" })).toHaveAttribute(
+      "href",
+      "https://go.microsoft.com/fwlink/?LinkId=521839",
+    );
+    expect(screen.getByRole("link", { name: "Leaderboard Data Notice" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
   });
 
   it("shows a specific warning when authentication readiness fails", async () => {
@@ -98,5 +105,27 @@ describe("service warning relevance", () => {
     renderLayout();
 
     expect(await screen.findByText(/Stored submission records failed/)).toBeVisible();
+  });
+
+  it("renders every mandatory Microsoft disclosure", async () => {
+    apiMocks.getJSON.mockResolvedValue({ status: "healthy", components: {} });
+    renderLayout();
+
+    await waitFor(() => expect(apiMocks.getJSON).toHaveBeenCalledWith("/api/health"));
+    expect(screen.getByRole("link", { name: "Consumer Health Privacy" })).toHaveAttribute(
+      "href",
+      "https://go.microsoft.com/fwlink/?linkid=2259814",
+    );
+    expect(screen.getByRole("link", { name: "Trademarks" })).toHaveAttribute(
+      "href",
+      "https://www.microsoft.com/trademarks",
+    );
+    expect(screen.getByRole("link", { name: "Terms of Use" })).toHaveAttribute(
+      "href",
+      "https://go.microsoft.com/fwlink/?LinkID=206977",
+    );
+    expect(
+      screen.getByLabelText(`Copyright ${new Date().getUTCFullYear()} Microsoft`),
+    ).toBeInTheDocument();
   });
 });

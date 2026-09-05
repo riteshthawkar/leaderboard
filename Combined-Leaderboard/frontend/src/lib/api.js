@@ -184,6 +184,25 @@ export async function postJSON(url, body) {
   }
 }
 
+async function deleteJSONAttempt(url) {
+  return requestJSON(url, {
+    method: "DELETE",
+    headers: csrfHeaders(),
+  }, WRITE_TIMEOUT_MS);
+}
+
+export async function deleteJSON(url) {
+  if (IS_STATIC_DEMO) {
+    throw new ApiError("This is a static demo; account changes are disabled.", { code: "static_demo" });
+  }
+  try {
+    return await deleteJSONAttempt(url);
+  } catch (error) {
+    if (error.code !== "csrf_required" || !(await refreshCsrfToken())) throw error;
+    return deleteJSONAttempt(url);
+  }
+}
+
 async function postFormDataAttempt(url, formData) {
   return requestJSON(url, {
     method: "POST",

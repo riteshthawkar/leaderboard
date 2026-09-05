@@ -613,23 +613,28 @@ def get_verified_admin_emails(emails) -> list[str]:
 
 
 # --- data subject rights -----------------------------------------------------------------
-# The account tables key submissions to a user by EMAIL STRING, not by user id, and the public
-# leaderboard renders registered_models.owner_email as "submitted_by". Erasure therefore has to
-# rewrite the address in every table that holds it, or the person stays identifiable on the
-# published board after they asked to be removed.
-EMAIL_OWNER_COLUMNS = (
-    ("submissions", "user_email"),
-    ("registered_models", "owner_email"),
-)
-ANONYMIZED_EMAIL_DOMAIN = "anonymized.invalid"   # .invalid is reserved (RFC 2606): never routable
+ANONYMIZED_EMAIL_DOMAIN = "anonymized.invalid"  # .invalid is reserved (RFC 2606): never routable
 
 
 def _anonymized_email() -> str:
     return f"deleted-user-{secrets.token_hex(6)}@{ANONYMIZED_EMAIL_DOMAIN}"
 
 
+def allocate_anonymized_email() -> str:
+    """Return a non-routable replacement address not already used by an account."""
+    with _Session() as session:
+        replacement = _anonymized_email()
+        while session.query(User.id).filter_by(email=replacement).first():
+            replacement = _anonymized_email()
+        return replacement
+
+
+def _export_datetime(value: Optional[datetime]) -> Optional[str]:
+    return value.isoformat() if value else None
+
+
 def export_user_data(email: str) -> Optional[dict]:
-    """Everything held about one account, for a data subject access request."""
+    """Export account metadata without credential material."""
     email = normalize_email(email)
     with _Session() as session:
         user = session.query(User).filter_by(email=email).first()
@@ -641,51 +646,31 @@ def export_user_data(email: str) -> Optional[dict]:
             "auth_provider": user.auth_provider,
             "oauth_provider": user.oauth_provider,
             "oauth_subject": user.oauth_subject,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "created_at": _export_datetime(user.created_at),
         }
-        owned = {}
-        for table, column in EMAIL_OWNER_COLUMNS:
-            try:
-                rows = session.execute(
-                    text(f"SELECT * FROM {table} WHERE lower({column}) = :email"),
-                    {"email": email},
-                ).mappings().all()
-            except Exception:
-                rows = []                      # table absent in this deployment
-            owned[table] = [
-                {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in row.items()}
-                for row in rows
-            ]
-        # Credentials are deliberately excluded: password hashes and reset tokens are secrets,
-        # not personal data the subject is entitled to receive back.
-        return {"account": account, "records": owned}
+        return {"account": account, "records": {}}
 
 
-def anonymize_user(email: str) -> Optional[str]:
-    """Erase the identity behind an account while preserving its published results.
+def anonymize_user(email: str, replacement: Optional[str] = None) -> Optional[str]:
+    """Erase an account identity and its browser credentials.
 
-    Replaces the email everywhere it is stored, clears credentials and OAuth linkage, and bumps
-    session_version so existing sessions stop working. Scores and submissions survive, detached
-    from the person -- the leaderboard stays reproducible without naming them. Returns the
-    replacement address, or None if no such account.
+    Submission ownership is rewritten through ``submission_store`` because a
+    deployment may keep authentication and submissions in separate databases.
     """
     email = normalize_email(email)
+    replacement = normalize_email(replacement or allocate_anonymized_email())
+    if not replacement.endswith(f"@{ANONYMIZED_EMAIL_DOMAIN}"):
+        raise ValueError("replacement must use the reserved anonymized email domain")
     with _Session() as session:
         user = session.query(User).filter_by(email=email).first()
         if not user:
             return None
-        replacement = _anonymized_email()
-        while session.query(User).filter_by(email=replacement).first():
-            replacement = _anonymized_email()
-
-        for table, column in EMAIL_OWNER_COLUMNS:
-            try:
-                session.execute(
-                    text(f"UPDATE {table} SET {column} = :new WHERE lower({column}) = :old"),
-                    {"new": replacement, "old": email},
-                )
-            except Exception:
-                pass                           # table absent in this deployment
+        collision = session.query(User.id).filter(
+            User.email == replacement,
+            User.id != user.id,
+        ).first()
+        if collision:
+            raise ValueError("replacement email is already in use")
 
         user.email = replacement
         user.password_hash = generate_password_hash(secrets.token_urlsafe(32))
