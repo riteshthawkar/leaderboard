@@ -13,10 +13,11 @@ if [[ ! ${TAG} =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
 fi
 
 if [[ ${EUID} -ne 0 ]]; then
-  exec sudo --preserve-env=PATH "$0" "$@"
+  exec sudo --preserve-env=PATH,MS_VISTA_DEPLOY_DIR "$0" "$@"
 fi
 
-DEPLOY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+DEPLOY_DIR=$(cd "${MS_VISTA_DEPLOY_DIR:-${SCRIPT_DIR}}" && pwd)
 APP_DIR=$(cd "${DEPLOY_DIR}/../.." && pwd)
 ENV_FILE="${DEPLOY_DIR}/production.env"
 BACKUP_DIR=/srv/ms-vista/deploy-env-backups

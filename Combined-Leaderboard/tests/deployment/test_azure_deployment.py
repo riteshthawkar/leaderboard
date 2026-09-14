@@ -22,6 +22,7 @@ def test_release_deployment_has_smoke_checked_rollback_and_locking():
     assert "CRITICAL: deployment and automatic rollback both failed" in script
     assert "RELEASE_COMMIT_FILE" in script
     assert "^[0-9a-f]{40}$" in script
+    assert "MS_VISTA_DEPLOY_DIR" in script
 
 
 def test_watchdog_requires_repeated_failures_and_has_recovery_cooldown():
@@ -41,6 +42,7 @@ def test_backup_verifier_performs_an_offline_restore_drill():
     assert "python -m backend.backup_cli verify" in script
     assert "python -m backend.backup_cli restore" in script
     assert "--destination" in script
+    assert "BACKUP_VERIFY_ALLOWED_FSTYPES" in script
     assert "OnCalendar=" in timer
 
 

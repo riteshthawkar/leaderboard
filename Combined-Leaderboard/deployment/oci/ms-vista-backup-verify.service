@@ -1,0 +1,36 @@
+[Unit]
+Description=Verify and restore-test the newest MS-VISTA backup volume archive
+Requires=ms-vista.service
+After=ms-vista.service network-online.target remote-fs.target
+Wants=network-online.target remote-fs.target
+RequiresMountsFor=/mnt/ms-vista-backups
+ConditionPathExists=/srv/ms-vista/app/deployment/oci/production.env
+
+[Service]
+Type=oneshot
+Environment=MS_VISTA_DEPLOY_DIR=/srv/ms-vista/app/deployment/oci
+Environment=MS_VISTA_BACKUP_DIR=/mnt/ms-vista-backups
+ExecStart=/usr/local/sbin/ms-vista-verify-backup
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH
+ReadWritePaths=/run/lock
+UMask=0077
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=15min

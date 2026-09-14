@@ -1,0 +1,117 @@
+name: ms-vista
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deployment/api/Dockerfile
+    image: ms-vista-api:${MS_VISTA_IMAGE_TAG:-local}
+    env_file:
+      - ${MS_VISTA_ENV_FILE:-production.env}
+    environment:
+      PORT: "7860"
+      WEB_CONCURRENCY: "1"
+      LEADERBOARD_DATA_DIR: /data
+      RESULTS_DIR: /data/results
+      DATABASE_URL: sqlite:////data/leaderboard.db
+      AUTH_DATABASE_URL: ""
+      SUBMISSION_DATABASE_URL: ""
+      LEADERBOARD_LOG_DIR: /data/logs
+      GROUND_TRUTHS_SOURCE: local
+      GROUND_TRUTHS_DIR: /data/ground_truths
+      SPATIAL_GROUND_TRUTH_FILE: /data/ground_truths/spatial_generated_v1/ground_truth.json
+      AUTO_BACKUP_ENABLED: "true"
+      AUTO_BACKUP_DIR: /data/backups
+      AUTO_BACKUP_MIRROR_DIR: /backup
+      LIMITER_STORAGE_URI: ${LIMITER_STORAGE_URI:-memory://}
+      TRUST_PROXY_HOPS: "1"
+      REQUIRE_OFFICIAL_SPATIAL: ${REQUIRE_OFFICIAL_SPATIAL:-false}
+      MAX_SPATIAL_SUBMISSION_BYTES: ${MAX_SPATIAL_SUBMISSION_BYTES:-67108864}
+    volumes:
+      - ${MS_VISTA_DATA_DIR:-/srv/ms-vista/data}:/data
+      - ${MS_VISTA_DATA_DIR:-/srv/ms-vista/data}/ground_truths:/data/ground_truths:ro
+      - ${MS_VISTA_BACKUP_DIR:-/mnt/ms-vista-backups}:/backup
+    expose:
+      - "7860"
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 45s
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_SAME_ORIGIN: "1"
+        VITE_PRIVACY_POLICY_URL: /privacy
+    image: ms-vista-frontend:${MS_VISTA_IMAGE_TAG:-local}
+    expose:
+      - "8080"
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 15s
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2.11.4-alpine}
+    env_file:
+      - ${MS_VISTA_ENV_FILE:-production.env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

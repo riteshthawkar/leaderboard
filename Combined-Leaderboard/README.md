@@ -24,7 +24,7 @@ MS VISTA is a unified evaluation framework for multimodal visual intelligence. T
 - `evaluation/` - visual-suite evaluation, extraction, packaging, and research-analysis tooling.
 - `spatial_harness/` - canonical Track 3 preparation, evaluation, judging, and submission contract.
 - `tests/` - backend, evaluation, integration, and opt-in live E2E verification.
-- `deployment/` - Azure, standalone API, frontend, and Hugging Face deployment configuration.
+- `deployment/` - OCI, Azure, standalone API, frontend, and Hugging Face deployment configuration.
 - `docs/` - architecture, deployment, and operating documentation.
 
 Flask does not render pages or expose frontend static files. The frontend calls the public API origin configured through `VITE_API_BASE_URL`.
@@ -158,8 +158,11 @@ back to Hugging Face when configured.
 The root [`Dockerfile`](Dockerfile) builds the same-origin Hugging Face Space
 with Nginx in front of the API. [`deployment/api/Dockerfile`](deployment/api/Dockerfile) and
 [`frontend/Dockerfile`](frontend/Dockerfile) remain available for split
-hosting. See the [deployment guide](docs/deployment.md) for storage, secrets, and
-temporary no-login test configuration.
+hosting. The hardened single-VM stacks are documented for
+[Oracle Cloud Always Free](deployment/oci/README.md) and
+[Azure](deployment/azure/README.md). See the
+[deployment guide](docs/deployment.md) for storage, secrets, and temporary
+no-login test configuration.
 
 ## Important Environment Variables
 
@@ -192,7 +195,7 @@ temporary no-login test configuration.
 | `ACS_*` or `SMTP_*` | Transactional email provider for account verification and password reset. |
 | `SESSION_COOKIE_SECURE` | Set `true` when served over HTTPS. |
 | `SESSION_COOKIE_SAMESITE` | Use `Lax` for same-site subdomains; use `None` with HTTPS when frontend and API are on different sites. |
-| `AUTH_TRANSPORT` | `cookie`, `bearer`, or `dual`; use `dual` when GitHub Pages calls the Azure API while the VM frontend remains available. |
+| `AUTH_TRANSPORT` | `cookie`, `bearer`, or `dual`; use `dual` when GitHub Pages calls a VM API while the VM frontend remains available. |
 | `ACCESS_TOKEN_TTL_SECONDS` | Signed bearer access-token lifetime; defaults to 900 seconds. |
 | `REFRESH_TOKEN_TTL_DAYS` | Rotating browser refresh-token lifetime; defaults to 7 days. |
 | `MAX_FILE_SIZE_PER_SUBMISSION` | Per-upload JSONL size limit in bytes. |
@@ -221,7 +224,7 @@ API_BASE_URL=https://your-api-domain.example
 OAUTH_REDIRECT_BASE_URL=https://your-api-domain.example
 ```
 
-Use `SESSION_COOKIE_SAMESITE=Lax` when frontend and API use same-site HTTPS subdomains such as `app.example.com` and `api.example.com`. For unrelated sites such as GitHub Pages and Azure, use bearer transport instead of relying on third-party cookies. Exact frontend origins must be listed in `CORS_ORIGINS`; wildcard origins are rejected for authenticated deployments. See [docs/deployment.md](docs/deployment.md#github-pages) for the Pages workflow and repository variables.
+Use `SESSION_COOKIE_SAMESITE=Lax` when frontend and API use same-site HTTPS subdomains such as `app.example.com` and `api.example.com`. For unrelated sites such as GitHub Pages and a VM API, use bearer transport instead of relying on third-party cookies. Exact frontend origins must be listed in `CORS_ORIGINS`; wildcard origins are rejected for authenticated deployments. See [docs/deployment.md](docs/deployment.md#github-pages) for the Pages workflow and repository variables.
 
 For production authentication, isolate the Pages browser origin with a custom
 domain or a dedicated GitHub account/organization. Project sites under one

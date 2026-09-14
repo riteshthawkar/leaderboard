@@ -19,6 +19,7 @@ apt-get install -y --no-install-recommends \
   cifs-utils \
   curl \
   fail2ban \
+  git \
   gnupg \
   jq \
   rsync \

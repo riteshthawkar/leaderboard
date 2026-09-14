@@ -2,12 +2,13 @@
 set -Eeuo pipefail
 
 if [[ ${EUID} -ne 0 ]]; then
-  exec sudo --preserve-env=PATH,BACKUP_VERIFY_MAX_AGE_HOURS "$0" "$@"
+  exec sudo --preserve-env=PATH,MS_VISTA_DEPLOY_DIR,MS_VISTA_BACKUP_DIR,BACKUP_VERIFY_ALLOWED_FSTYPES,BACKUP_VERIFY_MAX_AGE_HOURS \
+    "$0" "$@"
 fi
 
-DEPLOY_DIR=/srv/ms-vista/app/deployment/azure
+DEPLOY_DIR=${MS_VISTA_DEPLOY_DIR:-/srv/ms-vista/app/deployment/azure}
 ENV_FILE="${DEPLOY_DIR}/production.env"
-BACKUP_DIR=/mnt/ms-vista-backups
+BACKUP_DIR=${MS_VISTA_BACKUP_DIR:-/mnt/ms-vista-backups}
 MAX_AGE_HOURS=${BACKUP_VERIFY_MAX_AGE_HOURS:-60}
 DEPLOY_LOCK=/run/lock/ms-vista-deployment.lock
 COMPOSE=(
@@ -30,21 +31,39 @@ if [[ ! -f ${ENV_FILE} ]]; then
   exit 1
 fi
 
+ALLOWED_FSTYPES=${BACKUP_VERIFY_ALLOWED_FSTYPES:-}
+if [[ -z ${ALLOWED_FSTYPES} ]]; then
+  ALLOWED_FSTYPES=$(sed -n 's/^BACKUP_VERIFY_ALLOWED_FSTYPES=//p' "${ENV_FILE}")
+fi
+ALLOWED_FSTYPES=${ALLOWED_FSTYPES:-cifs}
+if [[ ! ${ALLOWED_FSTYPES} =~ ^[A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*$ ]]; then
+  echo "BACKUP_VERIFY_ALLOWED_FSTYPES must be a comma-separated filesystem list." >&2
+  exit 2
+fi
+
 exec 9>"${DEPLOY_LOCK}"
 if ! flock -n 9; then
   log "Skipped backup verification because a deployment or recovery operation is active."
   exit 0
 fi
 
-# Accessing the directory activates the systemd Azure Files automount.
+# Accessing the directory activates remote or systemd-managed mounts.
 if ! find "${BACKUP_DIR}" -maxdepth 0 -type d >/dev/null 2>&1; then
   log "Off-VM backup directory is unavailable."
   exit 1
 fi
 filesystems=$(findmnt -n -o FSTYPE --target "${BACKUP_DIR}" 2>/dev/null || true)
-if ! grep -qx 'cifs' <<<"${filesystems}"; then
+filesystem_allowed=false
+IFS=',' read -r -a allowed_filesystems <<<"${ALLOWED_FSTYPES}"
+for allowed_filesystem in "${allowed_filesystems[@]}"; do
+  if grep -Fxq "${allowed_filesystem}" <<<"${filesystems}"; then
+    filesystem_allowed=true
+    break
+  fi
+done
+if [[ ${filesystem_allowed} != true ]]; then
   filesystem_summary=$(tr '\n' ',' <<<"${filesystems}" | sed 's/,$//')
-  log "Off-VM backup directory is not mounted from Azure Files (fstype=${filesystem_summary:-none})."
+  log "Backup directory uses an unexpected filesystem (actual=${filesystem_summary:-none}, allowed=${ALLOWED_FSTYPES})."
   exit 1
 fi
 

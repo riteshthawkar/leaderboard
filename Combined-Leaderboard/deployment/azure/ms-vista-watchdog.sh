@@ -2,11 +2,11 @@
 set -Eeuo pipefail
 
 if [[ ${EUID} -ne 0 ]]; then
-  exec sudo --preserve-env=PATH,WATCHDOG_FAILURE_THRESHOLD,WATCHDOG_RECOVERY_COOLDOWN_SECONDS \
+  exec sudo --preserve-env=PATH,MS_VISTA_DEPLOY_DIR,WATCHDOG_FAILURE_THRESHOLD,WATCHDOG_RECOVERY_COOLDOWN_SECONDS \
     "$0" "$@"
 fi
 
-DEPLOY_DIR=/srv/ms-vista/app/deployment/azure
+DEPLOY_DIR=${MS_VISTA_DEPLOY_DIR:-/srv/ms-vista/app/deployment/azure}
 ENV_FILE="${DEPLOY_DIR}/production.env"
 STATE_DIR=/var/lib/ms-vista-watchdog
 FAILURE_FILE="${STATE_DIR}/consecutive_failures"

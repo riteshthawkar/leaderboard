@@ -1,9 +1,10 @@
 # Deployment
 
-MS-VISTA supports two deployment topologies:
+MS-VISTA supports three deployment topologies:
 
 - The root `Dockerfile` runs the Hugging Face single-origin deployment. Nginx serves React and proxies `/api` to a private Gunicorn process.
 - `deployment/api/Dockerfile` and `frontend/Dockerfile` provide independent API and frontend containers for conventional split hosting.
+- `deployment/oci` and `deployment/azure` provide hardened single-VM stacks with Caddy, persistent SQLite storage, a separate backup filesystem, systemd startup, a bounded watchdog, and restore-tested backups.
 
 In both topologies Flask remains API only. It does not render frontend routes or expose `frontend/static`.
 
@@ -125,9 +126,9 @@ does not depend on cross-site cookies.
 1. In GitHub, open **Settings → Pages** and choose **GitHub Actions** as the
    source.
 2. Open **Settings → Secrets and variables → Actions → Variables**.
-3. Create `PAGES_API_BASE_URL` with the public HTTPS Azure API origin, without a
+3. Create `PAGES_API_BASE_URL` with the public HTTPS VM API origin, without a
    trailing path, for example `https://api.example.com`.
-4. Create `PAGES_DEPLOY_ENABLED` with the value `true` only after the Azure API
+4. Create `PAGES_DEPLOY_ENABLED` with the value `true` only after the VM API
    has been deployed with `AUTH_TRANSPORT=dual` or `bearer`. This prevents a
    Pages release from getting ahead of its backend contract.
 5. Optionally create `PAGES_PRIVACY_POLICY_URL`; otherwise the app uses its
@@ -159,6 +160,25 @@ credentials use `sessionStorage`, production should use a custom domain for
 this repository or a dedicated GitHub account/organization that hosts no
 untrusted Pages projects. The project URL works technically without that
 isolation, but should be treated as staging until the origin is isolated.
+
+## Oracle Cloud Always Free VM
+
+The OCI deployment runs the API, a same-origin fallback frontend, and Caddy on
+one Ubuntu Ampere A1 VM while the user-facing frontend remains on GitHub Pages.
+Use 2 OCPUs, 12 GiB RAM, a 50 GiB boot volume, and a separate 50 GiB ext4 block
+volume mounted at `/mnt/ms-vista-backups`. Keep SSH restricted to administrator
+IP addresses and expose only TCP 80/443 plus optional UDP 443.
+
+The OCI scripts reuse the same release rollback, watchdog, backup restore drill,
+container limits, and production smoke checks as the Azure stack. Azure
+Communication Services Email continues to work from OCI in connection-string
+mode, and Microsoft Entra requires only a new exact callback URI for the OCI API
+hostname.
+
+Follow the complete [OCI provisioning and cutover runbook](../deployment/oci/README.md).
+Do not enable the GitHub Pages production workflow until the new API readiness
+check is healthy and real email, Microsoft login, password reset, and submission
+acceptance tests pass.
 
 ## Spatial Bundle
 

@@ -1,0 +1,22 @@
+{
+	email {$ACME_EMAIL}
+	admin 127.0.0.1:2019
+}
+
+{$MS_VISTA_DOMAIN} {
+	encode zstd gzip
+
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy api:7860
+	}
+
+	handle {
+		reverse_proxy frontend:8080
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

@@ -1,6 +1,6 @@
 # Deployment Cost Estimate
 
-Last reviewed: 2026-07-12
+Last reviewed: 2026-09-15
 
 This estimate covers the current MS VISTA architecture: a static React frontend,
 one Flask API instance, SQLite, Microsoft authentication, transactional email,
@@ -83,6 +83,30 @@ new verified snapshots frequently. A sudden restart can still lose changes
 made after the latest snapshot. That recovery window makes this arrangement
 appropriate for a pilot, but not the strongest production option.
 
+## Oracle Cloud Always Free pilot
+
+OCI's current Always Free allowance supports one Ampere A1 instance with a
+total of 2 OCPUs and 12 GiB memory. It also includes 200 GB of combined boot and
+block-volume storage plus five volume backups in the tenancy home region. The
+recommended 50 GiB boot volume and separate 50 GiB backup volume therefore fit
+inside the allowance when the console marks every resource Always Free
+eligible.
+
+| Component | Pilot estimate |
+|---|---:|
+| Ampere A1 VM, 2 OCPUs and 12 GiB | $0 |
+| 50 GiB boot plus 50 GiB backup volume | $0 |
+| Up to four retained weekly volume backups | $0 |
+| GitHub Pages frontend | $0 |
+| Microsoft authentication | $0 at expected usage |
+| Azure transactional email | Less than $0.50 |
+| Estimated total before domain | Less than $1 per month |
+
+Capacity is not guaranteed, resources must be created in the tenancy home
+region, and accidental use of a non-eligible shape, storage class, region, or
+cross-region backup can incur charges. The complete setup is in
+[`deployment/oci/README.md`](../deployment/oci/README.md).
+
 ## Recommended low traffic production deployment
 
 A small virtual machine with local SSD storage is a better fit for the current
@@ -123,6 +147,7 @@ upgraded Hugging Face Space running continuously.
 * [Azure Communication Services pricing](https://azure.microsoft.com/en-us/pricing/details/communication-services)
 * [DigitalOcean Droplet pricing](https://www.digitalocean.com/pricing/droplets)
 * [SQLite WAL documentation](https://sqlite.org/wal.html)
+* [Oracle Cloud Always Free limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm)
 
 Recheck provider pricing before deployment because rates and free tier limits
 can change.
