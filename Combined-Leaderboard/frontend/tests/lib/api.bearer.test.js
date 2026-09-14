@@ -122,4 +122,38 @@ describe("bearer API transport", () => {
     });
     expect(fetchMock.mock.calls[1][1].headers.get("Authorization")).toBe("Bearer access-restored");
   });
+
+  it("uses bearer credentials for protected POST downloads on Pages", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        email: "member@example.com",
+        auth_transport: "bearer",
+        token_type: "Bearer",
+        access_token: "download-access",
+        refresh_token: "download-refresh",
+        expires_in: 900,
+      }))
+      .mockResolvedValueOnce(new Response("archive", {
+        headers: { "Content-Disposition": 'attachment; filename="backup.zip"' },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true, value: vi.fn(() => "blob:test"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true, value: vi.fn(),
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const api = await import("@/lib/api");
+    await api.postJSON("/api/auth/login", {
+      email: "member@example.com", password: "violet telescope cedar glacier",
+    });
+    expect(await api.downloadFile("/api/admin/backups/download", "backup.zip", {
+      method: "POST",
+    })).toBe("backup.zip");
+    const options = fetchMock.mock.calls[1][1];
+    expect(options.credentials).toBe("omit");
+    expect(options.headers.get("Authorization")).toBe("Bearer download-access");
+    expect(options.headers.get("X-Auth-Transport")).toBe("bearer");
+  });
 });

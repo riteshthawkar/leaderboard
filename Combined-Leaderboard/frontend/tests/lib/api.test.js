@@ -1,11 +1,19 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiUrl, downloadFile, errorMessage, getJSON } from "@/lib/api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+let ApiError, apiUrl, downloadFile, errorMessage, getJSON;
 
 describe("API client error handling", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv("VITE_AUTH_TRANSPORT", "cookie");
+    ({ ApiError, apiUrl, downloadFile, errorMessage, getJSON } = await import("@/lib/api"));
+  });
+
   afterEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("builds API URLs without duplicating slashes", () => {
