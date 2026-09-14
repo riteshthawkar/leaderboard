@@ -1,0 +1,30 @@
+name: Build deployment images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build images without private runtime data
+        working-directory: Combined-Leaderboard
+        run: |
+          docker build -f deployment/api/Dockerfile -t "ms-vista-api:${GITHUB_SHA}" .
+          docker build -f frontend/Dockerfile --build-arg VITE_SAME_ORIGIN=1 --build-arg VITE_API_BASE_URL= --build-arg VITE_PRIVACY_POLICY_URL=/privacy -t "ms-vista-frontend:${GITHUB_SHA}" frontend
+          mkdir -p ../image-artifacts
+          docker save "ms-vista-api:${GITHUB_SHA}" "ms-vista-frontend:${GITHUB_SHA}" | gzip -1 > ../image-artifacts/images.tar.gz
+          cd ../image-artifacts
+          sha256sum images.tar.gz > images.tar.gz.sha256
+          printf '%s\n' "${GITHUB_SHA}" > source-commit.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: deployment-images-${{ github.sha }}
+          path: image-artifacts/
+          retention-days: 2
+          compression-level: 0

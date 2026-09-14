@@ -7,7 +7,9 @@ DEPLOYMENT = ROOT / "deployment" / "oci"
 
 
 def test_oci_shell_scripts_have_valid_bash_syntax():
-    scripts = sorted(DEPLOYMENT.glob("*.sh"))
+    scripts = sorted(DEPLOYMENT.glob("*.sh")) + sorted(
+        (DEPLOYMENT.parent / "oci-micro").glob("*.sh")
+    )
     assert scripts
     for script in scripts:
         subprocess.run(["bash", "-n", str(script)], check=True)
@@ -66,3 +68,20 @@ def test_oci_host_check_rejects_same_filesystem_backups():
     assert '[[ ${data_device} != "${backup_device}" ]]' in script
     assert "ext4" in script
     assert "xfs" in script
+
+
+def test_micro_profile_is_explicit_and_keeps_production_guards():
+    micro = DEPLOYMENT.parent / "oci-micro"
+    compose = (micro / "compose.yaml").read_text(encoding="utf-8")
+    check = (micro / "check_host.sh").read_text(encoding="utf-8")
+    production_check = (DEPLOYMENT / "check_host.sh").read_text(encoding="utf-8")
+
+    assert compose.count("file: ../oci/compose.yaml") == 3
+    assert 'GUNICORN_THREADS: "1"' in compose
+    assert "mem_limit: 512m" in compose
+    assert 'MAX_SPATIAL_SUBMISSION_BYTES: "33554432"' in compose
+    assert "DISABLE_SUBMISSION_AUTH" not in compose
+    assert "AUTO_BACKUP_ENABLED" not in compose
+    assert "SwapTotal" in check
+    assert "../oci/check_host.sh" in check
+    assert "MIN_MEMORY_KIB:-3670016" in production_check

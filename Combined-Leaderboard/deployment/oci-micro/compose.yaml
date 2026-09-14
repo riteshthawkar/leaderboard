@@ -1,0 +1,50 @@
+name: ms-vista
+
+# Explicitly limited testing profile. Production remains in ../oci/compose.yaml.
+services:
+  api:
+    extends:
+      file: ../oci/compose.yaml
+      service: api
+    env_file: !override
+      - ${MS_VISTA_ENV_FILE:-production.env}
+    environment:
+      WEB_CONCURRENCY: "1"
+      GUNICORN_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      MAX_CONTENT_LENGTH: "16777216"
+      MAX_FILE_SIZE_PER_SUBMISSION: "16777216"
+      MAX_SPATIAL_ARCHIVE_BYTES: "10485760"
+      MAX_SPATIAL_MULTIPART_BYTES: "12582912"
+      MAX_SPATIAL_SUBMISSION_BYTES: "33554432"
+    mem_limit: 512m
+    memswap_limit: 768m
+    pids_limit: 128
+
+  frontend:
+    extends:
+      file: ../oci/compose.yaml
+      service: frontend
+    mem_limit: 32m
+    memswap_limit: 64m
+    pids_limit: 32
+
+  caddy:
+    extends:
+      file: ../oci/compose.yaml
+      service: caddy
+    env_file: !override
+      - ${MS_VISTA_ENV_FILE:-production.env}
+    mem_limit: 96m
+    memswap_limit: 128m
+    environment:
+      GOMEMLIMIT: 64MiB
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
