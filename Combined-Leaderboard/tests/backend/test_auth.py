@@ -154,6 +154,67 @@ def test_password_reset_increments_session_version(isolated_auth):
     assert after == before + 1
 
 
+def test_refresh_tokens_are_hashed_rotated_and_reuse_revokes_family(isolated_auth):
+    db = isolated_auth
+    status, verification_token = db.register_user(
+        "bearer@example.com",
+        "violet telescope cedar glacier",
+    )
+    assert status == "created"
+    assert db.verify_email(verification_token) == "bearer@example.com"
+
+    refresh_token = db.issue_refresh_token("bearer@example.com", 7)
+    assert refresh_token
+    with db._Session() as session:
+        stored = session.query(db.RefreshToken).one()
+        assert stored.token_digest == hashlib.sha256(refresh_token.encode()).hexdigest()
+        assert stored.token_digest != refresh_token
+
+    status, email, replacement = db.rotate_refresh_token(refresh_token, 7)
+    assert (status, email) == ("ok", "bearer@example.com")
+    assert replacement and replacement != refresh_token
+
+    reused, reused_email, reused_replacement = db.rotate_refresh_token(refresh_token, 7)
+    assert (reused, reused_email, reused_replacement) == ("reused", None, None)
+    revoked, revoked_email, revoked_replacement = db.rotate_refresh_token(replacement, 7)
+    assert (revoked, revoked_email, revoked_replacement) == ("revoked", None, None)
+
+
+def test_password_reset_revokes_refresh_tokens(isolated_auth):
+    db = isolated_auth
+    status, verification_token = db.register_user(
+        "refresh-reset@example.com",
+        "violet telescope cedar glacier",
+    )
+    assert status == "created"
+    assert db.verify_email(verification_token) == "refresh-reset@example.com"
+    refresh_token = db.issue_refresh_token("refresh-reset@example.com", 7)
+
+    status, reset_token = db.request_password_reset("refresh-reset@example.com")
+    assert status == "sent"
+    assert db.reset_password(reset_token, "amber orbit meadow lantern") == "ok"
+    result = db.rotate_refresh_token(refresh_token, 7)
+    assert result == ("revoked", None, None)
+
+
+def test_oauth_exchange_code_is_hashed_short_lived_and_single_use(isolated_auth):
+    db = isolated_auth
+    assert db.oauth_upsert_user(
+        "microsoft",
+        "oauth-handoff@example.com",
+        "subject-handoff",
+    ) == "oauth-handoff@example.com"
+    code = db.issue_oauth_exchange_code("oauth-handoff@example.com", 60)
+    assert code
+    with db._Session() as session:
+        stored = session.query(db.OAuthExchangeCode).one()
+        assert stored.code_digest == hashlib.sha256(code.encode()).hexdigest()
+        assert stored.code_digest != code
+
+    assert db.consume_oauth_exchange_code(code) == "oauth-handoff@example.com"
+    assert db.consume_oauth_exchange_code(code) is None
+
+
 def test_oauth_identity_uses_stable_provider_subject(isolated_auth):
     db = isolated_auth
 

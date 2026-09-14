@@ -70,6 +70,14 @@ jobs:
           VITE_SAME_ORIGIN: "1"
         run: npm run build
 
+      - name: Build GitHub Pages frontend
+        working-directory: Combined-Leaderboard/frontend
+        env:
+          VITE_API_BASE_URL: https://api.example.test
+          VITE_AUTH_TRANSPORT: bearer
+          VITE_BASE_PATH: /leaderboard/
+        run: npm run build:pages
+
       - name: Validate deployment shell scripts
         run: >-
           find deployment evaluation spatial_harness

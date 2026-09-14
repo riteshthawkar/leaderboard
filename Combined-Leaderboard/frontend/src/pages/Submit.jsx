@@ -404,7 +404,7 @@ export function Submit() {
         );
         setTaskInfoError(
           failures.length
-            ? `${failures.length} released benchmark description${failures.length > 1 ? "s" : ""} could not be loaded. ${errorMessage(failures[0].reason)}`
+            ? `${failures.length} evaluation-module description${failures.length > 1 ? "s" : ""} could not be loaded. ${errorMessage(failures[0].reason)}`
             : "",
         );
       } catch (error) {
@@ -412,7 +412,7 @@ export function Submit() {
         setAvailableTaskIds([]);
         setTaskInfo({});
         setTaskInfoError(
-          `Released benchmarks could not be loaded, so uploads are disabled. ${errorMessage(error)}`,
+          `Evaluation modules could not be loaded, so uploads are disabled. ${errorMessage(error)}`,
         );
       }
     };
@@ -514,19 +514,19 @@ export function Submit() {
   const submissionSteps = [
     [
       "Download questions",
-      "Grab each benchmark's question set and submission template from its task card.",
+      "Grab each evaluation module's question set and submission template from its task card.",
     ],
     [
       "Run your model",
       hasSpatialTask
         ? "Produce one final answer per question_id. The spatial harness runs all six required conditions and creates one upload package."
-        : "Produce one final answer per question_id using the released benchmark prompt and evaluation settings.",
+        : "Produce one final answer per question_id using the released module prompt and evaluation settings.",
     ],
     [
       "Upload and rank",
       hasSpatialTask
-        ? "Submit one file per benchmark. Spatial provenance, per sample results, and the aggregate report remain bundled and are published for audit."
-        : "Submit one JSONL response file per benchmark. Each accepted result is attached to the selected model identity.",
+        ? "Submit one file per module. Reasoning-analysis claimed scores, per-sample answers, raw-output evidence, and checksums remain bundled for audit."
+        : "Submit one JSONL response file per module. Each accepted result is attached to the selected model identity.",
     ],
   ];
 
@@ -534,7 +534,7 @@ export function Submit() {
     <WorkspacePage
       eyebrow="Submission workspace"
       title="Evaluate your model"
-      description="Download released questions, preserve complete sample coverage, and submit one benchmark response file at a time."
+      description="Download released questions, preserve complete sample coverage, and submit one evaluation-module response at a time."
       accountNavigation
     >
       <SubmissionResultDialog result={submissionResult} onClose={() => setSubmissionResult(null)} />
@@ -557,11 +557,11 @@ export function Submit() {
             </p>
           )}
           {authEmail && !authDisabled && (
-            <p className="mb-5 text-sm text-muted">Signed in as <strong>{authEmail}</strong>{quota?.per_benchmark_limit ? ` · ${quota.per_benchmark_limit} submission per benchmark every 24 hours` : ""} · <button type="button" className={ui.linkButton} onClick={async () => { try { await logout(); setAuthEmail(null); setAuthError(""); } catch (error) { setAuthError(errorMessage(error, "Sign out could not be completed.")); } }}>Sign out</button></p>
+            <p className="mb-5 text-sm text-muted">Signed in as <strong>{authEmail}</strong>{quota?.per_benchmark_limit ? ` · ${quota.per_benchmark_limit} submission per module every 24 hours` : ""} · <button type="button" className={ui.linkButton} onClick={async () => { try { await logout(); setAuthEmail(null); setAuthError(""); } catch (error) { setAuthError(errorMessage(error, "Sign out could not be completed.")); } }}>Sign out</button></p>
           )}
           <p className="mb-6 max-w-[70ch] leading-relaxed text-muted">
-            Submit one benchmark at a time so each model keeps separate
-            evaluation evidence and a traceable score for every released track.
+            Submit one module at a time so each model keeps traceable evidence
+            for every evaluation layer in its unified capability profile.
           </p>
           <div className="mb-8 border-y border-border-strong">
             <div className="flex items-start justify-between gap-6 border-b border-border py-5 max-md:flex-col">
@@ -571,7 +571,7 @@ export function Submit() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className={ui.badge}>
-                  {availableTaskIds === null ? "Loading tasks" : `${availableSubmitTasks.length} tasks`}
+                  {availableTaskIds === null ? "Loading modules" : `${availableSubmitTasks.length} modules`}
                 </span>
                 <span className={ui.badge}>{hasSpatialTask ? "JSONL / ZIP" : "JSONL"}</span>
                 <span className={ui.badge}>{authDisabled ? "Open test uploads" : "Authenticated uploads"}</span>
@@ -596,7 +596,7 @@ export function Submit() {
                   <span className={ui.sectionTag}>Model workspace</span>
                   <h2 className={ui.heading2} id="model-workspace-title">Choose one model identity</h2>
                   <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-muted">
-                    Every benchmark uploaded with this model is connected to the same leaderboard row. Canonical model details are registered once.
+                    Every module result uploaded with this model is connected to the same capability profile. Canonical model details are registered once.
                   </p>
                 </div>
                 <Button
@@ -627,7 +627,7 @@ export function Submit() {
                     </Select>
                   </Field>
                   {modelsStatus === "ready" && models.length === 0 && (
-                    <p className="mt-3 text-sm text-muted">Register your first model before uploading benchmark outputs.</p>
+                    <p className="mt-3 text-sm text-muted">Register your first model before uploading module outputs.</p>
                   )}
                   {modelRegistryError && <div className={cn(ui.message, ui.messageError, "mt-4")} role="alert">{modelRegistryError}</div>}
                 </div>
@@ -639,7 +639,7 @@ export function Submit() {
                         <h3 className={ui.heading3}>{selectedModel.model_name}</h3>
                         <p className="mt-1 text-sm text-muted">{selectedModel.organization} · {selectedModel.access.replaceAll("_", " ")}</p>
                         <p className="mt-2 text-xs text-faint">
-                          {availableSubmitTasks.filter((task) => selectedModel.benchmarks?.[task.id]).length} of {availableSubmitTasks.length} released benchmarks submitted
+                          {availableSubmitTasks.filter((task) => selectedModel.benchmarks?.[task.id]).length} of {availableSubmitTasks.length} evaluation modules submitted
                         </p>
                       </div>
                     </div>
@@ -662,7 +662,7 @@ export function Submit() {
                     <span className={ui.sectionTag}>New model</span>
                     <DialogTitle className={ui.heading2}>Register a model</DialogTitle>
                     <DialogDescription className="mt-2 max-w-[60ch] text-sm leading-relaxed text-muted">
-                      Create one model identity, then use it for every benchmark submission that belongs on the same leaderboard row.
+                      Create one model identity, then use it for every module submission that belongs in the same capability profile.
                     </DialogDescription>
                   </div>
                 <form
@@ -722,12 +722,12 @@ export function Submit() {
           <div className="grid gap-7 lg:gap-9">
             {availableTaskIds === null && (
               <div className="border-y border-border-strong py-8 text-sm text-muted" role="status">
-                Loading released benchmarks...
+                Loading evaluation modules...
               </div>
             )}
             {availableTaskIds !== null && availableSubmitTasks.length === 0 && (
               <div className={cn(ui.message, ui.messageError)} role="alert">
-                No benchmark submission contracts are currently available.
+                No evaluation-module submission contracts are currently available.
               </div>
             )}
             {availableSubmitTasks.map((task) => {
@@ -761,7 +761,7 @@ export function Submit() {
                   )}
                   {grading && task.harness && (
                     <p className="mt-2 text-sm text-muted">
-                      Final outputs are mapped by the pinned Qwen judge. The server verifies public sample coverage, provenance, hashes, and score arithmetic, then publishes the retained evidence without independently grading it again.
+                      Track 3 scores are self-reported and artifact-backed. The server verifies public sample coverage, package hashes, and score arithmetic without comparing answers with reference answers.
                     </p>
                   )}
                   <div className="my-3 flex flex-wrap gap-2 max-sm:[&>*]:w-full">
@@ -784,7 +784,7 @@ export function Submit() {
                   </div>
                   {task.harness && (
                     <p className="text-sm text-muted">
-                      Run <code>spatial_harness/run_eval.sh</code>, then upload the generated <code>spatial_reasoning_submission.zip</code> package unchanged. Its final answer evidence, aggregate report, manifest, and original ZIP are retained and made public with the leaderboard result.
+                      Run <code>spatial_harness/run_eval.sh</code>, then upload the generated <code>track3_artifact_submission.zip</code> package unchanged. Its claimed scores, final answers, compressed model outputs, provenance, and checksums are retained for audit.
                     </p>
                   )}
                   {task.harness && submissionReady === false && (
@@ -803,7 +803,7 @@ export function Submit() {
                   )}
                   {authEmail === null && (
                     <p className="mt-3 border-t border-border pt-3 text-sm text-muted">
-                      <a href="/login?next=/submit">Sign in</a> to submit
+                      <Link to="/login?next=/submit">Sign in</Link> to submit
                       predictions for {task.label}.
                     </p>
                   )}
@@ -822,7 +822,7 @@ export function Submit() {
                       <div className="mb-4">
                         <span className={ui.sectionTag}>Run metadata</span>
                         <p className="mt-1 text-sm leading-relaxed text-muted">
-                          Describe this benchmark run. Canonical model details come from the selected model identity.
+                          Describe this module run. Canonical model details come from the selected model identity.
                         </p>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -905,7 +905,7 @@ export function Submit() {
                             <textarea
                               name="prompt_template"
                               rows="5"
-                              placeholder="Paste the prompt template used to generate predictions for this benchmark."
+                              placeholder="Paste the prompt template used to generate predictions for this module."
                               required
                             />
                           </Field>
@@ -936,7 +936,7 @@ export function Submit() {
                         required
                         maxBytes={task.harness ? taskInfo[task.id]?.max_upload_bytes : undefined}
                         hint={task.harness
-                          ? "ZIP · spatial_reasoning_submission.zip from the completed harness run"
+                          ? "ZIP · track3_artifact_submission.zip from the completed harness run"
                           : "JSONL · one final answer per question_id"}
                       />
                     </Field>

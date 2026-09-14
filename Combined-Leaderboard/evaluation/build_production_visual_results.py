@@ -18,9 +18,9 @@ from evaluation.extract_canonical_answers import (
     DEFAULT_EXCLUDED_VARIANTS,
     DEFAULT_EXTRACTOR_MODEL,
     DEFAULT_EXTRACTOR_REVISION,
+    EVIDENCE_VALIDATION_METHOD,
     FAIL_CLOSED_FALLBACK_METHOD,
     METHOD,
-    TERMINAL_FALLBACK_METHOD,
     candidate_key,
     classify_extractor_output,
     finalize_persistent_extractor_failure,
@@ -56,6 +56,7 @@ UNRESOLVED_STATUSES = {
 }
 EXTRACTION_IDENTITY_FIELDS = {
     "answer_extraction_method",
+    "evidence_validation_method",
     "extracted_answer",
     "ground_truth_available_to_validator",
     "ground_truth_loaded",
@@ -63,6 +64,7 @@ EXTRACTION_IDENTITY_FIELDS = {
     "ground_truth_supplied",
     "ground_truth_supplied_to_extractor",
     "independent_extraction_status",
+    "source_audit_sha256",
 }
 
 
@@ -121,12 +123,16 @@ def validate_source_artifact(path: Path, expected_sha256: Any) -> None:
 def load_completed_audit(
     audit_path: Path,
     candidates: list[dict[str, Any]],
-) -> tuple[dict[tuple[str, str, str], dict[str, Any]], str]:
+    *,
+    require_source_audit_sha256: bool = False,
+) -> tuple[dict[tuple[str, str, str], dict[str, Any]], str, str]:
     candidates_by_key = {candidate_key(item): item for item in candidates}
     if len(candidates_by_key) != len(candidates):
         raise ProductionBuildError("Expected evidence candidates are not unique.")
     audit: dict[tuple[str, str, str], dict[str, Any]] = {}
     contracts = set()
+    source_audit_hashes = set()
+    rows_without_source_audit_hash = 0
     failures = []
     for row in read_jsonl(audit_path):
         key = candidate_key(row)
@@ -137,6 +143,10 @@ def load_completed_audit(
             raise ProductionBuildError(f"Evidence audit contains unexpected row {key}.")
         if row.get("method") != METHOD:
             raise ProductionBuildError(f"Evidence audit method mismatch for {key}.")
+        if row.get("evidence_validation_method") != EVIDENCE_VALIDATION_METHOD:
+            raise ProductionBuildError(
+                f"Evidence validation method mismatch for {key}."
+            )
         if row.get("extractor_model") != DEFAULT_EXTRACTOR_MODEL:
             raise ProductionBuildError(f"Evidence extractor model mismatch for {key}.")
         if row.get("extractor_revision") != DEFAULT_EXTRACTOR_REVISION:
@@ -151,6 +161,15 @@ def load_completed_audit(
         if not re.fullmatch(r"[0-9a-f]{64}", contract):
             raise ProductionBuildError(f"Evidence contract hash is missing for {key}.")
         contracts.add(contract)
+        source_audit_hash = str(row.get("source_audit_sha256") or "")
+        if not source_audit_hash:
+            rows_without_source_audit_hash += 1
+        elif not re.fullmatch(r"[0-9a-f]{64}", source_audit_hash):
+            raise ProductionBuildError(
+                f"Source extractor audit hash is invalid for {key}."
+            )
+        else:
+            source_audit_hashes.add(source_audit_hash)
         status = str(row.get("status") or "")
         if status not in FINAL_STATUSES:
             failures.append((key, status))
@@ -161,10 +180,7 @@ def load_completed_audit(
         )
         fallback_method = row.get("terminal_fallback_method")
         if fallback_method:
-            if fallback_method not in {
-                TERMINAL_FALLBACK_METHOD,
-                FAIL_CLOSED_FALLBACK_METHOD,
-            }:
+            if fallback_method != FAIL_CLOSED_FALLBACK_METHOD:
                 raise ProductionBuildError(
                     f"Terminal fallback method mismatch for {key}."
                 )
@@ -209,7 +225,22 @@ def load_completed_audit(
         )
     if len(contracts) != 1:
         raise ProductionBuildError("Evidence audit uses more than one extractor contract.")
-    return audit, contracts.pop()
+    if source_audit_hashes and rows_without_source_audit_hash:
+        raise ProductionBuildError(
+            "Evidence audit mixes rows with and without source-audit provenance."
+        )
+    if require_source_audit_sha256 and rows_without_source_audit_hash:
+        raise ProductionBuildError(
+            "Production evidence audit is missing its source extractor audit hash."
+        )
+    if len(source_audit_hashes) > 1:
+        raise ProductionBuildError(
+            "Evidence audit references more than one source extractor audit."
+        )
+    source_audit_hash = (
+        source_audit_hashes.pop() if source_audit_hashes else sha256(audit_path)
+    )
+    return audit, contracts.pop(), source_audit_hash
 
 
 def replace_extraction(
@@ -244,6 +275,7 @@ def replace_extraction(
     diagnostic.update(
         {
             "answer_extraction_method": METHOD,
+            "extractor_evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
             "extractor_model": DEFAULT_EXTRACTOR_MODEL,
             "extractor_revision": DEFAULT_EXTRACTOR_REVISION,
             "extractor_contract_sha256": str(audit["extractor_contract_sha256"]),
@@ -254,6 +286,7 @@ def replace_extraction(
             "extractor_finish_reason": audit.get("finish_reason"),
             "extractor_completion_tokens": audit.get("completion_tokens"),
             "extractor_source_output_sha256": str(audit["response_sha256"]),
+            "extractor_source_audit_sha256": str(audit["source_audit_sha256"]),
             "extractor_ground_truth_loaded": False,
             "extractor_ground_truth_supplied": False,
             "extracted_answer": answer,
@@ -298,8 +331,10 @@ def build_track(
     track: str,
     audit: dict[tuple[str, str, str], dict[str, Any]],
     expected_ids: list[str],
-    audit_sha256: str,
+    validated_audit_sha256: str,
+    source_extractor_audit_sha256: str,
     contract_sha256: str,
+    final_pipeline_revision: str,
 ) -> dict[str, Any]:
     slug = str(variant["variant_id"])
     source_record = variant["tracks"][track]
@@ -338,14 +373,17 @@ def build_track(
     shutil.copy2(source_run_config, source_config_copy)
     run_config = read_json(source_run_config)
     run_config["source_pipeline_revision"] = run_config.get("pipeline_revision")
-    run_config["pipeline_revision"] = CURRENT_PIPELINE_REVISION
+    run_config["pipeline_revision"] = final_pipeline_revision
     run_config["schema_version"] = 12
     run_config["answer_extraction"] = {
         "method": METHOD,
         "model": DEFAULT_EXTRACTOR_MODEL,
         "revision": DEFAULT_EXTRACTOR_REVISION,
+        "evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
         "extractor_contract_sha256": contract_sha256,
-        "audit_sha256": audit_sha256,
+        "audit_sha256": validated_audit_sha256,
+        "validated_audit_sha256": validated_audit_sha256,
+        "source_extractor_audit_sha256": source_extractor_audit_sha256,
         "input_fields": [
             "question",
             "answer_type",
@@ -356,7 +394,9 @@ def build_track(
         "image_supplied": False,
         "ground_truth_loaded": False,
         "ground_truth_supplied": False,
-        "evidence_requirement": "literal-source-quote-and-commitment-validation",
+        "evidence_requirement": (
+            "formatting-equivalent-source-quote-and-commitment-validation"
+        ),
     }
     run_config_path = destination / f"{track}.run_config.json"
     write_json(run_config_path, run_config)
@@ -415,8 +455,11 @@ def build_track(
             "method": METHOD,
             "extractor_model": DEFAULT_EXTRACTOR_MODEL,
             "extractor_revision": DEFAULT_EXTRACTOR_REVISION,
+            "evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
             "extractor_contract_sha256": contract_sha256,
-            "audit_sha256": audit_sha256,
+            "audit_sha256": validated_audit_sha256,
+            "validated_audit_sha256": validated_audit_sha256,
+            "source_extractor_audit_sha256": source_extractor_audit_sha256,
             "status_counts": dict(status_counts),
             "image_supplied": False,
             "ground_truth_loaded": False,
@@ -460,6 +503,57 @@ def reasoning_profile_for_variant(
     return profile
 
 
+def execution_profile_for_variant(
+    source_root: Path,
+    variant: dict[str, Any],
+) -> dict[str, str]:
+    """Validate source execution metadata shared by both visual tracks."""
+    defaults = {
+        "weight_loading": "unquantized",
+        "compute_dtype": "bfloat16",
+        "access": "open_weights",
+        "selection_precision": "original-unquantized-bf16",
+        "final_pipeline_revision": CURRENT_PIPELINE_REVISION,
+    }
+    profile = {
+        field: str(variant.get(field) or default).strip()
+        for field, default in defaults.items()
+    }
+    for track in TRACKS:
+        config = read_json(
+            source_root
+            / str(variant["tracks"][track]["relative_dir"])
+            / f"{track}.run_config.json"
+        )
+        for field in ("weight_loading", "compute_dtype", "access"):
+            configured = str(config.get(field) or "").strip()
+            if configured and configured != profile[field]:
+                raise ProductionBuildError(
+                    f"Variant {variant.get('variant_id')} has conflicting {field} "
+                    f"metadata for {track}: {configured!r} != {profile[field]!r}."
+                )
+        configured_revision = str(
+            config.get("final_pipeline_revision") or ""
+        ).strip()
+        if (
+            configured_revision
+            and configured_revision != profile["final_pipeline_revision"]
+        ):
+            raise ProductionBuildError(
+                f"Variant {variant.get('variant_id')} has conflicting final pipeline "
+                f"revisions for {track}."
+            )
+    if profile["access"] not in {"open", "open_weights", "closed", "research"}:
+        raise ProductionBuildError(
+            f"Variant {variant.get('variant_id')} has unsupported access metadata."
+        )
+    if not all(profile.values()):
+        raise ProductionBuildError(
+            f"Variant {variant.get('variant_id')} has incomplete execution metadata."
+        )
+    return profile
+
+
 def build_production_results(
     project_root: Path,
     source_root: Path,
@@ -480,8 +574,16 @@ def build_production_results(
         "all",
         excluded_variants=excluded_variants,
     )
-    audit, contract_sha256 = load_completed_audit(audit_path, candidates)
-    audit_digest = sha256(audit_path)
+    (
+        audit,
+        contract_sha256,
+        source_extractor_audit_sha256,
+    ) = load_completed_audit(
+        audit_path,
+        candidates,
+        require_source_audit_sha256=True,
+    )
+    validated_audit_sha256 = sha256(audit_path)
     expected = {
         track: expected_question_ids(project_root, track) for track in TRACKS
     }
@@ -492,11 +594,14 @@ def build_production_results(
     )
     try:
         index_models = []
+        pipeline_revisions = set()
         for variant in variants:
             slug = str(variant["variant_id"])
             destination = staging / slug
             destination.mkdir()
             reasoning_profile = reasoning_profile_for_variant(source_root, variant)
+            execution_profile = execution_profile_for_variant(source_root, variant)
+            pipeline_revisions.add(execution_profile["final_pipeline_revision"])
             track_records = {
                 track: build_track(
                     source_root=source_root,
@@ -505,8 +610,12 @@ def build_production_results(
                     track=track,
                     audit=audit,
                     expected_ids=expected[track],
-                    audit_sha256=audit_digest,
+                    validated_audit_sha256=validated_audit_sha256,
+                    source_extractor_audit_sha256=source_extractor_audit_sha256,
                     contract_sha256=contract_sha256,
+                    final_pipeline_revision=execution_profile[
+                        "final_pipeline_revision"
+                    ],
                 )
                 for track in TRACKS
             }
@@ -514,22 +623,28 @@ def build_production_results(
                 "schema_version": 2,
                 "finalized_at": datetime.now(timezone.utc).isoformat(),
                 "selection_policy": {
-                    "precision": "original-unquantized-bf16",
-                    "pipeline_revision": CURRENT_PIPELINE_REVISION,
+                    "precision": execution_profile["selection_precision"],
+                    "pipeline_revision": execution_profile[
+                        "final_pipeline_revision"
+                    ],
                     "required_tracks": list(TRACKS),
                     "excluded_variants": sorted(excluded_variants),
                 },
                 "model_id": str(variant["model_id"]),
                 "model_revision": str(variant["model_revision"]),
                 "reasoning_profile": reasoning_profile,
-                "weight_loading": "unquantized",
-                "compute_dtype": "bfloat16",
+                "access": execution_profile["access"],
+                "weight_loading": execution_profile["weight_loading"],
+                "compute_dtype": execution_profile["compute_dtype"],
                 "evidence_extraction": {
                     "method": METHOD,
                     "extractor_model": DEFAULT_EXTRACTOR_MODEL,
                     "extractor_revision": DEFAULT_EXTRACTOR_REVISION,
+                    "evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
                     "extractor_contract_sha256": contract_sha256,
-                    "source_audit_sha256": audit_digest,
+                    "source_audit_sha256": source_extractor_audit_sha256,
+                    "source_extractor_audit_sha256": source_extractor_audit_sha256,
+                    "validated_audit_sha256": validated_audit_sha256,
                     "image_supplied": False,
                     "ground_truth_loaded": False,
                     "ground_truth_supplied": False,
@@ -544,6 +659,10 @@ def build_production_results(
                     "model_id": manifest["model_id"],
                     "model_revision": manifest["model_revision"],
                     "reasoning_profile": reasoning_profile,
+                    "access": execution_profile["access"],
+                    "pipeline_revision": execution_profile[
+                        "final_pipeline_revision"
+                    ],
                     "manifest": f"{slug}/final_manifest.json",
                     "manifest_sha256": sha256(manifest_path),
                     "tracks": {
@@ -566,15 +685,22 @@ def build_production_results(
         index = {
             "schema_version": 2,
             "generated_at": datetime.now(timezone.utc).isoformat(),
-            "pipeline_revision": CURRENT_PIPELINE_REVISION,
+            "pipeline_revision": (
+                next(iter(pipeline_revisions))
+                if len(pipeline_revisions) == 1
+                else "mixed-source-gold-blind-evidence-extraction-v1"
+            ),
             "model_count": len(index_models),
             "excluded_variants": sorted(excluded_variants),
             "evidence_extraction": {
                 "method": METHOD,
                 "extractor_model": DEFAULT_EXTRACTOR_MODEL,
                 "extractor_revision": DEFAULT_EXTRACTOR_REVISION,
+                "evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
                 "extractor_contract_sha256": contract_sha256,
-                "source_audit_sha256": audit_digest,
+                "source_audit_sha256": source_extractor_audit_sha256,
+                "source_extractor_audit_sha256": source_extractor_audit_sha256,
+                "validated_audit_sha256": validated_audit_sha256,
                 "response_count": len(candidates),
                 "image_supplied": False,
                 "ground_truth_loaded": False,

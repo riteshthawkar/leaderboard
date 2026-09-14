@@ -1,16 +1,16 @@
 ---
-title: MS VISTA Leaderboard
+title: MS VISTA Evaluation Framework
 sdk: docker
 app_port: 7860
 fullWidth: true
 header: mini
-short_description: Visual perception, cognition, and spatial reasoning model evaluation
+short_description: Unified visual perception, cognition, and reasoning-behavior evaluation
 startup_duration_timeout: 30m
 ---
 
-# Combined Leaderboard
+# MS VISTA Evaluation Framework
 
-React + Flask application for the MSR visual cognition and spatial reasoning leaderboard. It evaluates VLM submissions across Do-You-See-Me, Mind's-Eye, and Spatial Reasoning, then exposes track-aware rankings, metadata filters, comparison views, and model reports.
+MS VISTA is a unified evaluation framework for multimodal visual intelligence. This repository provides the capability modules, evidence contracts, scoring and verification services, analysis surfaces, and leaderboard used to evaluate visual perception, visual cognition, and reasoning behavior under one model profile.
 
 ## Current Architecture
 
@@ -28,6 +28,47 @@ React + Flask application for the MSR visual cognition and spatial reasoning lea
 - `docs/` - architecture, deployment, and operating documentation.
 
 Flask does not render pages or expose frontend static files. The frontend calls the public API origin configured through `VITE_API_BASE_URL`.
+
+## Scientific Contract
+
+MS VISTA integrates three published Microsoft Research evaluation suites as
+modules in one capability framework. It unifies model identity, run provenance,
+submission contracts, evidence retention, diagnostics, and reporting while
+preserving the scoring method required by each module:
+
+- The **visual perception module (Do You See Me)** is server-scored against
+  private ground truth using a dimension-balanced task macro. Its current
+  release contains 4,500 validated questions; the published paper study
+  evaluated 2,612.
+- The **visual cognition module (Mind's Eye)** is server-scored against private
+  ground truth using an unweighted mean across eight tasks. Its current release
+  contains 799 questions; the published paper describes 800.
+- The **reasoning-analysis module (Spatial Reasoning & Robustness)** is
+  self-reported and artifact-backed. The API verifies package hashes, public
+  sample coverage, unique identifiers, all six conditions, and claimed score
+  arithmetic. It does not load reference answers, rerun a judge, or
+  independently regrade the submitted answers.
+- The **integrated capability profile** reports perception, cognition, VPCI,
+  and reasoning diagnostics together. VPCI is the equally weighted mean of the
+  two visual capability scores and is available only when both are present.
+  Reasoning diagnostics do not enter VPCI because they measure intervention
+  effects rather than the same accuracy construct.
+
+The committed public question bundles, templates, and spatial manifest define
+the release evaluated by a deployment. Accepted submissions retain immutable
+answer-level or artifact-level evidence so later audits can reproduce the
+published score under that release contract.
+
+### Known limitations
+
+- Track 3 verification establishes artifact integrity, coverage, and internal
+  arithmetic consistency; it does not prove that the claimed credit is correct
+  against an independent answer key.
+- Module scores measure different constructs. The framework reports them
+  together as a capability profile but does not treat them as one directly
+  comparable accuracy scale.
+- Paper-study statistics and current leaderboard-release statistics are kept
+  separate because their evaluated sample sets are not identical.
 
 ## Prerequisites
 
@@ -151,6 +192,9 @@ temporary no-login test configuration.
 | `ACS_*` or `SMTP_*` | Transactional email provider for account verification and password reset. |
 | `SESSION_COOKIE_SECURE` | Set `true` when served over HTTPS. |
 | `SESSION_COOKIE_SAMESITE` | Use `Lax` for same-site subdomains; use `None` with HTTPS when frontend and API are on different sites. |
+| `AUTH_TRANSPORT` | `cookie`, `bearer`, or `dual`; use `dual` when GitHub Pages calls the Azure API while the VM frontend remains available. |
+| `ACCESS_TOKEN_TTL_SECONDS` | Signed bearer access-token lifetime; defaults to 900 seconds. |
+| `REFRESH_TOKEN_TTL_DAYS` | Rotating browser refresh-token lifetime; defaults to 7 days. |
 | `MAX_FILE_SIZE_PER_SUBMISSION` | Per-upload JSONL size limit in bytes. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Enables Google OAuth. |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | Enables Microsoft OAuth. |
@@ -162,19 +206,27 @@ Create `frontend/.env.production` from `frontend/.env.example` and set the API s
 
 ```env
 VITE_API_BASE_URL=https://your-api-domain.example
+VITE_AUTH_TRANSPORT=bearer
+VITE_BASE_PATH=/leaderboard/
 ```
 
 Then set backend production env accordingly:
 
 ```env
 CORS_ORIGINS=https://your-frontend-domain.example
+AUTH_TRANSPORT=dual
 SESSION_COOKIE_SECURE=true
 FRONTEND_BASE_URL=https://your-frontend-domain.example
 API_BASE_URL=https://your-api-domain.example
 OAUTH_REDIRECT_BASE_URL=https://your-api-domain.example
 ```
 
-Use `SESSION_COOKIE_SAMESITE=Lax` when frontend and API use same-site HTTPS subdomains such as `app.example.com` and `api.example.com`. Use `SESSION_COOKIE_SAMESITE=None` with `SESSION_COOKIE_SECURE=true` only when the two origins are on different sites. Exact frontend origins must be listed in `CORS_ORIGINS`; wildcard origins are rejected because authentication uses credentialed cookies.
+Use `SESSION_COOKIE_SAMESITE=Lax` when frontend and API use same-site HTTPS subdomains such as `app.example.com` and `api.example.com`. For unrelated sites such as GitHub Pages and Azure, use bearer transport instead of relying on third-party cookies. Exact frontend origins must be listed in `CORS_ORIGINS`; wildcard origins are rejected for authenticated deployments. See [docs/deployment.md](docs/deployment.md#github-pages) for the Pages workflow and repository variables.
+
+For production authentication, isolate the Pages browser origin with a custom
+domain or a dedicated GitHub account/organization. Project sites under one
+`github.io` account share browser storage, so the personal project URL is best
+treated as staging when that account hosts other Pages projects.
 
 OAuth provider callback URLs must point at the backend, for example `https://your-api-domain.example/api/auth/oauth/google/callback`.
 
@@ -183,11 +235,11 @@ OAuth provider callback URLs must point at the backend, for example `https://you
 1. Register or sign in on the frontend `/login` route.
 2. Register the model once, then select its stable model identity in the submission workspace.
 3. Download questions/templates from the frontend `/submit` route.
-4. Run the model locally, ideally through the harness for that benchmark.
-5. Upload one benchmark's JSONL or spatial ZIP plus run-specific metadata.
-6. For Do You See Me and Mind's Eye, the backend validates sample coverage and scores final answers against private ground truth. For Spatial, it validates official harness provenance, public per-sample evidence, and aggregate arithmetic without independently grading the answers. Every accepted result is linked to the selected model and published to the appropriate leaderboard.
+4. Run the model locally, ideally through the harness for that evaluation module.
+5. Upload one module's JSONL or reasoning-analysis ZIP plus run-specific metadata.
+6. For the perception and cognition modules, the backend validates sample coverage and scores final answers against private ground truth. Reasoning-analysis results are self-reported and artifact-backed: the backend checks package integrity, public sample coverage, and claimed score arithmetic without reference answers. Every accepted result is linked to the selected model and added to its MS VISTA capability profile.
 
-Visual submission JSONL rows must include `question_id` and `answer`; `sample_id` is accepted for legacy local bundles. `condition` defaults to `standard`. Spatial users upload only the versioned ZIP emitted by the official harness.
+Visual submission JSONL rows must include `question_id` and `answer`; `sample_id` is accepted for legacy local bundles. `condition` defaults to `standard`. Spatial users upload only the versioned artifact ZIP emitted by the Track 3 harness.
 
 Combined generator exports that contain the `subset` and `output` fields can be
 split into canonical task files with the checked scorer before upload:
@@ -225,7 +277,7 @@ The command provisions the pinned environment and dataset, runs DYS and Mind's E
 for auditing. Public ranking uses `macro_accuracy` with a benchmark-specific
 aggregation contract:
 
-| Benchmark | Public ranking score |
+| Evaluation module | Public ranking score |
 | --- | --- |
 | Do You See Me | Mean task accuracy within 2D and 3D, then an equal mean across the two dimensions |
 | Mind's Eye | Unweighted mean of the eight task accuracies |
@@ -246,7 +298,7 @@ Private ground truth can also be loaded from a private Hugging Face repo. Set `G
 
 Raw upload files are not stored. For audit and re-scoring, the database stores one structured row per final answer (`submission_id`, `row_index`, `question_id`, `condition`, `answer`, answer hash). Authenticated users can regenerate their submitted final-answer JSONL from `/api/submissions/<submission_id>/export.jsonl`.
 
-Canonical model metadata includes organization, source status, paper link, and optional parameter count. It is registered once. Each benchmark submission separately records CoT usage, method description, prompt template, and change log. Accounts receive an independent rolling quota for each benchmark, so all three tracks can be submitted for the same model without competing for one shared allowance.
+Canonical model metadata includes organization, source status, paper link, and optional parameter count. It is registered once. Each module submission separately records CoT usage, method description, prompt template, and change log. Accounts receive an independent rolling quota for each evaluation module, so a complete framework profile can be submitted without competing for one shared allowance.
 
 Signed-in users can review scored uploads at `/submissions`. Admin users listed
 in `ADMIN_EMAILS` can review all submissions, hide/restore entries, soft-delete
@@ -268,7 +320,9 @@ backend.backup_cli verify <archive>` and `python -m backend.backup_cli restore
 
 ## Spatial Public Evidence Contract
 
-`backend/build_tasks.py` creates a small synthetic spatial bundle so the app can boot. The API always rejects submissions against this demo bundle. Build a versioned official bundle on a trusted administrator machine after preparing all 13 normalized datasets:
+`backend/build_tasks.py` can create a small synthetic spatial bundle for local
+development. Production must use a versioned official bundle generated on a
+trusted administrator machine after preparing all 13 normalized datasets:
 
 ```bash
 cd Combined-Leaderboard
@@ -290,20 +344,55 @@ does not use that private key to grade Spatial uploads. Restart the API and
 confirm `/api/health` reports `spatial_bundle: healthy` before opening
 submissions.
 
-The canonical `spatial_harness/` produces one user-facing upload,
-`spatial_reasoning_submission.zip`, containing `submission.jsonl`,
-`run_manifest.json`, and `leaderboard.json`. The API validates the package in
-memory, confirms the per-sample correctness evidence agrees with the aggregate
-report, and stores the exact ZIP and all three members in SQLite. It also
-retains each official public benchmark contract once, links every Spatial
-submission to its manifest hash, and uses that immutable version for future
-rescoring. Visible spatial results expose public evidence metadata, hashes,
-per-sample results, and the original package under
-`/api/public/submissions/<submission_id>/`.
+The canonical `spatial_harness/` produces `track3_artifact_submission.zip`
+with `manifest.json`, `claimed_scores.json`, `answers.jsonl.gz`,
+`raw_outputs.jsonl.gz`, and `checksums.json`. Track 3 scores are explicitly
+self-reported and artifact-backed. The API validates SHA-256 integrity, public
+sample coverage, unique identifiers, condition/group counts, and agreement
+between per-sample `claimed_credit` flags and aggregate integer counts. It does
+not load reference answers or run a judge. The compressed raw-output member is
+retained in the exact archive for later audit without being parsed during the
+normal submission path.
 
-The checked-in spatial bundle is intentionally small. Treat spatial launch as blocked until the official bundle has been generated from the pinned TSV files and all dataset preparation checks pass.
+The historical three-member `spatial_reasoning_submission.zip` remains
+readable for stored records and administrator migration. Convert a completed
+legacy package with original model responses using:
 
-`REQUIRE_OFFICIAL_SPATIAL` defaults to false while this track is pending, so the visual leaderboard can pass readiness independently. Spatial uploads remain closed against the demo bundle. After mounting the official public manifest, question identifiers, and template, set the flag to true and confirm the spatial component is healthy before announcing the track.
+```bash
+python scripts/convert_spatial_artifact_package.py \
+  --source-package /secure/results/model/spatial_reasoning_submission.zip \
+  --raw-outputs /secure/results/model/judged.jsonl \
+  --benchmark-manifest tasks/spatial/manifest.json \
+  --output /secure/results/model/track3_artifact_submission.zip
+```
+
+Administrators can validate and import completed canonical packages without
+using a user account or weakening submission authentication. The command is a
+dry run unless `--apply` is present and creates a retained backup before any
+database write:
+
+```bash
+LEADERBOARD_DATA_DIR=/srv/ms-vista/data \
+python scripts/import_spatial_results.py \
+  --package /secure/results/internvl/track3_artifact_submission.zip
+
+LEADERBOARD_DATA_DIR=/srv/ms-vista/data \
+python scripts/import_spatial_results.py \
+  --package /secure/results/internvl/track3_artifact_submission.zip \
+  --apply
+```
+
+Use `--package-root` to discover multiple canonical ZIP packages recursively.
+When a harness repository name must attach to an existing display name, pass
+`--model-name 'repository/name=Leaderboard display name'`. The importer stores
+the exact archive, the lightweight members needed for public inspection, and
+an immutable copy of the public contract used to validate it. The compressed
+raw outputs remain inside the exact downloadable archive without being
+duplicated in the database.
+
+`REQUIRE_OFFICIAL_SPATIAL` defaults to false so a visual-only development
+deployment can boot without Track 3. Set it to true in production and confirm
+the spatial component is healthy before announcing the track.
 
 ## Production Build
 

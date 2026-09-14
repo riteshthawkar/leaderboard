@@ -1,9 +1,448 @@
 {
-  "schema_version": "ms-vista-spatial-benchmark/v2",
-  "task_id": "spatial",
-  "benchmark_version": "demo-only",
-  "demo": true,
-  "note": "This checked-in bundle only exercises local code paths. It cannot be used for leaderboard submissions.",
+  "artifacts": {
+    "questions": {
+      "filename": "questions.jsonl",
+      "rows": 14215,
+      "sha256": "97b7e0dbeaacf690ef46522ec9c5cdd2d1a919fb6bd909f603bfcb58ea97aff9"
+    },
+    "submission_template": {
+      "filename": "submission_template.jsonl",
+      "rows": 80826,
+      "sha256": "26983ed991b7d5eca9cf1d43cba34f2cbbb43c67c84cdbdb4f9cb6ab67bffcc5"
+    }
+  },
+  "benchmark_version": "paper-aligned-v5-2026-07",
+  "condition_counts": {
+    "main_cot": 13951,
+    "main_noncot": 13951,
+    "no_image_cot": 13539,
+    "no_image_noncot": 13539,
+    "no_image_plus_cot": 12923,
+    "no_image_plus_noncot": 12923
+  },
+  "condition_group_counts": {
+    "main_cot": 13539,
+    "main_noncot": 13539,
+    "no_image_cot": 13539,
+    "no_image_noncot": 13539,
+    "no_image_plus_cot": 12923,
+    "no_image_plus_noncot": 12923
+  },
+  "created_at": "2026-07-29T06:19:24.966525+00:00",
+  "data_manifest": {
+    "filename": "track3_data_manifest.json",
+    "sha256": "3ec62d0f4f311619eddad7467d926804e550b0cb58296f496d4367b3c7520407"
+  },
+  "dataset_condition_counts": {
+    "3DSRBench": {
+      "main_cot": 2625,
+      "main_noncot": 2625,
+      "no_image_cot": 2625,
+      "no_image_noncot": 2625,
+      "no_image_plus_cot": 2625,
+      "no_image_plus_noncot": 2625
+    },
+    "BLINK": {
+      "main_cot": 1901,
+      "main_noncot": 1901,
+      "no_image_cot": 1901,
+      "no_image_noncot": 1901,
+      "no_image_plus_cot": 1901,
+      "no_image_plus_noncot": 1901
+    },
+    "CV-Bench-2D": {
+      "main_cot": 1438,
+      "main_noncot": 1438,
+      "no_image_cot": 1438,
+      "no_image_noncot": 1438,
+      "no_image_plus_cot": 1438,
+      "no_image_plus_noncot": 1438
+    },
+    "CV-Bench-3D": {
+      "main_cot": 1200,
+      "main_noncot": 1200,
+      "no_image_cot": 1200,
+      "no_image_noncot": 1200,
+      "no_image_plus_cot": 1200,
+      "no_image_plus_noncot": 1200
+    },
+    "MMSIBench_wo_circular": {
+      "main_cot": 1000,
+      "main_noncot": 1000,
+      "no_image_cot": 1000,
+      "no_image_noncot": 1000,
+      "no_image_plus_cot": 1000,
+      "no_image_plus_noncot": 1000
+    },
+    "MMVP": {
+      "main_cot": 300,
+      "main_noncot": 300,
+      "no_image_cot": 300,
+      "no_image_noncot": 300,
+      "no_image_plus_cot": 300,
+      "no_image_plus_noncot": 300
+    },
+    "MindCube": {
+      "main_cot": 1040,
+      "main_noncot": 1040,
+      "no_image_cot": 1040,
+      "no_image_noncot": 1040,
+      "no_image_plus_cot": 1040,
+      "no_image_plus_noncot": 1040
+    },
+    "OmniSpatial": {
+      "main_cot": 1533,
+      "main_noncot": 1533,
+      "no_image_cot": 1533,
+      "no_image_noncot": 1533,
+      "no_image_plus_cot": 1304,
+      "no_image_plus_noncot": 1304
+    },
+    "RealWorldQA": {
+      "main_cot": 765,
+      "main_noncot": 765,
+      "no_image_cot": 765,
+      "no_image_noncot": 765,
+      "no_image_plus_cot": 438,
+      "no_image_plus_noncot": 438
+    },
+    "SAT-Real": {
+      "main_cot": 300,
+      "main_noncot": 300,
+      "no_image_cot": 150,
+      "no_image_noncot": 150,
+      "no_image_plus_cot": 150,
+      "no_image_plus_noncot": 150
+    },
+    "SpatialBench": {
+      "main_cot": 436,
+      "main_noncot": 436,
+      "no_image_cot": 174,
+      "no_image_noncot": 174,
+      "no_image_plus_cot": 114,
+      "no_image_plus_noncot": 114
+    },
+    "VSR_MCQ": {
+      "main_cot": 1222,
+      "main_noncot": 1222,
+      "no_image_cot": 1222,
+      "no_image_noncot": 1222,
+      "no_image_plus_cot": 1222,
+      "no_image_plus_noncot": 1222
+    },
+    "VStarBench": {
+      "main_cot": 191,
+      "main_noncot": 191,
+      "no_image_cot": 191,
+      "no_image_noncot": 191,
+      "no_image_plus_cot": 191,
+      "no_image_plus_noncot": 191
+    }
+  },
+  "dataset_condition_group_counts": {
+    "3DSRBench": {
+      "main_cot": 2625,
+      "main_noncot": 2625,
+      "no_image_cot": 2625,
+      "no_image_noncot": 2625,
+      "no_image_plus_cot": 2625,
+      "no_image_plus_noncot": 2625
+    },
+    "BLINK": {
+      "main_cot": 1901,
+      "main_noncot": 1901,
+      "no_image_cot": 1901,
+      "no_image_noncot": 1901,
+      "no_image_plus_cot": 1901,
+      "no_image_plus_noncot": 1901
+    },
+    "CV-Bench-2D": {
+      "main_cot": 1438,
+      "main_noncot": 1438,
+      "no_image_cot": 1438,
+      "no_image_noncot": 1438,
+      "no_image_plus_cot": 1438,
+      "no_image_plus_noncot": 1438
+    },
+    "CV-Bench-3D": {
+      "main_cot": 1200,
+      "main_noncot": 1200,
+      "no_image_cot": 1200,
+      "no_image_noncot": 1200,
+      "no_image_plus_cot": 1200,
+      "no_image_plus_noncot": 1200
+    },
+    "MMSIBench_wo_circular": {
+      "main_cot": 1000,
+      "main_noncot": 1000,
+      "no_image_cot": 1000,
+      "no_image_noncot": 1000,
+      "no_image_plus_cot": 1000,
+      "no_image_plus_noncot": 1000
+    },
+    "MMVP": {
+      "main_cot": 300,
+      "main_noncot": 300,
+      "no_image_cot": 300,
+      "no_image_noncot": 300,
+      "no_image_plus_cot": 300,
+      "no_image_plus_noncot": 300
+    },
+    "MindCube": {
+      "main_cot": 1040,
+      "main_noncot": 1040,
+      "no_image_cot": 1040,
+      "no_image_noncot": 1040,
+      "no_image_plus_cot": 1040,
+      "no_image_plus_noncot": 1040
+    },
+    "OmniSpatial": {
+      "main_cot": 1533,
+      "main_noncot": 1533,
+      "no_image_cot": 1533,
+      "no_image_noncot": 1533,
+      "no_image_plus_cot": 1304,
+      "no_image_plus_noncot": 1304
+    },
+    "RealWorldQA": {
+      "main_cot": 765,
+      "main_noncot": 765,
+      "no_image_cot": 765,
+      "no_image_noncot": 765,
+      "no_image_plus_cot": 438,
+      "no_image_plus_noncot": 438
+    },
+    "SAT-Real": {
+      "main_cot": 150,
+      "main_noncot": 150,
+      "no_image_cot": 150,
+      "no_image_noncot": 150,
+      "no_image_plus_cot": 150,
+      "no_image_plus_noncot": 150
+    },
+    "SpatialBench": {
+      "main_cot": 174,
+      "main_noncot": 174,
+      "no_image_cot": 174,
+      "no_image_noncot": 174,
+      "no_image_plus_cot": 114,
+      "no_image_plus_noncot": 114
+    },
+    "VSR_MCQ": {
+      "main_cot": 1222,
+      "main_noncot": 1222,
+      "no_image_cot": 1222,
+      "no_image_noncot": 1222,
+      "no_image_plus_cot": 1222,
+      "no_image_plus_noncot": 1222
+    },
+    "VStarBench": {
+      "main_cot": 191,
+      "main_noncot": 191,
+      "no_image_cot": 191,
+      "no_image_noncot": 191,
+      "no_image_plus_cot": 191,
+      "no_image_plus_noncot": 191
+    }
+  },
+  "dataset_count": 13,
+  "dataset_files": {
+    "3DSRBench": {
+      "answer_types": {
+        "mcq": 5157
+      },
+      "filename": "3DSRBench.tsv",
+      "rows": 5157,
+      "sha256": "0a1bce3c052993ac616dcc94aa0ed8e0d3c8bed845f154ce51ec0b99ffcb9958",
+      "size_bytes": 372058474,
+      "source": {
+        "repo_id": "ccvl/3DSRBench",
+        "revision": "5c90e422b68d0484d50a3ff06b3096ea7d288026",
+        "source_file": "3dsrbench_v1_vlmevalkit.tsv",
+        "source_sha256": "a16e365dc72d8cd3bbbbbc9839bdd175d12d83fdfb40512db1ce8fedb92c8dce"
+      }
+    },
+    "BLINK": {
+      "answer_types": {
+        "mcq": 1901
+      },
+      "filename": "BLINK.tsv",
+      "rows": 1901,
+      "sha256": "a0b903717dd80ad0de6ea7109be72317d5f7fddd2d24dd7fa804c82e8744375a",
+      "size_bytes": 538367316,
+      "source": {
+        "registry_name": "BLINK",
+        "source": "VLMEvalKit",
+        "vlmevalkit_commit": "7055d3010c38ccb5dcae1bc9535ca19c7fe5d79f"
+      }
+    },
+    "CV-Bench-2D": {
+      "answer_types": {
+        "mcq": 1438
+      },
+      "filename": "CV-Bench-2D.tsv",
+      "rows": 1438,
+      "sha256": "6523f9dfba54472faebd700adc6cd46985de8c7d6f8649905de11b0a7552987c",
+      "size_bytes": 139918425,
+      "source": {
+        "registry_name": "CV-Bench-2D",
+        "source": "VLMEvalKit",
+        "vlmevalkit_commit": "7055d3010c38ccb5dcae1bc9535ca19c7fe5d79f"
+      }
+    },
+    "CV-Bench-3D": {
+      "answer_types": {
+        "mcq": 1200
+      },
+      "filename": "CV-Bench-3D.tsv",
+      "rows": 1200,
+      "sha256": "2f958a50e3278d800c6d5d430e376317921ec6b53fd84c780875745cfc2006aa",
+      "size_bytes": 158159676,
+      "source": {
+        "registry_name": "CV-Bench-3D",
+        "source": "VLMEvalKit",
+        "vlmevalkit_commit": "7055d3010c38ccb5dcae1bc9535ca19c7fe5d79f"
+      }
+    },
+    "MMSIBench_wo_circular": {
+      "answer_types": {
+        "mcq": 1000
+      },
+      "filename": "MMSIBench_wo_circular.tsv",
+      "rows": 1000,
+      "sha256": "229e05b87205a2d7426370b54cb544e581c1452756061ff553d96d129a2c00a1",
+      "size_bytes": 1058542498,
+      "source": {
+        "repo_id": "lmms-lab-si/EASI-Leaderboard-Data",
+        "revision": "52bb1dd2bc5cd58a291b3a780dab08d19c0ccf0d",
+        "source_file": "MMSIBench_wo_circular.tsv",
+        "source_sha256": "68053dbe08957b831f583261ed544234c37028e3b0f9de5330939bdee3d3d625"
+      }
+    },
+    "MMVP": {
+      "answer_types": {
+        "mcq": 300
+      },
+      "filename": "MMVP.tsv",
+      "rows": 300,
+      "sha256": "d40060fa0b31ebed7c1d290fd38569612106c46d03ad8fa81988135767ed0fc3",
+      "size_bytes": 4179526,
+      "source": {
+        "repo_id": "MMVP/MMVP",
+        "revision": "37eafecab8a3940c50c2ade5b36de69dbc99a8cf"
+      }
+    },
+    "MindCube": {
+      "answer_types": {
+        "mcq": 1040
+      },
+      "filename": "MindCube.tsv",
+      "rows": 1040,
+      "sha256": "b9957943104a4ef831ad5f5610c6a28d240c11e36011dc42f15c4d74b990c278",
+      "size_bytes": 943245,
+      "source": {
+        "asset_archive_sha256": "714c8961d66e9662c826d2202493a7d86cbe31797cf41e3a0567cb4d72b0aaa8",
+        "asset_repo_id": "MLL-Lab/MindCube",
+        "asset_revision": "9c941b46a6bd65b6914669ef7a579948fc9c8467",
+        "tsv_repo_id": "lmms-lab-si/EASI-Leaderboard-Data",
+        "tsv_revision": "52bb1dd2bc5cd58a291b3a780dab08d19c0ccf0d",
+        "tsv_source_file": "MindCubeBench_tiny_raw_qa.tsv",
+        "tsv_source_sha256": "a268abfe1c230b9591345e150a58933cd073d5b3cb5940fcec83344d7bd5f01c"
+      }
+    },
+    "OmniSpatial": {
+      "answer_types": {
+        "mcq": 1304,
+        "vqa": 229
+      },
+      "filename": "OmniSpatial.tsv",
+      "rows": 1533,
+      "sha256": "bd8b1707898186c9290fdf2f9f2ace4f8b0a75059354849fded938804da707fb",
+      "size_bytes": 2420479902,
+      "source": {
+        "archive_sha256": "6c2cc57a62e7ef6219c26593017e18a9fbc00b82fd2e86f31c01f42e8b97c988",
+        "repo_id": "qizekun/OmniSpatial",
+        "revision": "6691f3288bb1ff207d6ead4d841b505de08a6fd8"
+      }
+    },
+    "RealWorldQA": {
+      "answer_types": {
+        "mcq": 438,
+        "vqa": 327
+      },
+      "filename": "RealWorldQA.tsv",
+      "rows": 765,
+      "sha256": "a4b612399ab461fcc0332ba5c98877ea0e33f2b8572305a798a2b9faa9230f4e",
+      "size_bytes": 904401580,
+      "source": {
+        "parquet_sha256": [
+          "2cf29e308a34e0255f23520796fc04445a01b8baab18686f1a4b3c3943f695b2",
+          "dac5b9f7cfb947a4865ea3424abfbdb3449d09e0a0b911a787cdc930cefefdc0"
+        ],
+        "repo_id": "xai-org/RealworldQA",
+        "revision": "17e7f75e092e47169732462ea3cdfebe911105dd"
+      }
+    },
+    "SAT-Real": {
+      "answer_types": {
+        "mcq": 150
+      },
+      "filename": "SAT-Real.tsv",
+      "rows": 150,
+      "sha256": "5b08aea20aa5174da6045c1673fd39b375585c0cfbebed42bff8b243317b2a43",
+      "size_bytes": 177051423,
+      "source": {
+        "parquet_sha256": "eea844ab8c45da93254a676d0f79d2d4e5d310489fa55cf992aaa73e7f567be2",
+        "repo_id": "array/SAT",
+        "revision": "bda5dde942d7f7b41bff7935f086ed9a9e348ae3"
+      }
+    },
+    "SpatialBench": {
+      "answer_types": {
+        "mcq": 114,
+        "vqa": 60
+      },
+      "filename": "SpatialBench.tsv",
+      "rows": 174,
+      "sha256": "b3d8bcf8d17737d2e4c2bf034f2cdd62ab7b64632b7307f54bed00b49d819b84",
+      "size_bytes": 117609426,
+      "source": {
+        "repo_id": "RussRobin/SpatialBench",
+        "revision": "dcfdaec5ed04aaee1ff57eef44fe25d8b530fae5",
+        "skipped": {},
+        "transport": "https"
+      }
+    },
+    "VSR_MCQ": {
+      "answer_types": {
+        "mcq": 1222
+      },
+      "filename": "VSR_MCQ.tsv",
+      "rows": 1222,
+      "sha256": "f23113545d8ecafb9c7bc0faa3dfb362318132418c9739a9311c0ddeb82a40af",
+      "size_bytes": 72253306,
+      "source": {
+        "registry_name": "VSR-zeroshot",
+        "source": "VLMEvalKit",
+        "vlmevalkit_commit": "7055d3010c38ccb5dcae1bc9535ca19c7fe5d79f"
+      }
+    },
+    "VStarBench": {
+      "answer_types": {
+        "mcq": 191
+      },
+      "filename": "VStarBench.tsv",
+      "rows": 191,
+      "sha256": "ab3797b5f81279ac05e5a01700f4181ae5852b167e2f8191f87debf7b7e1c436",
+      "size_bytes": 161984802,
+      "source": {
+        "repo_id": "xjtupanda/VStar_Bench",
+        "revision": "b1312e6fbf89ace5a50cc5b0214010aeb0f69bdc",
+        "source_file": "VStarBench.tsv",
+        "source_sha256": "9826a55e0e0992a59a91b28c991f07e0ac75be9f183ed3802151985425f4002e"
+      }
+    }
+  },
   "datasets": [
     "BLINK",
     "CV-Bench-2D",
@@ -19,6 +458,62 @@
     "OmniSpatial",
     "SAT-Real"
   ],
+  "decoding": {
+    "completion_budget": "server_context_remainder",
+    "seed": 0,
+    "strategy": "greedy",
+    "temperature": 0,
+    "top_p": 1.0
+  },
+  "demo": false,
+  "distribution": "Question content and images remain in the pinned upstream datasets. This contract publishes stable identifiers and condition coverage only.",
+  "evaluation_policy": {
+    "answer_type": {
+      "main": "mcq_and_vqa",
+      "noimage": "mcq_and_vqa",
+      "noimgpp": "text_mcq_only"
+    },
+    "circular_datasets": [
+      "SAT-Real",
+      "SpatialBench"
+    ],
+    "circular_modes": [
+      "main"
+    ],
+    "noimage_image": "same_size_gray",
+    "noimgpp_answer": "Cannot determine from the image",
+    "noimgpp_image": "same_size_gray",
+    "scoring": "all_rotations_correct_within_evaluation_group"
+  },
+  "harness_contract": "ms-vista-track3-paper-aligned-v5",
+  "harness_version": "2.0.0",
+  "judge": {
+    "decoding": {
+      "max_tokens": 4,
+      "repetition_penalty": 1.0,
+      "strategy": "greedy",
+      "temperature": 0,
+      "top_k": -1,
+      "top_p": 1.0
+    },
+    "model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+    "revision": "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe",
+    "system_prompt_sha256": {
+      "mcq": "d68c9c92cb1eb78180a51d861dc97e69ad2c58ba3074df4b698f4a01cee149ca",
+      "vqa": "e1c38563bd6e2da680469c844a5930b5cfd766f58121d41d12261e39df605a60"
+    }
+  },
+  "primary_condition": "main_noncot",
+  "prompts": {
+    "cot": {
+      "sha256": "5bbcaadcfac80166a8bb2c1e057aa48457b2605bedf8296eacf1a8d143366449",
+      "source": "spatial_harness.run_track3_vllm.COT_SYSTEM_PROMPT"
+    },
+    "noncot": {
+      "sha256": "5c9dd6309cbe706dac32f81b9270036af52aca057ebf137fd4ccbd84fa96e477",
+      "source": "spatial_harness.run_track3_vllm.BASE_SYSTEM_PROMPT"
+    }
+  },
   "required_conditions": [
     "main_noncot",
     "main_cot",
@@ -27,197 +522,7 @@
     "no_image_plus_noncot",
     "no_image_plus_cot"
   ],
-  "primary_condition": "main_noncot",
-  "no_image_plus_option": "Cannot determine from the image",
-  "dataset_count": 13,
-  "condition_counts": {
-    "main_noncot": 39,
-    "main_cot": 39,
-    "no_image_noncot": 39,
-    "no_image_cot": 39,
-    "no_image_plus_noncot": 39,
-    "no_image_plus_cot": 39
-  },
-  "approx_total_samples": 16830,
-  "dataset_catalog": [
-    {
-      "id": "blink",
-      "name": "BLINK",
-      "type": "2D",
-      "approx_n": 1900,
-      "tags": [
-        "depth",
-        "relation",
-        "count",
-        "localization"
-      ],
-      "hf_id": "BLINK-Benchmark/BLINK",
-      "license": "Apache-2.0",
-      "verify": false
-    },
-    {
-      "id": "cvbench2d",
-      "name": "CV-Bench (2D)",
-      "type": "2D",
-      "approx_n": 1400,
-      "tags": [
-        "relation",
-        "count",
-        "localization",
-        "size"
-      ],
-      "hf_id": "nyu-visionx/CV-Bench",
-      "license": "Apache-2.0",
-      "verify": false
-    },
-    {
-      "id": "mmvp",
-      "name": "MMVP",
-      "type": "2D",
-      "approx_n": 300,
-      "tags": [
-        "relation",
-        "localization"
-      ],
-      "hf_id": "MMVP/MMVP",
-      "license": "MIT",
-      "verify": true
-    },
-    {
-      "id": "realworldqa",
-      "name": "RealWorldQA",
-      "type": "2D",
-      "approx_n": 765,
-      "tags": [
-        "relation",
-        "localization"
-      ],
-      "hf_id": "xai-org/RealworldQA",
-      "license": "CC BY-ND 4.0",
-      "verify": false
-    },
-    {
-      "id": "spatialbench",
-      "name": "SpatialBench",
-      "type": "2D",
-      "approx_n": 174,
-      "tags": [
-        "relation",
-        "localization",
-        "size"
-      ],
-      "hf_id": "RussRobin/SpatialBench",
-      "license": "see source",
-      "verify": true
-    },
-    {
-      "id": "vsr",
-      "name": "VSR",
-      "type": "2D",
-      "approx_n": 1200,
-      "tags": [
-        "relation",
-        "orientation",
-        "egocentric"
-      ],
-      "hf_id": "cambridgeltl/vsr_zeroshot",
-      "license": "Apache-2.0",
-      "verify": true
-    },
-    {
-      "id": "vstar",
-      "name": "V*Bench",
-      "type": "2D",
-      "approx_n": 191,
-      "tags": [
-        "attribute",
-        "relation"
-      ],
-      "hf_id": "craigwu/vstar_bench",
-      "license": "MIT",
-      "verify": false
-    },
-    {
-      "id": "3dsrbench",
-      "name": "3DSRBench",
-      "type": "3D",
-      "approx_n": 5200,
-      "tags": [
-        "3d",
-        "localization",
-        "orientation"
-      ],
-      "hf_id": "ccvl/3DSRBench",
-      "license": "see source",
-      "verify": false
-    },
-    {
-      "id": "cvbench3d",
-      "name": "CV-Bench (3D)",
-      "type": "3D",
-      "approx_n": 1200,
-      "tags": [
-        "depth",
-        "3d",
-        "relation"
-      ],
-      "hf_id": "nyu-visionx/CV-Bench",
-      "license": "Apache-2.0",
-      "verify": false
-    },
-    {
-      "id": "mindcube",
-      "name": "MindCube",
-      "type": "3D",
-      "approx_n": 1000,
-      "tags": [
-        "multiview",
-        "relation",
-        "egocentric"
-      ],
-      "hf_id": "MLL-Lab/MindCube",
-      "license": "see source",
-      "verify": true
-    },
-    {
-      "id": "mmsibench",
-      "name": "MMSI-Bench",
-      "type": "3D",
-      "approx_n": 1000,
-      "tags": [
-        "multiimage",
-        "spatial"
-      ],
-      "hf_id": "RunsenXu/MMSI-Bench",
-      "license": "see source",
-      "verify": false
-    },
-    {
-      "id": "omnispatial",
-      "name": "OmniSpatial",
-      "type": "3D",
-      "approx_n": 1500,
-      "tags": [
-        "spatial",
-        "reasoning"
-      ],
-      "hf_id": "qizekun/OmniSpatial",
-      "license": "see source",
-      "verify": true
-    },
-    {
-      "id": "satreal",
-      "name": "SAT (Real)",
-      "type": "dynamic",
-      "approx_n": 1000,
-      "tags": [
-        "dynamic",
-        "egocentric",
-        "action"
-      ],
-      "hf_id": "array/SAT",
-      "license": "see source",
-      "verify": true
-    }
-  ]
+  "schema_version": "ms-vista-spatial-benchmark/v3",
+  "task_id": "spatial",
+  "unique_question_ids": 14215
 }

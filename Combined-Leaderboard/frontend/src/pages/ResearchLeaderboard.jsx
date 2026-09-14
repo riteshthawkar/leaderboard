@@ -7,9 +7,9 @@ import { cn, fmtDelta, fmtPct, fmtVci, modelType, prettyLabel } from "@/lib/util
 import { ui } from "@/lib/styles";
 
 const trackTabs = [
-  { id: "vc", label: "Visual Perception and Cognition Index" },
-  { id: "spatial", label: "Spatial Reasoning and Robustness" },
-  { id: "compare", label: "Compare Models" },
+  { id: "vc", label: "Perception & Cognition" },
+  { id: "spatial", label: "Reasoning Analysis" },
+  { id: "compare", label: "Integrated Comparison" },
 ];
 
 const DEFAULT_COMPARE_MODELS = 4;
@@ -105,8 +105,9 @@ const leaderboardSurfaceClasses = [
   "[&_.rank-col]:sticky [&_.rank-col]:left-0 [&_.rank-col]:z-[6] [&_.rank-col]:w-16 [&_.rank-col]:border-r [&_.rank-col]:border-border-strong [&_tbody_.rank-col]:bg-background",
   "[&_.model-col]:sticky [&_.model-col]:left-16 [&_.model-col]:z-[5] [&_.model-col]:w-[160px] [&_.model-col]:min-w-[160px] [&_.model-col]:max-w-[160px] [&_tbody_.model-col]:bg-background",
   "[&_.model-col-first]:!left-0",
-  "[&_.lb-table_thead_.rank-col]:z-30 [&_.lb-table_thead_.model-col]:z-20",
-  "[&_.clickable:hover_.rank-col]:bg-brand-soft [&_.clickable:hover_.model-col]:bg-brand-soft",
+  "[&_.evidence-col]:sticky [&_.evidence-col]:left-[224px] [&_.evidence-col]:z-[4] [&_.evidence-col]:w-[72px] [&_.evidence-col]:min-w-[72px] [&_.evidence-col]:max-w-[72px] [&_.evidence-col]:!px-2 [&_.evidence-col]:text-center [&_tbody_.evidence-col]:bg-background",
+  "[&_.lb-table_thead_.rank-col]:z-30 [&_.lb-table_thead_.model-col]:z-20 [&_.lb-table_thead_.evidence-col]:z-[19]",
+  "[&_.clickable:hover_.rank-col]:bg-brand-soft [&_.clickable:hover_.model-col]:bg-brand-soft [&_.clickable:hover_.evidence-col]:bg-brand-soft",
   "[&_.num]:text-right [&_.num]:tabular-nums",
   "[&_.vci-val]:font-bold [&_.vci-val]:text-brand-strong",
   "[&_.pos]:text-positive [&_.neg]:text-negative",
@@ -148,7 +149,7 @@ function visualDefaultMetric(benchmark) {
 }
 
 const visualBenchmarkOptions = [
-  { value: "all", label: "All visual benchmarks" },
+  { value: "all", label: "All visual modules" },
   { value: "do_you_see_me", label: "Do You See Me" },
   { value: "minds_eye", label: "Mind's Eye" },
 ];
@@ -161,7 +162,7 @@ const allSpatialTypeOptions = [
 ];
 
 const compareBenchmarkOptions = [
-  { value: "all", label: "All benchmarks" },
+  { value: "all", label: "All evaluation modules" },
   { value: "do_you_see_me", label: "Do You See Me" },
   { value: "minds_eye", label: "Mind's Eye" },
   { value: "spatial", label: "Spatial" },
@@ -263,7 +264,7 @@ function RankBadge({ rank }) {
 function DiagnosticsChip({ diagnostics }) {
   if (!diagnostics) return <span className={ui.badge}>Standard only</span>;
   const count = diagnostics.conditions_present?.length || 1;
-  return <span className={cn(ui.badge, "border-transparent bg-spatial-soft text-spatial")}>{count}/4 conditions</span>;
+  return <span className={cn(ui.badge, "border-transparent bg-spatial-soft text-spatial")}>{count}/6 conditions</span>;
 }
 
 function mean(rows, resolveValue) {
@@ -986,7 +987,7 @@ function CompareModelPicker({
           })
         ) : (
           <p className="text-sm text-muted">
-            No models match this search and benchmark scope.
+            No models match this search and evaluation scope.
           </p>
         )}
       </div>
@@ -997,14 +998,14 @@ function CompareModelPicker({
 function visualBenchmarkLabel(value) {
   return (
     visualBenchmarkOptions.find((option) => option.value === value)?.label ||
-    "All visual benchmarks"
+    "All visual modules"
   );
 }
 
 function compareBenchmarkLabel(value) {
   return (
     compareBenchmarkOptions.find((option) => option.value === value)?.label ||
-    "All benchmarks"
+    "All evaluation modules"
   );
 }
 
@@ -1217,7 +1218,7 @@ function PerceptionCognitionChart({ benchmark, rows, selected }) {
       categories={shownRows.map((row) => ({ label: row.model_name, row }))}
       emptyMessage={benchmark === "all"
         ? "Select a model with both perception and cognition scores."
-        : "Select a model with a score for this benchmark."}
+        : "Select a model with a score for this module."}
       series={series}
     />
   );
@@ -1229,7 +1230,7 @@ function BalancedFrontierChart({ rows }) {
     return (
       <EmptyChart
         aspectRatio="16 / 7"
-        message="Combined benchmark profiles appear when models have both Do You See Me and Mind's Eye scores."
+        message="Combined visual profiles appear when models have both Do You See Me and Mind's Eye scores."
       />
     );
   }
@@ -1261,11 +1262,11 @@ function BalancedFrontierChart({ rows }) {
   return (
     <>
       <p className="mt-2 text-sm leading-relaxed text-muted">
-        {frontierRows.length} frontier {frontierRows.length === 1 ? "model is" : "models are"} not dominated on either benchmark. {topBalanced.model_name} has the strongest robust two-task score at {fmtPct(topBalanced.balancedScore)}.
+        {frontierRows.length} frontier {frontierRows.length === 1 ? "model is" : "models are"} not dominated on either capability module. {topBalanced.model_name} has the strongest robust two-module score at {fmtPct(topBalanced.balancedScore)}.
       </p>
       <ScatterChart
         aspectRatio="16 / 7"
-        emptyMessage="Combined benchmark profiles appear when models have both scores."
+        emptyMessage="Combined visual profiles appear when models have both scores."
         points={points}
         showLabels={false}
         xLabel="Do You See Me accuracy"
@@ -1304,7 +1305,7 @@ function RobustGeneralistRankingChart({ rows }) {
     return (
       <EmptyChart
         aspectRatio="16 / 7"
-        message="Combined benchmark profiles appear when models have both Do You See Me and Mind's Eye scores."
+        message="Combined visual profiles appear when models have both Do You See Me and Mind's Eye scores."
       />
     );
   }
@@ -1314,7 +1315,7 @@ function RobustGeneralistRankingChart({ rows }) {
   return (
     <>
       <p className="mt-2 text-sm leading-relaxed text-muted">
-        Harmonic mean penalizes one-sided models. {leader.model_name} leads this view with {fmtPct(leader.balancedScore)} and a {fmtPointGap(leader.absGap)} benchmark gap.
+        Harmonic mean penalizes one-sided models. {leader.model_name} leads this view with {fmtPct(leader.balancedScore)} and a {fmtPointGap(leader.absGap)} capability gap.
       </p>
       <div className="mt-4 space-y-3" aria-label="Robust generalist ranking">
         {visibleRows.map((row, index) => (
@@ -1342,7 +1343,7 @@ function RobustGeneralistRankingChart({ rows }) {
   );
 }
 
-function BenchmarkGapDumbbellChart({ rows }) {
+function CapabilityGapDumbbellChart({ rows }) {
   const data = [...rows]
     .filter((row) => finiteNumber(row.combinedAverage))
     .sort((left, right) => {
@@ -1356,7 +1357,7 @@ function BenchmarkGapDumbbellChart({ rows }) {
     return (
       <EmptyChart
         aspectRatio="16 / 7"
-        message="Combined benchmark profiles appear when models have both Do You See Me and Mind's Eye scores."
+        message="Combined visual profiles appear when models have both Do You See Me and Mind's Eye scores."
       />
     );
   }
@@ -1384,7 +1385,7 @@ function BenchmarkGapDumbbellChart({ rows }) {
           Mind's Eye
         </span>
       </div>
-      <div className="mt-4 space-y-3" aria-label="Benchmark gap dumbbell chart">
+      <div className="mt-4 space-y-3" aria-label="Capability gap dumbbell chart">
         {visibleRows.map((row) => {
           const low = Math.min(row.perception, row.cognition);
           const high = Math.max(row.perception, row.cognition);
@@ -1849,8 +1850,8 @@ export function ResearchLeaderboard() {
       {
         value: "all",
         label: spatialFilters.datasetType === "all"
-          ? "All spatial benchmarks"
-          : `All ${spatialFilters.datasetType} benchmarks`,
+          ? "All spatial datasets"
+          : `All ${spatialFilters.datasetType} datasets`,
       },
       ...datasetsForSelectedType.map((dataset) => ({ value: dataset, label: dataset })),
     ],
@@ -2180,13 +2181,13 @@ export function ResearchLeaderboard() {
     spatialFilters.dataset !== "all"
       ? spatialFilters.dataset
       : spatialFilters.datasetType !== "all"
-        ? `${spatialFilters.datasetType} spatial benchmarks`
-        : "All spatial benchmarks";
+        ? `${spatialFilters.datasetType} spatial datasets`
+        : "All spatial datasets";
   const compareScopeLabel = compareBenchmarkLabel(compareBenchmark);
   const visualEmptyMessage = loadStatus === "error"
     ? "Rankings are unavailable. Use Retry above."
     : visualRows.length === 0
-      ? "No visual benchmark submissions are published yet."
+      ? "No visual capability results are published yet."
       : "No models match these filters.";
   const spatialEmptyMessage = loadStatus === "error"
     ? "Rankings are unavailable. Use Retry above."
@@ -2483,10 +2484,10 @@ export function ResearchLeaderboard() {
         <div className={ui.sectionFrame}>
           <div className={ui.sectionBand}>
             <div className="max-w-copy">
-              <div className={ui.sectionTag}>Leaderboard</div>
-              <h1 className={ui.heading1}>MS VISTA leaderboard rankings</h1>
+              <div className={ui.sectionTag}>Unified evaluation framework</div>
+              <h1 className={ui.heading1}>MS VISTA capability profiles</h1>
               <p className={cn(ui.lede, "mt-4")}>
-                Rank, filter, and compare models across visual perception, cognition, and spatial reasoning.
+                Compare visual perception, cognition, VPCI, and controlled reasoning diagnostics under one model identity and provenance record.
               </p>
             </div>
           </div>
@@ -2495,7 +2496,7 @@ export function ResearchLeaderboard() {
           </div>
           <div className="px-6 pb-8 pt-3 lg:px-8 lg:pb-10 lg:pt-4">
 
-          {loadStatus === "loading" && <div className={ui.message} role="status">Loading current rankings and benchmark details...</div>}
+          {loadStatus === "loading" && <div className={ui.message} role="status">Loading current rankings and evaluation details...</div>}
           {tab === "vc" && (
             <section className="tab-panel is-active">
               <DashboardStats items={visualStats} />
@@ -2505,7 +2506,7 @@ export function ResearchLeaderboard() {
                 chips={visualChips}
               >
                 <SegmentControl
-                  label="Visual benchmark scope"
+                  label="Visual module scope"
                   options={visualBenchmarkOptions}
                   value={visualFilters.benchmark}
                   onChange={setVisualBenchmark}
@@ -2794,15 +2795,15 @@ export function ResearchLeaderboard() {
                 {visualIsCombined && (
                   <div className="viz-card wide !p-0">
                     <div className="p-6">
-                      <h3 className="!mb-0">Combined benchmark insights</h3>
+                      <h3 className="!mb-0">Combined capability insights</h3>
                       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted">
-                        These views only use models with both Do You See Me and Mind's Eye scores, so they separate robust generalists from benchmark specialists.
+                        These views use models with both perception and cognition module scores, separating robust generalists from capability specialists.
                       </p>
                     </div>
                     <div className="grid grid-cols-1 border-t border-border xl:grid-cols-2">
                       <div className="min-w-0 border-b border-border p-6 xl:col-span-2">
                         <h4 className="font-display text-base font-semibold text-foreground">Balanced frontier map</h4>
-                        <p className="mt-1 text-sm text-muted">Upper-right frontier models are strong on both benchmark tasks and are not beaten by another model on both axes.</p>
+                        <p className="mt-1 text-sm text-muted">Upper-right frontier models are strong in both visual capability modules and are not beaten by another model on both axes.</p>
                         <BalancedFrontierChart rows={combinedBenchmarkRows} />
                       </div>
                       <div className="min-w-0 border-b border-border p-6 xl:border-b-0 xl:border-r">
@@ -2811,9 +2812,9 @@ export function ResearchLeaderboard() {
                         <RobustGeneralistRankingChart rows={combinedBenchmarkRows} />
                       </div>
                       <div className="min-w-0 p-6">
-                        <h4 className="font-display text-base font-semibold text-foreground">Benchmark gap dumbbell</h4>
-                        <p className="mt-1 text-sm text-muted">Connected dots expose whether a high-ranked model is balanced or tilted toward one benchmark.</p>
-                        <BenchmarkGapDumbbellChart rows={combinedBenchmarkRows} />
+                        <h4 className="font-display text-base font-semibold text-foreground">Capability gap dumbbell</h4>
+                        <p className="mt-1 text-sm text-muted">Connected dots expose whether a high-ranked model is balanced or tilted toward one visual capability.</p>
+                        <CapabilityGapDumbbellChart rows={combinedBenchmarkRows} />
                       </div>
                     </div>
                   </div>
@@ -2908,7 +2909,7 @@ export function ResearchLeaderboard() {
               >
                 {spatialTypeOptions.length > 2 && (
                   <SegmentControl
-                    label="Spatial benchmark type"
+                    label="Spatial dataset type"
                     options={spatialTypeOptions}
                     value={spatialFilters.datasetType}
                     onChange={setSpatialType}
@@ -2916,7 +2917,7 @@ export function ResearchLeaderboard() {
                 )}
                 <div className="primary-controls">
                   {spatialBenchmarkOptions.length > 2 && (
-                    <FilterField label="Benchmark">
+                    <FilterField label="Dataset">
                       <select
                         value={spatialFilters.dataset}
                         onChange={(event) =>
@@ -2995,6 +2996,12 @@ export function ResearchLeaderboard() {
                         onSort={handleSpatialSort}
                         defaultDirection="asc"
                       />
+                      <th
+                        className="evidence-col"
+                        title="Open the public artifacts retained for this Track 3 submission."
+                      >
+                        Evidence
+                      </th>
                       {spatialMetaCols.has("org") && (
                         <SortHeader
                           className="w-28 min-w-28 max-w-28"
@@ -3089,16 +3096,27 @@ export function ResearchLeaderboard() {
                             >
                               {row.model_name}
                             </button>
-                            {row.evidence_url && (
+                          </td>
+                          <td className="evidence-col">
+                            {row.evidence_url ? (
                               <a
-                                className="mt-1 inline-flex items-center gap-1 text-xs text-muted underline decoration-border-strong underline-offset-4 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                                aria-label={`View public evidence for ${row.model_name}`}
+                                className="mx-auto grid size-8 place-items-center border border-border-strong bg-surface text-muted transition-colors hover:bg-surface-subtle hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                                 href={apiUrl(row.evidence_url)}
                                 target="_blank"
                                 rel="noreferrer noopener"
+                                title={`View public evidence for ${row.model_name}`}
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                Public evidence <ExternalLink size={12} aria-hidden="true" />
+                                <ExternalLink size={14} aria-hidden="true" />
                               </a>
+                            ) : (
+                              <span
+                                aria-label={`No public evidence for ${row.model_name}`}
+                                className="text-faint"
+                              >
+                                &mdash;
+                              </span>
                             )}
                           </td>
                           {spatialMetaCols.has("org") && (
@@ -3151,7 +3169,7 @@ export function ResearchLeaderboard() {
                       <tr>
                         <td
                           colSpan={
-                            4 + spatialMetaCols.size + (hasSpatialDiagnostics ? 4 : 0)
+                            5 + spatialMetaCols.size + (hasSpatialDiagnostics ? 4 : 0)
                           }
                           className="empty-row"
                         >
@@ -3199,7 +3217,7 @@ export function ResearchLeaderboard() {
                 chips={compareChips}
               >
                 <SegmentControl
-                  label="Comparison benchmark scope"
+                  label="Comparison module scope"
                   options={availableCompareBenchmarkOptions}
                   value={compareBenchmark}
                   onChange={setCompareBenchmarkScope}
@@ -3326,7 +3344,7 @@ export function ResearchLeaderboard() {
               </section>
               <div className="dashboard-grid">
                 <div className="viz-card wide">
-                  <h3>{compareBenchmark === "all" ? "Profile matrix across available tracks" : `${compareScopeLabel} profile matrix`}</h3>
+                  <h3>{compareBenchmark === "all" ? "Profile matrix across available modules" : `${compareScopeLabel} profile matrix`}</h3>
                   <ComparisonChart rows={compareRows.slice(0, 14)} scope={compareBenchmark} />
                 </div>
               </div>

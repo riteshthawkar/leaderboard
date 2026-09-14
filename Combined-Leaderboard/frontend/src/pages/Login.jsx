@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { WorkspacePage } from "@/components/WorkspacePage";
 import { Button } from "@/components/ui/button";
-import { apiUrl, postJSON, saveUser, getJSON, fetchMe, errorMessage, IS_STATIC_DEMO } from "@/lib/api";
+import {
+  exchangeOAuthCode,
+  fetchMe,
+  getJSON,
+  IS_STATIC_DEMO,
+  oauthStartUrl,
+  postJSON,
+  saveUser,
+  errorMessage,
+} from "@/lib/api";
 import { cn, safeNext } from "@/lib/utils";
 import { ui } from "@/lib/styles";
 
@@ -64,12 +73,32 @@ export function Login() {
     const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
     const oauthError = hash.get("oauth_error");
     const verifyError = hash.get("verify_error");
+    const oauthCode = hash.get("oauth_code");
     const verifyToken = hash.get("verify_token");
     const token = hash.get("reset_token");
     const verified = hash.get("verified");
     let live = true;
+    if (oauthCode) {
+      window.history.replaceState(null, "", `${window.location.pathname}${location.search}`);
+      setBusy(true);
+      setMessage("");
+      setNotice("Completing sign-in...");
+      exchangeOAuthCode(oauthCode)
+        .then((response) => {
+          if (!live) return;
+          saveUser({ email: response.email, csrfToken: response.csrf_token });
+          navigate(next, { replace: true });
+        })
+        .catch((error) => {
+          if (!live) return;
+          setNotice("");
+          setMessage(errorMessage(error, "Sign-in could not be completed. Restart Microsoft sign-in and try again."));
+        })
+        .finally(() => { if (live) setBusy(false); });
+      return () => { live = false; };
+    }
     if (verifyToken) {
-      window.history.replaceState(null, "", `${location.pathname}${location.search}`);
+      window.history.replaceState(null, "", `${window.location.pathname}${location.search}`);
       setBusy(true);
       setMessage("");
       setNotice("Verifying your email address...");
@@ -92,20 +121,20 @@ export function Login() {
       setTab("reset");
       setMessage("");
       setNotice("");
-      window.history.replaceState(null, "", `${location.pathname}${location.search}`);
+      window.history.replaceState(null, "", `${window.location.pathname}${location.search}`);
       return undefined;
     }
     if (oauthError || verifyError) {
       setMessage(oauthError || verifyError);
-      window.history.replaceState(null, "", `${location.pathname}${location.search}`);
+      window.history.replaceState(null, "", `${window.location.pathname}${location.search}`);
     } else if (verified) {
       setNotice("Email verified. You can now submit models.");
-      window.history.replaceState(null, "", `${location.pathname}${location.search}`);
+      window.history.replaceState(null, "", `${window.location.pathname}${location.search}`);
     }
     fetchMe()
       .then((user) => {
         if (!live) return;
-        if (user) { saveUser(user); window.location.replace(next); }
+        if (user) { saveUser(user); navigate(next, { replace: true }); }
       })
       .catch((error) => {
         if (live) setProviderWarning(errorMessage(error, "Account status could not be checked. You can still try to sign in."));
@@ -128,7 +157,7 @@ export function Login() {
       if (mode === "register") params.set("mode", "register");
       else params.delete("mode");
       const query = params.toString();
-      window.history.replaceState(null, "", `${location.pathname}${query ? `?${query}` : ""}`);
+      window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
     }
   };
 
@@ -169,7 +198,7 @@ export function Login() {
       } else {
         const user = await postJSON("/api/auth/login", { email, password });
         saveUser({ email: user.email, csrfToken: user.csrf_token });
-        window.location.replace(next);
+        navigate(next, { replace: true });
       }
     } catch (error) {
       if (error.status === 403 && error.code === "unverified") {
@@ -250,7 +279,7 @@ export function Login() {
                 This frozen review build does not connect to the account service. Sign in, registration, password recovery, and submissions are unavailable.
               </p>
               <Button asChild variant="brand" className="mt-5 min-h-12 w-full font-medium">
-                <a href="/leaderboard">View leaderboard</a>
+                <Link to="/leaderboard">View leaderboard</Link>
               </Button>
             </div>
           ) : (
@@ -260,7 +289,7 @@ export function Login() {
                   <div className="grid gap-2" aria-label="Single sign-on options">
                     {visibleProviders.map(({ id, provider, Icon }) => (
                       <Button asChild variant="ghost" className="min-h-12 w-full font-medium" key={id}>
-                        <a href={apiUrl(`/api/auth/oauth/${id}?next=${encodeURIComponent(next)}`)}>
+                        <a href={oauthStartUrl(id, next)}>
                           <Icon />{tab === "login" ? "Sign in" : "Sign up"} with {provider}
                         </a>
                       </Button>

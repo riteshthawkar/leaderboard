@@ -86,10 +86,10 @@ describe("overview page", () => {
 
     expect(container.querySelectorAll("#faq details")).toHaveLength(8);
     expect(
-      screen.getByText("How do I submit the same model to multiple benchmarks?"),
+      screen.getByText("How does MS VISTA create one profile across evaluation modules?"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("What file should I upload for each benchmark?"),
+      screen.getByText("What file should I upload for each evaluation module?"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("How often can I submit, and can I delete a result?"),
@@ -101,14 +101,42 @@ describe("overview page", () => {
       screen.getAllByText("CoT degrades spatial reasoning"),
     ).toHaveLength(2);
     const visualItemsLabel = screen.getByText(
-      "Scored items across the two visual leaderboard tracks",
+      "Scored items across the framework's visual capability modules",
     );
     await waitFor(() =>
       expect(visualItemsLabel.previousElementSibling).toHaveTextContent("20"),
     );
     const rankedModelsLabel = screen.getByText(
-      "Unique models currently ranked across all tracks",
+      "Unique models profiled by MS VISTA",
     );
     expect(rankedModelsLabel.previousElementSibling).toHaveTextContent("2");
+    expect(
+      screen.getAllByRole("link", { name: "Do You See Me source paper" }),
+    ).toHaveLength(3);
+    expect(
+      screen.getAllByRole("link", { name: "Do You See Me source paper" })[0],
+    ).toHaveAttribute("href", "https://arxiv.org/abs/2506.02022");
+    expect(screen.getByText("Controlled interventions")).toBeInTheDocument();
+    expect(
+      screen.getByText(/unification does not erase scientific differences/i),
+    ).toBeInTheDocument();
+  });
+
+  it("uses frozen public release counts when runtime statistics are unavailable", async () => {
+    apiMocks.getJSON.mockRejectedValue(new Error("service unavailable"));
+
+    render(
+      <MemoryRouter>
+        <Home />
+      </MemoryRouter>,
+    );
+
+    const visualItemsLabel = screen.getByText(
+      "Scored items across the framework's visual capability modules",
+    );
+    await waitFor(() =>
+      expect(visualItemsLabel.previousElementSibling).toHaveTextContent("5,299"),
+    );
+    expect(screen.queryByText("Unavailable")).not.toBeInTheDocument();
   });
 });

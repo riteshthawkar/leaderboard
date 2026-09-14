@@ -31,6 +31,7 @@ from config import (
     LEADERBOARD_STORE_FILE,
 )
 from evaluation.finalize_visual_results import verify_canonical_results
+from evaluation.closed_source_catalog import importer_catalog
 from leaderboard_store import LeaderboardStore
 from scoring.task_scorer import TaskScorer
 from submission_store import (
@@ -152,6 +153,7 @@ MODEL_CATALOG: dict[str, dict[str, str]] = {
         "parameter_count": "",
     },
 }
+MODEL_CATALOG.update(importer_catalog())
 
 
 @dataclass
@@ -192,29 +194,45 @@ def _submission_model_meta(
     track_manifest = model.manifest["tracks"][task_id]
     prompt_mode = str(track_manifest["generation"]["prompt_mode"])
     organization = model.catalog["organization"]
-    access = "open_weights"
+    access = str(model.catalog.get("access") or "open_weights")
     reasoning_profile = str(model.manifest.get("reasoning_profile") or "nonthinking")
     extraction_method = str(
         model.manifest.get("evidence_extraction", {}).get("method")
         or "unknown"
     )
+    if access == "closed":
+        method_description = (
+            "Official MS-VISTA evaluation from retained provider API outputs using "
+            "the provider model identifier and direct non-CoT prompt documented by "
+            "the supplied evaluation bundle. Raw responses were retained verbatim "
+            "and passed through the gold-blind final-answer evidence audit recorded "
+            f"in the canonical manifest ({extraction_method})."
+        )
+        prompt_template = (
+            "Direct non-CoT MS-VISTA prompt documented by the retained provider "
+            "evaluation bundle; the supplied bundle does not contain the original "
+            "provider request log or a prompt hash."
+        )
+    else:
+        method_description = (
+            "Official MS-VISTA canonical visual evaluation using the pinned model "
+            "revision, original unquantized weights, BF16 compute, benchmark prompt, "
+            "and the gold-blind final-answer evidence audit recorded in the retained "
+            f"manifest ({extraction_method})."
+        )
+        prompt_template = (
+            "Official shared MS-VISTA prompt identified by the prompt hash in the "
+            "canonical final manifest."
+        )
     return {
         "organization": organization,
         "org": organization,
         "access": access,
         "type": access,
         "parameter_count": model.catalog.get("parameter_count", ""),
-        "method_description": (
-            "Official MS-VISTA canonical visual evaluation using the pinned model "
-            "revision, original unquantized weights, BF16 compute, benchmark prompt, "
-            "and the gold-blind final-answer evidence audit recorded in the retained "
-            f"manifest ({extraction_method})."
-        ),
+        "method_description": method_description,
         "cot_used": "Yes" if prompt_mode == "cot" else "No",
-        "prompt_template": (
-            "Official shared MS-VISTA prompt identified by the prompt hash in the "
-            "canonical final manifest."
-        ),
+        "prompt_template": prompt_template,
         "changes_from_previous": "Initial import from the verified canonical evaluation set.",
         "model_repository": model.manifest["model_id"],
         "model_revision": model.manifest["model_revision"],
@@ -270,6 +288,26 @@ def build_import_plan(
             raise ValueError(
                 f"Catalog repository mismatch for '{slug}': "
                 f"{catalog['repository']} != {manifest['model_id']}"
+            )
+        expected_revision = str(catalog.get("model_revision") or "")
+        if expected_revision and manifest.get("model_revision") != expected_revision:
+            raise ValueError(
+                f"Catalog revision mismatch for '{slug}': "
+                f"{expected_revision} != {manifest.get('model_revision')}"
+            )
+        expected_access = str(catalog.get("access") or "open_weights")
+        manifest_access = str(manifest.get("access") or "open_weights")
+        if manifest_access != expected_access:
+            raise ValueError(
+                f"Catalog access mismatch for '{slug}': "
+                f"{expected_access} != {manifest_access}"
+            )
+        if expected_access == "closed" and (
+            manifest.get("weight_loading") != "provider_managed"
+            or manifest.get("compute_dtype") != "provider_managed"
+        ):
+            raise ValueError(
+                f"Closed-source provider metadata is invalid for '{slug}'."
             )
         expected_profile = catalog.get("reasoning_profile")
         if expected_profile and manifest.get("reasoning_profile") != expected_profile:
@@ -401,7 +439,7 @@ def apply_import_plan(
                 model.catalog["display_name"],
                 {
                     "organization": model.catalog["organization"],
-                    "access": "open_weights",
+                    "access": str(model.catalog.get("access") or "open_weights"),
                     "parameter_count": model.catalog.get("parameter_count", ""),
                 },
             )

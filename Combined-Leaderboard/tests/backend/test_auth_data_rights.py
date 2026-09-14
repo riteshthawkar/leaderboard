@@ -64,6 +64,8 @@ def _add_submission_records():
 def test_export_returns_account_data_and_no_secrets(data_rights_app):
     client = _signed_in(data_rights_app)
     _add_submission_records()
+    assert auth_db.issue_refresh_token("route-user@example.com", 7)
+    assert auth_db.issue_oauth_exchange_code("route-user@example.com", 60)
 
     response = client.get("/api/auth/me/export")
     assert response.status_code == 200
@@ -72,6 +74,8 @@ def test_export_returns_account_data_and_no_secrets(data_rights_app):
     assert body["account"]["email"] == "route-user@example.com"
     assert len(body["records"]["submissions"]) == 1
     assert len(body["records"]["registered_models"]) == 1
+    assert len(body["records"]["auth_refresh_tokens"]) == 1
+    assert len(body["records"]["auth_oauth_exchange_codes"]) == 1
     encoded = json.dumps(body)
     for secret_field in (
         "password_hash",
@@ -92,6 +96,8 @@ def test_export_requires_authentication(auth_app):
 def test_delete_anonymises_and_preserves_published_rows(data_rights_app):
     client = _signed_in(data_rights_app)
     _add_submission_records()
+    assert auth_db.issue_refresh_token("route-user@example.com", 7)
+    assert auth_db.issue_oauth_exchange_code("route-user@example.com", 60)
 
     csrf_token = client.get("/api/auth/me").get_json()["csrf_token"]
     response = client.delete(
@@ -103,6 +109,13 @@ def test_delete_anonymises_and_preserves_published_rows(data_rights_app):
 
     # the identity is gone everywhere it was stored...
     assert auth_db.get_user("route-user@example.com") is None
+    with auth_db._Session() as session:
+        assert session.query(auth_db.RefreshToken).filter_by(
+            user_email="route-user@example.com"
+        ).count() == 0
+        assert session.query(auth_db.OAuthExchangeCode).filter_by(
+            user_email="route-user@example.com"
+        ).count() == 0
     with submission_store._Session() as session:
         submissions = session.query(submission_store.Submission).all()
         models = session.query(submission_store.RegisteredModel).all()

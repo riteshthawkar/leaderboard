@@ -43,7 +43,7 @@ function quotaLabel(user) {
   if (!quota || !Number.isFinite(quota.limit)) return "Not available";
   if (Number.isFinite(quota.per_benchmark_limit)) {
     const remaining = Number.isFinite(quota.remaining) ? quota.remaining : 0;
-    return `${quota.per_benchmark_limit} per benchmark every 24 hours · ${remaining} quota ${remaining === 1 ? "slot" : "slots"} remaining across all tracks. Track availability is shown on the submission page.`;
+    return `${quota.per_benchmark_limit} per module every 24 hours · ${remaining} quota ${remaining === 1 ? "slot" : "slots"} remaining across the framework. Module availability is shown on the submission page.`;
   }
   return `${quota.remaining} of ${quota.limit} submissions remaining`;
 }

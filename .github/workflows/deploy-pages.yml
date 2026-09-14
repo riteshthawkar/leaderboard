@@ -1,0 +1,100 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: vars.PAGES_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.22"
+          cache: npm
+          cache-dependency-path: Combined-Leaderboard/frontend/package-lock.json
+
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+
+      - name: Configure project Pages build
+        env:
+          API_BASE_URL: ${{ vars.PAGES_API_BASE_URL }}
+          BASE_PATH_OVERRIDE: ${{ vars.PAGES_BASE_PATH }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "::error::Set the PAGES_API_BASE_URL repository variable to the public Azure API origin."
+            exit 1
+          fi
+          node - <<'NODE'
+          const value = process.env.API_BASE_URL.trim();
+          let parsed;
+          try {
+            parsed = new URL(value);
+          } catch {
+            console.error("::error::PAGES_API_BASE_URL must be a valid HTTPS origin.");
+            process.exit(1);
+          }
+          if (parsed.protocol !== "https:" || parsed.origin !== value.replace(/\/$/, "")) {
+            console.error("::error::PAGES_API_BASE_URL must be an HTTPS origin without a path, query, or fragment.");
+            process.exit(1);
+          }
+          NODE
+          if [ -n "$BASE_PATH_OVERRIDE" ]; then
+            base_path="$BASE_PATH_OVERRIDE"
+          else
+            repository_name="${GITHUB_REPOSITORY#*/}"
+            if [[ "$repository_name" == *.github.io ]]; then
+              base_path="/"
+            else
+              base_path="/$repository_name/"
+            fi
+          fi
+          echo "VITE_API_BASE_URL=$API_BASE_URL" >> "$GITHUB_ENV"
+          echo "VITE_AUTH_TRANSPORT=bearer" >> "$GITHUB_ENV"
+          echo "VITE_BASE_PATH=$base_path" >> "$GITHUB_ENV"
+
+      - name: Install frontend dependencies
+        working-directory: Combined-Leaderboard/frontend
+        run: npm ci
+
+      - name: Validate frontend
+        working-directory: Combined-Leaderboard/frontend
+        run: |
+          npm run lint
+          npm run test:run
+
+      - name: Build GitHub Pages frontend
+        working-directory: Combined-Leaderboard/frontend
+        env:
+          VITE_PRIVACY_POLICY_URL: ${{ vars.PAGES_PRIVACY_POLICY_URL }}
+        run: npm run build:pages
+
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: Combined-Leaderboard/frontend/dist
+
+  deploy:
+    if: vars.PAGES_DEPLOY_ENABLED == 'true'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

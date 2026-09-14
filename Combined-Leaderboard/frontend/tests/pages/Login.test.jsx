@@ -10,6 +10,7 @@ const apiMocks = vi.hoisted(() => ({
   fetchMe: vi.fn(),
   postJSON: vi.fn(),
   saveUser: vi.fn(),
+  exchangeOAuthCode: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -19,6 +20,8 @@ vi.mock("@/lib/api", () => ({
   fetchMe: apiMocks.fetchMe,
   postJSON: apiMocks.postJSON,
   saveUser: apiMocks.saveUser,
+  exchangeOAuthCode: apiMocks.exchangeOAuthCode,
+  oauthStartUrl: (provider, next) => `http://api.test/api/auth/oauth/${provider}?next=${encodeURIComponent(next)}`,
   errorMessage: (error, fallback = "The action could not be completed.") => error?.message || fallback,
 }));
 
@@ -40,6 +43,7 @@ describe("authentication workspace", () => {
     apiMocks.fetchMe.mockResolvedValue(null);
     apiMocks.postJSON.mockReset();
     apiMocks.saveUser.mockReset();
+    apiMocks.exchangeOAuthCode.mockReset();
     window.history.replaceState(null, "", "/");
   });
 
@@ -94,6 +98,24 @@ describe("authentication workspace", () => {
     expect(apiMocks.saveUser).toHaveBeenCalledWith({
       email: "verified@example.com",
       csrfToken: "csrf-token",
+    });
+    expect(window.location.hash).toBe("");
+  });
+
+  it("exchanges one-time OAuth handoff codes from the URL fragment", async () => {
+    apiMocks.exchangeOAuthCode.mockResolvedValue({
+      email: "oauth@example.com",
+      access_token: "access-token",
+      refresh_token: "refresh-token",
+      token_type: "Bearer",
+    });
+
+    renderLogin("/login?next=/submissions#oauth_code=handoff-code");
+
+    await waitFor(() => expect(apiMocks.exchangeOAuthCode).toHaveBeenCalledWith("handoff-code"));
+    expect(apiMocks.saveUser).toHaveBeenCalledWith({
+      email: "oauth@example.com",
+      csrfToken: undefined,
     });
     expect(window.location.hash).toBe("");
   });

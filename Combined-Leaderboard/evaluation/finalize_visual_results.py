@@ -26,6 +26,9 @@ from visual_answer_contract import (
 
 
 TRACKS = ("do_you_see_me", "minds_eye")
+LEGACY_PRODUCTION_EXTRACTION_METHODS = {
+    "qwen3-8b-gold-blind-evidence-extractor-v4",
+}
 CURRENT_PIPELINE_REVISION = "unquantized-bf16-evidence-extraction-v12"
 SUPPORTED_PIPELINE_REVISIONS = {
     "unquantized-bf16-smoke-and-full-text-extraction-v10",
@@ -184,6 +187,7 @@ def answer_provenance_counts(
                 ANSWER_EXTRACTION_METHOD,
                 PRODUCTION_EXTRACTION_METHOD,
                 PUBLIC_EXTRACTION_METHOD,
+                *LEGACY_PRODUCTION_EXTRACTION_METHODS,
             }
         )
         parsed = ""

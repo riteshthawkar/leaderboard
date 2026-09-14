@@ -8,8 +8,6 @@ import hashlib
 import json
 import os
 import re
-import zipfile
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +42,18 @@ from spatial_harness.submission_contract import (
     public_question_id,
     sha256_file,
     validate_contract_identity,
+)
+from spatial_harness.artifact_package import (
+    ANSWERS_SCHEMA_VERSION as ARTIFACT_ANSWERS_SCHEMA_VERSION,
+    ARCHIVE_NAME as ARTIFACT_ARCHIVE_NAME,
+    PACKAGE_SCHEMA_VERSION as ARTIFACT_PACKAGE_SCHEMA_VERSION,
+    SCORE_SOURCE as ARTIFACT_SCORE_SOURCE,
+    SCORE_UNIT as ARTIFACT_SCORE_UNIT,
+    VERIFICATION_LEVEL as ARTIFACT_VERIFICATION_LEVEL,
+    aggregate_claimed_scores,
+    raw_output_row,
+    write_artifact_package,
+    write_gzip_jsonl,
 )
 
 
@@ -370,12 +380,15 @@ def package_submission(
     report = _aggregate_report(evidence, model)
     _atomic_json(report_path, report)
 
+    run_created_at = str(run_config.get("created_at") or "").strip()
+    if not run_created_at:
+        raise ValueError("run_config.json does not contain the source run creation time")
     run_manifest = {
         "schema_version": RUN_MANIFEST_SCHEMA_VERSION,
         "submission_schema_version": SUBMISSION_SCHEMA_VERSION,
         "harness_contract": HARNESS_CONTRACT,
         "harness_version": HARNESS_VERSION,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": run_created_at,
         "model": model,
         "datasets": list(DATASETS),
         "conditions": list(REQUIRED_CONDITIONS),
@@ -451,22 +464,85 @@ def package_submission(
     }
     _atomic_json(manifest_path, run_manifest)
 
-    archive_path = output_dir / "spatial_reasoning_submission.zip"
-    temporary = archive_path.with_suffix(".zip.tmp")
-    temporary.unlink(missing_ok=True)
-    with zipfile.ZipFile(
-        temporary,
-        "w",
-        compression=zipfile.ZIP_DEFLATED,
-        compresslevel=9,
-    ) as archive:
-        archive.write(submission_path, arcname="submission.jsonl")
-        archive.write(manifest_path, arcname="run_manifest.json")
-        archive.write(report_path, arcname="leaderboard.json")
-    with temporary.open("rb+") as handle:
-        os.fsync(handle.fileno())
-    os.replace(temporary, archive_path)
-    return archive_path
+    artifact_answers = [
+        {
+            "schema_version": ARTIFACT_ANSWERS_SCHEMA_VERSION,
+            "dataset": row["dataset"],
+            "question_id": row["question_id"],
+            "evaluation_group": row["evaluation_group"],
+            "answer_type": row["answer_type"],
+            "condition": row["condition"],
+            "final_answer": row["answer"],
+            "claimed_credit": int(row["correct"]),
+        }
+        for row in evidence
+    ]
+    claimed_scores = aggregate_claimed_scores(
+        artifact_answers,
+        DATASETS,
+        REQUIRED_CONDITIONS,
+    )
+    artifact_answers_path = output_dir / "answers.jsonl.gz"
+    artifact_raw_outputs_path = output_dir / "raw_outputs.jsonl.gz"
+    answer_count = write_gzip_jsonl(
+        artifact_answers_path,
+        artifact_answers,
+    )
+    raw_output_count = write_gzip_jsonl(
+        artifact_raw_outputs_path,
+        (raw_output_row(row) for row in judged_rows),
+    )
+    if answer_count != len(evidence) or raw_output_count != len(evidence):
+        raise ValueError(
+            "Artifact answer and raw-output evidence counts must match"
+        )
+    artifact_manifest = {
+        "schema_version": ARTIFACT_PACKAGE_SCHEMA_VERSION,
+        "created_at": run_created_at,
+        "verification_level": ARTIFACT_VERIFICATION_LEVEL,
+        "score_source": ARTIFACT_SCORE_SOURCE,
+        "model": model,
+        "benchmark": {
+            "version": benchmark_manifest["benchmark_version"],
+            "manifest_sha256": run_manifest[
+                "benchmark_manifest_sha256"
+            ],
+        },
+        "evaluation": {
+            "harness_contract": HARNESS_CONTRACT,
+            "harness_version": HARNESS_VERSION,
+            "harness_commit": run_config.get("harness_commit"),
+            "configuration_sha256": sha256_file(
+                input_dir / "run_config.json"
+            ),
+            "judge": {
+                "name": PAPER_JUDGE_MODEL,
+                "revision": PAPER_JUDGE_REVISION,
+            },
+        },
+        "evidence": {
+            "answer_rows": answer_count,
+            "raw_output_rows": raw_output_count,
+            "raw_output_scope": "complete_model_response",
+        },
+        "scoring": {
+            "source": ARTIFACT_SCORE_SOURCE,
+            "unit": ARTIFACT_SCORE_UNIT,
+        },
+        "source_evidence": {
+            "run_config_sha256": sha256_file(input_dir / "run_config.json"),
+            "judged_sha256": sha256_file(input_dir / "judged.jsonl"),
+            "audit_manifest_sha256": sha256_file(manifest_path),
+            "audit_report_sha256": sha256_file(report_path),
+        },
+    }
+    return write_artifact_package(
+        output_dir / ARTIFACT_ARCHIVE_NAME,
+        artifact_manifest,
+        claimed_scores,
+        artifact_answers_path,
+        artifact_raw_outputs_path,
+    )
 
 
 def parse_args() -> argparse.Namespace:

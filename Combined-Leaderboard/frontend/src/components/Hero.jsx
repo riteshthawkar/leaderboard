@@ -10,12 +10,12 @@ export function HomeHero() {
       <div className="home-hero-art" aria-hidden="true" />
       <div className="container relative z-10">
         <div className="w-full max-w-[550px]">
-          <span className="mb-5 inline-flex items-center text-xs font-medium uppercase text-[#d3d9dd]">Microsoft Research · Multimodal Evaluation</span>
+          <span className="mb-5 inline-flex items-center text-xs font-medium uppercase text-[#d3d9dd]">Microsoft Research · Unified Multimodal Evaluation</span>
           <h1 className="max-w-[18ch] font-display text-4xl font-bold leading-[1.06] text-[#f5f7f8] sm:text-5xl lg:text-[3.55rem]">
-            <span>MS VISTA:</span> Do multimodal LLMs <span>truly see</span> what they reason about?
+            <span>MS VISTA:</span> A unified framework for multimodal visual intelligence
           </h1>
           <p className="mt-3 max-w-[62ch] text-base leading-relaxed text-[#d3d9dd] sm:text-lg">
-            MS VISTA is a benchmark suite and leaderboard for the visual intelligence of multimodal LLMs. It evaluates visual <strong>perception</strong>, <strong>visual cognition</strong>, and spatial <strong>reasoning</strong> under one reproducible protocol faithful to each paper.
+            Evaluate what multimodal models <strong>perceive</strong>, how they perform <strong>visual cognition</strong>, and how <strong>reasoning strategies</strong> change those capabilities through one evidence, diagnostics, and reporting pipeline.
           </p>
           <div className="mt-8 flex flex-wrap gap-3 max-sm:w-full max-sm:[&>*]:w-full">
             <Button asChild variant="brand"><Link to="/leaderboard">View the leaderboard</Link></Button>

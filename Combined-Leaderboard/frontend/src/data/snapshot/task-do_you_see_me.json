@@ -11,7 +11,7 @@
   "label": "Do You See Me",
   "layer": "perception",
   "paper_total_samples": 2612,
-  "request_id": "178ebbc3-d600-4a8b-874e-26eeb42c23a7",
+  "request_id": "26873f2f-c236-4bb0-aea8-be2884f5927c",
   "score_description": "Mean task accuracy within 2D and 3D, followed by an equal mean across the two dimensions.",
   "score_method": "dimension_balanced_task_macro",
   "score_provenance": "leaderboard_release_suite",

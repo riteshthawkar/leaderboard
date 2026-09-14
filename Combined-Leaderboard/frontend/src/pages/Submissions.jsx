@@ -71,7 +71,7 @@ function DeleteSubmissionDialog({ state, onClose, onConfirm }) {
               </DialogTitle>
               <DialogDescription className="mt-3 text-sm leading-relaxed text-muted">
                 {isDeleted
-                  ? `${state.row.model_name || "This model"} was removed from your history. The leaderboard now uses the latest remaining visible run for this benchmark, when one exists.`
+                  ? `${state.row.model_name || "This model"} was removed from your history. The framework now uses the latest remaining visible run for this module, when one exists.`
                   : `This removes ${state.row.model_name || "this model"} from your submission history. The audit record remains retained for integrity and quota enforcement, and any earlier visible run becomes active on the leaderboard.`}
               </DialogDescription>
               {state.error && (

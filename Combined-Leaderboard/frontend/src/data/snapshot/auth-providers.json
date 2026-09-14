@@ -1,8 +1,3 @@
 {
-  "providers": [
-    {
-      "id": "microsoft",
-      "label": "Microsoft"
-    }
-  ]
+  "providers": []
 }

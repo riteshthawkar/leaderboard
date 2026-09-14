@@ -4,8 +4,9 @@ User authentication database — email + password with email verification.
 Accounts are keyed by email address (the email IS the username). New accounts
 are created unverified and must confirm ownership of the email via a
 verification link before they can sign in. OAuth (Google/Microsoft) identities
-are treated as pre-verified. Authentication is session-cookie based — there are
-no API tokens.
+are treated as pre-verified. The web service can authenticate with either a
+same-origin session cookie or short-lived access tokens backed by rotating,
+server-revocable refresh tokens.
 """
 
 import hashlib
@@ -81,7 +82,7 @@ class OAuthIdentityConflictError(Exception):
 
 
 _DB_URL = AUTH_DATABASE_URL
-AUTH_SCHEMA_VERSION = 2
+AUTH_SCHEMA_VERSION = 3
 
 
 def _sqlite_db_path(db_url: str) -> Optional[Path]:
@@ -181,6 +182,37 @@ class User(Base):
         return f"<User {self.email}>"
 
 
+class RefreshToken(Base):
+    """Hashed, rotating refresh credential for browser bearer sessions."""
+
+    __tablename__ = "auth_refresh_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token_digest = Column(String(64), unique=True, nullable=False, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    family_id = Column(String(64), nullable=False, index=True)
+    session_version = Column(Integer, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    rotated_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    replaced_by_digest = Column(String(64), nullable=True)
+
+
+class OAuthExchangeCode(Base):
+    """One-time code used to hand an OAuth login back to a static frontend."""
+
+    __tablename__ = "auth_oauth_exchange_codes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code_digest = Column(String(64), unique=True, nullable=False, index=True)
+    user_email = Column(String(255), nullable=False, index=True)
+    session_version = Column(Integer, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
+    consumed_at = Column(DateTime, nullable=True)
+
+
 def init_db() -> None:
     """Create tables if they don't exist."""
     if _DB_DRIVER.startswith("postgresql"):
@@ -190,7 +222,11 @@ def init_db() -> None:
             run_schema_migrations(
                 connection,
                 "auth",
-                [(1, _ensure_user_columns), (2, _ensure_auth_security_columns)],
+                [
+                    (1, _ensure_user_columns),
+                    (2, _ensure_auth_security_columns),
+                    (3, _ensure_bearer_auth_tables),
+                ],
             )
     else:
         with _schema_file_lock():
@@ -199,7 +235,11 @@ def init_db() -> None:
                 run_schema_migrations(
                     connection,
                     "auth",
-                    [(1, _ensure_user_columns), (2, _ensure_auth_security_columns)],
+                    [
+                        (1, _ensure_user_columns),
+                        (2, _ensure_auth_security_columns),
+                        (3, _ensure_bearer_auth_tables),
+                    ],
                 )
 
 
@@ -237,6 +277,12 @@ def _ensure_auth_security_columns(connection) -> None:
         "ON users (oauth_provider, oauth_subject)"
     ))
     _migrate_token_digests(connection)
+
+
+def _ensure_bearer_auth_tables(connection) -> None:
+    """Create the additive token tables used by cross-site static clients."""
+    RefreshToken.__table__.create(connection, checkfirst=True)
+    OAuthExchangeCode.__table__.create(connection, checkfirst=True)
 
 
 def _migrate_token_digests(connection) -> None:
@@ -321,6 +367,192 @@ def _token_consume_query(session, query):
     return query
 
 
+def _as_utc(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def _purge_expired_browser_credentials(session) -> None:
+    """Bound token-table growth while retaining live reuse-detection records."""
+    now = _utcnow()
+    session.query(RefreshToken).filter(RefreshToken.expires_at < now).delete(
+        synchronize_session=False
+    )
+    session.query(OAuthExchangeCode).filter(OAuthExchangeCode.expires_at < now).delete(
+        synchronize_session=False
+    )
+
+
+def _verified_user(session, email: str) -> Optional[User]:
+    user = session.query(User).filter_by(email=normalize_email(email)).first()
+    return user if user and user.email_verified else None
+
+
+def _revoke_user_refresh_tokens_in_session(session, email: str, now: datetime) -> int:
+    return int(session.query(RefreshToken).filter(
+        RefreshToken.user_email == normalize_email(email),
+        RefreshToken.revoked_at.is_(None),
+    ).update(
+        {RefreshToken.revoked_at: now},
+        synchronize_session=False,
+    ) or 0)
+
+
+def issue_refresh_token(email: str, ttl_days: int) -> Optional[str]:
+    """Create a new refresh-token family for a verified account."""
+    if ttl_days <= 0:
+        raise ValueError("ttl_days must be positive")
+    raw_token = secrets.token_urlsafe(48)
+    with _Session() as session:
+        user = _verified_user(session, email)
+        if user is None:
+            return None
+        _purge_expired_browser_credentials(session)
+        session.add(RefreshToken(
+            token_digest=_token_digest(raw_token),
+            user_email=user.email,
+            family_id=secrets.token_hex(32),
+            session_version=int(user.session_version or 0),
+            expires_at=_utcnow() + timedelta(days=ttl_days),
+        ))
+        session.commit()
+    return raw_token
+
+
+def rotate_refresh_token(token: str, ttl_days: int) -> tuple[str, Optional[str], Optional[str]]:
+    """Consume and replace a refresh token.
+
+    Returns ``(status, email, replacement)`` where status is ``ok``,
+    ``invalid``, ``expired``, ``revoked``, or ``reused``. Reuse of a token that
+    was already rotated revokes its entire family.
+    """
+    token = (token or "").strip()
+    if not token or ttl_days <= 0:
+        return "invalid", None, None
+    digest = _token_digest(token)
+    replacement = secrets.token_urlsafe(48)
+    replacement_digest = _token_digest(replacement)
+    now = _utcnow()
+    with _Session() as session:
+        query = session.query(RefreshToken).filter_by(token_digest=digest)
+        row = _token_consume_query(session, query).first()
+        if row is None:
+            return "invalid", None, None
+        if row.rotated_at is not None:
+            session.query(RefreshToken).filter_by(family_id=row.family_id).update(
+                {RefreshToken.revoked_at: now},
+                synchronize_session=False,
+            )
+            session.commit()
+            return "reused", None, None
+        if row.revoked_at is not None:
+            return "revoked", None, None
+        if (_as_utc(row.expires_at) or now) <= now:
+            row.revoked_at = now
+            session.commit()
+            return "expired", None, None
+        user = _verified_user(session, row.user_email)
+        if (
+            user is None
+            or int(row.session_version) != int(user.session_version or 0)
+        ):
+            session.query(RefreshToken).filter_by(family_id=row.family_id).update(
+                {RefreshToken.revoked_at: now},
+                synchronize_session=False,
+            )
+            session.commit()
+            return "revoked", None, None
+
+        row.rotated_at = now
+        row.replaced_by_digest = replacement_digest
+        session.add(RefreshToken(
+            token_digest=replacement_digest,
+            user_email=user.email,
+            family_id=row.family_id,
+            session_version=int(user.session_version or 0),
+            expires_at=now + timedelta(days=ttl_days),
+        ))
+        session.commit()
+        return "ok", user.email, replacement
+
+
+def revoke_refresh_token(token: str) -> bool:
+    """Revoke one refresh token without revealing whether it existed."""
+    token = (token or "").strip()
+    if not token:
+        return False
+    now = _utcnow()
+    with _Session() as session:
+        query = session.query(RefreshToken).filter_by(token_digest=_token_digest(token))
+        row = _token_consume_query(session, query).first()
+        if row is None:
+            return False
+        if row.revoked_at is None:
+            row.revoked_at = now
+            session.commit()
+        return True
+
+
+def revoke_user_refresh_tokens(email: str) -> int:
+    """Revoke every active refresh token for an account."""
+    now = _utcnow()
+    with _Session() as session:
+        count = _revoke_user_refresh_tokens_in_session(session, email, now)
+        session.commit()
+        return count
+
+
+def issue_oauth_exchange_code(email: str, ttl_seconds: int = 60) -> Optional[str]:
+    """Issue a short-lived one-time code after a successful OAuth callback."""
+    if ttl_seconds <= 0:
+        raise ValueError("ttl_seconds must be positive")
+    raw_code = secrets.token_urlsafe(32)
+    with _Session() as session:
+        user = _verified_user(session, email)
+        if user is None:
+            return None
+        _purge_expired_browser_credentials(session)
+        session.add(OAuthExchangeCode(
+            code_digest=_token_digest(raw_code),
+            user_email=user.email,
+            session_version=int(user.session_version or 0),
+            expires_at=_utcnow() + timedelta(seconds=ttl_seconds),
+        ))
+        session.commit()
+    return raw_code
+
+
+def consume_oauth_exchange_code(code: str) -> Optional[str]:
+    """Atomically consume an OAuth handoff code and return its account email."""
+    code = (code or "").strip()
+    if not code:
+        return None
+    now = _utcnow()
+    with _Session() as session:
+        query = session.query(OAuthExchangeCode).filter_by(
+            code_digest=_token_digest(code)
+        )
+        row = _token_consume_query(session, query).first()
+        if row is None or row.consumed_at is not None:
+            return None
+        if (_as_utc(row.expires_at) or now) <= now:
+            row.consumed_at = now
+            session.commit()
+            return None
+        user = _verified_user(session, row.user_email)
+        if (
+            user is None
+            or int(row.session_version) != int(user.session_version or 0)
+        ):
+            row.consumed_at = now
+            session.commit()
+            return None
+        row.consumed_at = now
+        session.commit()
+        return user.email
+
+
 def register_user(email: str, password: str) -> Tuple[str, Optional[str]]:
     """
     Register a new email/password account (created unverified).
@@ -353,6 +585,7 @@ def register_user(email: str, password: str) -> Tuple[str, Optional[str]]:
             user.password_reset_token = None
             user.password_reset_expires_at = None
             user.session_version = (user.session_version or 0) + 1
+            _revoke_user_refresh_tokens_in_session(session, user.email, _utcnow())
             session.commit()
             return "resent", token
         user = User(
@@ -385,6 +618,7 @@ def register_user(email: str, password: str) -> Tuple[str, Optional[str]]:
             user.password_reset_token = None
             user.password_reset_expires_at = None
             user.session_version = (user.session_version or 0) + 1
+            _revoke_user_refresh_tokens_in_session(session, user.email, _utcnow())
             session.commit()
             return "resent", token
         return "created", token
@@ -519,6 +753,7 @@ def reset_password(token: str, password: str) -> str:
         user.verification_token = None
         user.verification_expires_at = None
         user.session_version = (user.session_version or 0) + 1
+        _revoke_user_refresh_tokens_in_session(session, user.email, _utcnow())
         session.commit()
         return "ok"
 
@@ -634,7 +869,7 @@ def _export_datetime(value: Optional[datetime]) -> Optional[str]:
 
 
 def export_user_data(email: str) -> Optional[dict]:
-    """Export account metadata without credential material."""
+    """Export account and browser-session metadata without credential material."""
     email = normalize_email(email)
     with _Session() as session:
         user = session.query(User).filter_by(email=email).first()
@@ -648,7 +883,30 @@ def export_user_data(email: str) -> Optional[dict]:
             "oauth_subject": user.oauth_subject,
             "created_at": _export_datetime(user.created_at),
         }
-        return {"account": account, "records": {}}
+        refresh_tokens = session.query(RefreshToken).filter_by(user_email=email).all()
+        exchange_codes = session.query(OAuthExchangeCode).filter_by(user_email=email).all()
+        records = {
+            "auth_refresh_tokens": [
+                {
+                    "session_version": row.session_version,
+                    "expires_at": _export_datetime(row.expires_at),
+                    "created_at": _export_datetime(row.created_at),
+                    "rotated_at": _export_datetime(row.rotated_at),
+                    "revoked_at": _export_datetime(row.revoked_at),
+                }
+                for row in refresh_tokens
+            ],
+            "auth_oauth_exchange_codes": [
+                {
+                    "session_version": row.session_version,
+                    "expires_at": _export_datetime(row.expires_at),
+                    "created_at": _export_datetime(row.created_at),
+                    "consumed_at": _export_datetime(row.consumed_at),
+                }
+                for row in exchange_codes
+            ],
+        }
+        return {"account": account, "records": records}
 
 
 def anonymize_user(email: str, replacement: Optional[str] = None) -> Optional[str]:
@@ -671,6 +929,13 @@ def anonymize_user(email: str, replacement: Optional[str] = None) -> Optional[st
         ).first()
         if collision:
             raise ValueError("replacement email is already in use")
+
+        session.query(RefreshToken).filter_by(user_email=email).delete(
+            synchronize_session=False
+        )
+        session.query(OAuthExchangeCode).filter_by(user_email=email).delete(
+            synchronize_session=False
+        )
 
         user.email = replacement
         user.password_hash = generate_password_hash(secrets.token_urlsafe(32))

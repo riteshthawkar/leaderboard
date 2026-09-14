@@ -4,10 +4,18 @@ import { snapshots } from "@/data/snapshot";
 // served from a frozen snapshot and write actions (submit / sign-in) are disabled.
 export const IS_STATIC_DEMO = import.meta.env.VITE_STATIC === "1";
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/+$/, "");
+export const AUTH_TRANSPORT = (import.meta.env.VITE_AUTH_TRANSPORT || "cookie").trim().toLowerCase();
+if (!["cookie", "bearer"].includes(AUTH_TRANSPORT)) {
+  throw new Error("VITE_AUTH_TRANSPORT must be cookie or bearer.");
+}
+export const USE_BEARER_AUTH = AUTH_TRANSPORT === "bearer";
 const CSRF_STORAGE_KEY = "lb_csrf_token";
+const REFRESH_STORAGE_KEY = "lb_refresh_token_v1";
 const READ_TIMEOUT_MS = 20_000;
 const WRITE_TIMEOUT_MS = 30_000;
 const UPLOAD_TIMEOUT_MS = 180_000;
+let accessToken = "";
+let refreshPromise = null;
 
 function pathOnly(url) {
   const value = String(url || "/");
@@ -25,6 +33,12 @@ export function apiUrl(path) {
   if (/^https?:\/\//i.test(value)) return value;
   const normalized = value.startsWith("/") ? value : `/${value}`;
   return API_BASE_URL ? `${API_BASE_URL}${normalized}` : normalized;
+}
+
+export function oauthStartUrl(provider, next = "/submit") {
+  const params = new URLSearchParams({ next });
+  if (USE_BEARER_AUTH) params.set("transport", "bearer");
+  return apiUrl(`/api/auth/oauth/${encodeURIComponent(provider)}?${params.toString()}`);
 }
 
 export class ApiError extends Error {
@@ -76,24 +90,164 @@ function httpError(response, data, invalidBody) {
   });
 }
 
-async function requestJSON(url, options = {}, timeoutMs = READ_TIMEOUT_MS) {
+function readRefreshToken() {
+  if (!USE_BEARER_AUTH) return "";
+  try {
+    return sessionStorage.getItem(REFRESH_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveRefreshToken(token) {
+  if (!USE_BEARER_AUTH || !token) return;
+  try {
+    sessionStorage.setItem(REFRESH_STORAGE_KEY, token);
+  } catch {
+    /* A memory-only access token remains usable until it expires. */
+  }
+}
+
+function clearAuthTokens() {
+  accessToken = "";
+  try {
+    sessionStorage.removeItem(REFRESH_STORAGE_KEY);
+  } catch {
+    /* Storage can be disabled by browser privacy settings. */
+  }
+}
+
+export function adoptAuthResponse(data) {
+  if (!USE_BEARER_AUTH || !data || data.token_type !== "Bearer") return data;
+  if (typeof data.access_token === "string" && data.access_token) {
+    accessToken = data.access_token;
+  }
+  if (typeof data.refresh_token === "string" && data.refresh_token) {
+    saveRefreshToken(data.refresh_token);
+  }
+  return data;
+}
+
+function requestHeaders(headers) {
+  if (!USE_BEARER_AUTH) return headers;
+  const result = new Headers(headers || {});
+  result.set("X-Auth-Transport", "bearer");
+  if (accessToken) result.set("Authorization", `Bearer ${accessToken}`);
+  return result;
+}
+
+function canRefreshRequest(url) {
+  const path = pathOnly(url);
+  return ![
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/verify",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+    "/api/auth/resend",
+    "/api/auth/token/exchange",
+    "/api/auth/token/refresh",
+    "/api/auth/logout",
+  ].includes(path);
+}
+
+async function performTokenRefresh() {
+  const refreshToken = readRefreshToken();
+  if (!refreshToken) return false;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), WRITE_TIMEOUT_MS);
+  try {
+    const response = await fetch(apiUrl("/api/auth/token/refresh"), {
+      method: "POST",
+      credentials: "omit",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Auth-Transport": "bearer",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      signal: controller.signal,
+    });
+    const { data, invalid } = await parseResponse(response);
+    if (!response.ok) {
+      if ([400, 401, 403].includes(response.status)) clearAuthTokens();
+      throw httpError(response, data, invalid);
+    }
+    if (invalid || !data?.access_token || !data?.refresh_token) {
+      clearAuthTokens();
+      throw new ApiError("The server returned an invalid session refresh response. Sign in again.", {
+        status: response.status,
+        code: "invalid_token_response",
+      });
+    }
+    adoptAuthResponse(data);
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error?.name === "AbortError") {
+      throw new ApiError("The session refresh timed out. Check your connection and try again.", {
+        code: "request_timeout",
+        retryable: true,
+      });
+    }
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    throw new ApiError(
+      offline
+        ? "You appear to be offline. Reconnect to continue your session."
+        : "The application could not refresh your session. Check your connection and try again.",
+      { code: offline ? "offline" : "network_error", retryable: true },
+    );
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+export async function refreshBearerSession() {
+  if (!USE_BEARER_AUTH || !readRefreshToken()) return false;
+  if (!refreshPromise) {
+    refreshPromise = performTokenRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+async function requestJSON(url, options = {}, timeoutMs = READ_TIMEOUT_MS, allowRefresh = true) {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(apiUrl(url), {
-      credentials: "include",
       ...options,
+      credentials: USE_BEARER_AUTH ? "omit" : "include",
+      headers: requestHeaders(options.headers),
       signal: controller.signal,
     });
     const { data, invalid } = await parseResponse(response);
-    if (!response.ok) throw httpError(response, data, invalid);
+    if (!response.ok) {
+      const error = httpError(response, data, invalid);
+      if (
+        response.status === 401
+        && USE_BEARER_AUTH
+        && allowRefresh
+        && canRefreshRequest(url)
+        && readRefreshToken()
+      ) {
+        try {
+          if (await refreshBearerSession()) {
+            return requestJSON(url, options, timeoutMs, false);
+          }
+        } catch (refreshError) {
+          if (![400, 401, 403].includes(refreshError?.status)) throw refreshError;
+        }
+      }
+      throw error;
+    }
     if (invalid) {
       throw new ApiError(
         "The server returned an unreadable response. Refresh the page and retry; contact the administrator if it continues.",
         { status: response.status, code: "invalid_server_response", retryable: true },
       );
     }
-    return data;
+    return adoptAuthResponse(data);
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (error?.name === "AbortError") {
@@ -115,6 +269,7 @@ async function requestJSON(url, options = {}, timeoutMs = READ_TIMEOUT_MS) {
 }
 
 function readCsrfToken() {
+  if (USE_BEARER_AUTH) return "";
   try {
     return localStorage.getItem(CSRF_STORAGE_KEY) || "";
   } catch {
@@ -123,6 +278,7 @@ function readCsrfToken() {
 }
 
 function saveCsrfToken(token) {
+  if (USE_BEARER_AUTH) return;
   try {
     if (token) localStorage.setItem(CSRF_STORAGE_KEY, token);
   } catch {
@@ -155,6 +311,7 @@ export async function getJSON(url) {
 }
 
 async function refreshCsrfToken() {
+  if (USE_BEARER_AUTH) return false;
   const data = await requestJSON("/api/auth/me");
   if (!data?.authenticated || !data?.csrf_token) {
     clearCsrfToken();
@@ -249,8 +406,8 @@ export async function downloadFile(url, fallbackName = "download", options = {})
     const attempt = async () => {
       const response = await fetch(apiUrl(url), {
         method,
-        credentials: "include",
-        headers: method === "POST" ? csrfHeaders() : undefined,
+        credentials: USE_BEARER_AUTH ? "omit" : "include",
+        headers: requestHeaders(method === "POST" ? csrfHeaders() : undefined),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -263,10 +420,19 @@ export async function downloadFile(url, fallbackName = "download", options = {})
     try {
       response = await attempt();
     } catch (error) {
-      if (method !== "POST" || error.code !== "csrf_required" || !(await refreshCsrfToken())) {
-        throw error;
+      if (
+        error.status === 401
+        && USE_BEARER_AUTH
+        && readRefreshToken()
+        && await refreshBearerSession()
+      ) {
+        response = await attempt();
+      } else {
+        if (method !== "POST" || error.code !== "csrf_required" || !(await refreshCsrfToken())) {
+          throw error;
+        }
+        response = await attempt();
       }
-      response = await attempt();
     }
     const blob = await response.blob();
     const disposition = response.headers.get("Content-Disposition") || "";
@@ -329,16 +495,38 @@ export function clearUser() {
   } catch {
     /* Storage can be disabled by browser privacy settings. */
   }
+  clearAuthTokens();
   clearCsrfToken();
   window.dispatchEvent(new CustomEvent("lb_auth", { detail: null }));
 }
 
-// Ask the backend who is signed in (via the session cookie), or who is acting in
-// explicit test-deployment mode.
+export async function exchangeOAuthCode(code) {
+  return postJSON("/api/auth/token/exchange", { code });
+}
+
+// Ask the backend who is signed in through the configured browser transport.
 export async function fetchMe() {
   if (IS_STATIC_DEMO) return null;
-  const data = await getJSON("/api/auth/me");
+  if (USE_BEARER_AUTH && !accessToken && readRefreshToken()) {
+    try {
+      await refreshBearerSession();
+    } catch (error) {
+      if (![400, 401, 403].includes(error?.status)) throw error;
+      return null;
+    }
+  }
+  let data;
+  try {
+    data = await getJSON("/api/auth/me");
+  } catch (error) {
+    if (USE_BEARER_AUTH && error?.status === 401) {
+      clearAuthTokens();
+      return null;
+    }
+    throw error;
+  }
   if (!data || !data.authenticated) {
+    if (USE_BEARER_AUTH) clearAuthTokens();
     clearCsrfToken();
     return null;
   }
@@ -356,6 +544,17 @@ export async function fetchMe() {
 }
 
 export async function logout() {
-  if (!IS_STATIC_DEMO) await postJSON("/api/auth/logout", {});
-  clearUser();
+  if (IS_STATIC_DEMO) {
+    clearUser();
+    return;
+  }
+  const refreshToken = readRefreshToken();
+  try {
+    await postJSON(
+      "/api/auth/logout",
+      USE_BEARER_AUTH ? { refresh_token: refreshToken } : {},
+    );
+  } finally {
+    clearUser();
+  }
 }

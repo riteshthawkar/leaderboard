@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 UNRESOLVED_TOKEN = "UNRESOLVED"
 INVALID_FORMAT_TOKEN = "__INVALID_FORMAT__"
-PRODUCTION_EXTRACTION_METHOD = "qwen3-8b-gold-blind-evidence-extractor-v4"
+PRODUCTION_EXTRACTION_METHOD = "qwen3-8b-gold-blind-evidence-extractor-v5"
 LETTER_DISAMBIGUATION_MAX_LENGTH = 9
 
 _DYSM_ID_RE = re.compile(

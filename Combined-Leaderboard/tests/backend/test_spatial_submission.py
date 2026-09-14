@@ -19,6 +19,16 @@ from config import (  # noqa: E402
 )
 from scoring.task_scorer import SubmissionValidationError  # noqa: E402
 from spatial_harness import submission_contract  # noqa: E402
+from spatial_harness.artifact_package import (  # noqa: E402
+    ANSWERS_SCHEMA_VERSION,
+    PACKAGE_SCHEMA_VERSION,
+    SCORE_SOURCE,
+    SCORE_UNIT,
+    VERIFICATION_LEVEL,
+    aggregate_claimed_scores,
+    write_artifact_package,
+    write_gzip_jsonl,
+)
 
 
 LEGACY_HARNESS_VERSION = "1.1.0"
@@ -268,6 +278,103 @@ def test_spatial_run_manifest_accepts_matching_official_artifacts(tmp_path):
 
     assert result["benchmark_version"] == "test-v1"
     assert result["judge_revision"] == GRADING["spatial"]["judge_model"]
+
+
+def test_artifact_backed_package_uses_public_ids_and_claimed_credit_only(tmp_path):
+    (
+        manifest_path,
+        _ground_truth,
+        template_path,
+        questions_path,
+        submission,
+        _run_manifest,
+        _records,
+        _report,
+    ) = _official_fixture(tmp_path)
+    legacy_rows = [json.loads(line) for line in submission.splitlines()]
+    answers = [
+        {
+            "schema_version": ANSWERS_SCHEMA_VERSION,
+            "dataset": row["dataset"],
+            "question_id": row["question_id"],
+            "evaluation_group": row["evaluation_group"],
+            "answer_type": "mcq",
+            "condition": row["condition"],
+            "final_answer": row["answer"],
+            "claimed_credit": int(row["correct"]),
+        }
+        for row in legacy_rows
+    ]
+    answer_path = tmp_path / "answers.jsonl.gz"
+    raw_path = tmp_path / "raw_outputs.jsonl.gz"
+    write_gzip_jsonl(answer_path, answers)
+    write_gzip_jsonl(
+        raw_path,
+        (
+            {
+                "schema_version": "ms-vista-track3-raw-outputs/v1",
+                "dataset": row["dataset"],
+                "question_id": row["question_id"],
+                "evaluation_group": row["evaluation_group"],
+                "condition": row["condition"],
+                "raw_output": "user-provided model output",
+            }
+            for row in answers
+        ),
+    )
+    claimed_scores = aggregate_claimed_scores(
+        answers,
+        SPATIAL_DATASET_KEYS,
+        EVAL_CONDITIONS,
+    )
+    package_path = write_artifact_package(
+        tmp_path / "track3_artifact_submission.zip",
+        {
+            "schema_version": PACKAGE_SCHEMA_VERSION,
+            "created_at": "2026-08-02T00:00:00+00:00",
+            "verification_level": VERIFICATION_LEVEL,
+            "score_source": SCORE_SOURCE,
+            "model": {"name": "Test Model", "revision": "model-revision"},
+            "benchmark": {
+                "version": "test-v1",
+                "manifest_sha256": _sha(manifest_path.read_bytes()),
+            },
+            "evaluation": {
+                "harness_contract": "user-declared-harness",
+                "harness_version": "user-version",
+                "harness_commit": "user-commit",
+                "configuration_sha256": "f" * 64,
+                "judge": {"name": "User Judge", "revision": "user-judge-revision"},
+            },
+            "evidence": {
+                "answer_rows": len(answers),
+                "raw_output_rows": len(answers),
+                "raw_output_scope": "complete_model_response",
+            },
+            "scoring": {"source": SCORE_SOURCE, "unit": SCORE_UNIT},
+        },
+        claimed_scores,
+        answer_path,
+        raw_path,
+    )
+
+    package = spatial_submission.read_spatial_artifact_archive(
+        package_path.read_bytes()
+    )
+    records, report, _manifest, metadata = (
+        spatial_submission.parse_spatial_artifact_evidence(
+            package,
+            "Test Model",
+            manifest_path,
+            template_path,
+            questions_path,
+        )
+    )
+
+    assert len(records) == len(answers)
+    assert report["summary"]["main_noncot"] == 1.0
+    assert metadata["verification_level"] == VERIFICATION_LEVEL
+    assert metadata["server_ground_truth_evaluation"] is False
 
 
 @pytest.mark.parametrize(

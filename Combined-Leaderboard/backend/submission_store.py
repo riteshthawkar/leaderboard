@@ -48,6 +48,13 @@ from constants import (
     SUBMISSION_DAILY_LIMIT_PER_BENCHMARK,
     SUBMISSION_RESERVATION_TIMEOUT_MINUTES,
 )
+from spatial_harness.artifact_package import (
+    ANSWERS_MEMBER as SPATIAL_ARTIFACT_ANSWERS_MEMBER,
+    ARCHIVE_NAME as SPATIAL_ARTIFACT_ARCHIVE_NAME,
+    CHECKSUMS_MEMBER as SPATIAL_ARTIFACT_CHECKSUMS_MEMBER,
+    MANIFEST_MEMBER as SPATIAL_ARTIFACT_MANIFEST_MEMBER,
+    SCORES_MEMBER as SPATIAL_ARTIFACT_SCORES_MEMBER,
+)
 try:
     from config import (
         DB_MAX_OVERFLOW,
@@ -714,13 +721,30 @@ def submission_integrity_status() -> Dict:
         if not isinstance(public_evidence, dict):
             public_evidence = {}
         if row.task_id == "spatial" and public_evidence.get("available") is True:
-            required_artifacts = {
+            legacy_required_artifacts = {
                 "spatial_reasoning_submission.zip",
                 "submission.jsonl",
                 "run_manifest.json",
                 "leaderboard.json",
             }
-            archive_metadata = artifacts.get("spatial_reasoning_submission.zip")
+            artifact_required_artifacts = {
+                SPATIAL_ARTIFACT_ARCHIVE_NAME,
+                SPATIAL_ARTIFACT_MANIFEST_MEMBER,
+                SPATIAL_ARTIFACT_SCORES_MEMBER,
+                SPATIAL_ARTIFACT_ANSWERS_MEMBER,
+                SPATIAL_ARTIFACT_CHECKSUMS_MEMBER,
+            }
+            artifact_backed = SPATIAL_ARTIFACT_ARCHIVE_NAME in artifacts
+            required_artifacts = (
+                artifact_required_artifacts
+                if artifact_backed
+                else legacy_required_artifacts
+            )
+            archive_metadata = artifacts.get(
+                SPATIAL_ARTIFACT_ARCHIVE_NAME
+                if artifact_backed
+                else "spatial_reasoning_submission.zip"
+            )
             if (
                 set(artifacts) != required_artifacts
                 or archive_metadata is None
@@ -1238,6 +1262,19 @@ def get_public_spatial_evidence(score_submission_id: str) -> Optional[Dict]:
             .all()
         )
         score = _json_loads(submission.latest_score_json)
+        score_metadata = score.get("metadata") if isinstance(score, dict) else {}
+        public_evidence = (
+            score_metadata.get("public_evidence")
+            if isinstance(score_metadata, dict)
+            else {}
+        )
+        if not isinstance(public_evidence, dict):
+            public_evidence = {}
+        verification_level = str(
+            public_evidence.get("verification_level")
+            or "provenance_and_arithmetic"
+        )
+        artifact_backed = verification_level == "self_reported_artifact_backed"
         base_url = f"/api/public/submissions/{submission.score_submission_id}"
         return {
             "submission_id": submission.score_submission_id,
@@ -1251,15 +1288,24 @@ def get_public_spatial_evidence(score_submission_id: str) -> Optional[Dict]:
             "row_count": submission.row_count,
             "score": score,
             "verification": {
-                "level": "provenance_and_arithmetic",
+                "level": verification_level,
                 "server_ground_truth_evaluation": False,
                 "description": (
+                    "The server validates package integrity, public sample coverage, and agreement between "
+                    "submitter-claimed per-sample credit and aggregate counts. It does not compare answers "
+                    "with reference answers."
+                    if artifact_backed
+                    else
                     "The server validates the official harness version, package hashes, public sample coverage, "
                     "and agreement between per-sample correctness flags and aggregate scores. It does not "
                     "independently compare spatial answers with private ground truth."
                 ),
             },
-            "answers_url": f"{base_url}/answers.jsonl",
+            "answers_url": (
+                f"{base_url}/answers.jsonl.gz"
+                if artifact_backed
+                else f"{base_url}/answers.jsonl"
+            ),
             "artifacts": [
                 {
                     "name": artifact.artifact_name,

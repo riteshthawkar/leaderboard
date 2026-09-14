@@ -1,10 +1,10 @@
 {
-  "best_spatial_accuracy": 0.0,
-  "best_vci": 0.4443,
-  "ranked_models": 14,
-  "request_id": "bef4797a-0553-49af-883d-cbcba70e33db",
-  "spatial_models": 0,
-  "total_models": 14,
-  "visual_cognition_models": 14,
-  "with_diagnostics": 0
+  "best_spatial_accuracy": 0.5885,
+  "best_vci": 0.5866,
+  "ranked_models": 23,
+  "request_id": "f16a7734-0cb6-4150-94ca-03df8edf151d",
+  "spatial_models": 1,
+  "total_models": 23,
+  "visual_cognition_models": 23,
+  "with_diagnostics": 1
 }

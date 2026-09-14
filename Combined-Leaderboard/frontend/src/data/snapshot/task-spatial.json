@@ -1,19 +1,23 @@
 {
   "archive_members": [
-    "submission.jsonl",
-    "run_manifest.json",
-    "leaderboard.json"
+    "manifest.json",
+    "claimed_scores.json",
+    "answers.jsonl.gz",
+    "raw_outputs.jsonl.gz",
+    "checksums.json"
   ],
   "bundle_details": {
-    "conditions": 0,
-    "datasets": 0,
-    "error": "Spatial benchmark manifest is a demo bundle",
+    "benchmark_version": "paper-aligned-v5-2026-07",
+    "conditions": 6,
+    "datasets": 13,
+    "manifest_sha256": "44e26931e188fe9c95d80b807f541f4cbe771f5ea5a0461b4c0e85cb0e56537f",
     "min_samples": 1000,
-    "production_ready": false,
-    "required": false,
-    "samples": 0
+    "production_ready": true,
+    "required": true,
+    "samples": 14215,
+    "verification_mode": "public_evidence"
   },
-  "bundle_status": "unhealthy",
+  "bundle_status": "healthy",
   "conditions": [
     "main_noncot",
     "main_cot",
@@ -205,32 +209,34 @@
   ],
   "description": "Spatial reasoning robustness across 13 public benchmarks, with CoT / no-image / no-image++ diagnostics.",
   "grading": {
-    "method": "harness_reported_public_evidence",
+    "method": "submitter_claimed_artifact_evidence",
     "paper": "CoT Degrades Visual Spatial Reasoning (arXiv:2604.16060)",
     "random_baseline": null,
     "server_ground_truth_evaluation": false,
-    "submission_format": "spatial_evidence_zip"
+    "submission_format": "track3_artifact_submission_v1"
   },
   "group_by": "dataset",
   "harness_url": "/api/spatial/harness",
   "label": "Spatial Reasoning Analysis",
   "layer": "reasoning",
   "manifest_url": "/api/spatial/manifest",
-  "max_upload_bytes": 10485760,
+  "max_upload_bytes": 268435456,
   "no_image_plus_option": "Cannot determine from the image",
   "paper_total_samples": null,
   "public_evidence": true,
-  "request_id": "63420512-e15d-4afb-9877-395f3289e59a",
+  "reference_answer_evaluation": false,
+  "request_id": "7d8fb49e-4d63-4489-83c5-d7b1b7a7ac81",
   "required_uploads": [
-    "spatial_reasoning_submission.zip"
+    "track3_artifact_submission.zip"
   ],
   "score_description": "Unweighted mean of main non-CoT accuracy across the 13 datasets.",
   "score_method": "unweighted_dataset_macro",
-  "score_provenance": "harness_report_with_public_evidence",
+  "score_provenance": "submitter_claimed_artifact_backed",
   "section": "spatial",
-  "submission_ready": false,
+  "submission_ready": true,
   "supports_diagnostics": true,
   "task_id": "spatial",
-  "total_samples": 0,
-  "upload_processing": "in_memory"
+  "total_samples": 14215,
+  "upload_processing": "in_memory",
+  "verification_level": "self_reported_artifact_backed"
 }

@@ -3,19 +3,35 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { HomeHero } from "@/components/Hero";
+import { snapshots } from "@/data/snapshot";
 import { getJSON } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ui } from "@/lib/styles";
 
-const overviewBenchmarks = [
+const visualTaskSnapshotPaths = [
+  "/api/tasks/do_you_see_me/info",
+  "/api/tasks/minds_eye/info",
+];
+const snapshotVisualReleaseItems = visualTaskSnapshotPaths.reduce(
+  (sum, path) =>
+    sum +
+    (Number.isFinite(snapshots[path]?.total_samples)
+      ? snapshots[path].total_samples
+      : 0),
+  0,
+);
+const snapshotRankedModels = snapshots["/api/statistics/overview"]?.ranked_models;
+
+const frameworkLayers = [
   {
     to: "/benchmarks/do-you-see-me",
     n: "01",
     art: "rings",
-    name: "Do You See Me",
-    layer: "Perception",
-    body: "7 perceptual skills in 2D and 3D: shape, color, figure ground, closure, and spatial relations. Drawn from a benchmark containing 2,612 questions with parametric difficulty.",
-    meta: ["7 skills", "2D & 3D", "2,612 questions"],
+    name: "Visual Perception",
+    layer: "Evaluation layer",
+    body: "Measures whether a model can detect and organize visual evidence across seven perceptual skills and controlled 2D and 3D difficulty. Do You See Me supplies this framework module.",
+    meta: ["Do You See Me module", "7 skills", "4,500 release"],
+    linkLabel: "Explore the perception module",
     theme: {
       art: "!border-border !bg-[color-mix(in_srgb,var(--dysm)_5%,var(--surface))] !text-dysm group-hover:!border-border-strong",
       label: "!text-dysm",
@@ -27,10 +43,11 @@ const overviewBenchmarks = [
     to: "/benchmarks/minds-eye",
     n: "02",
     art: "cube",
-    name: "Mind's Eye",
-    layer: "Visual Cognition",
-    body: "8 visual cognition tasks covering mental rotation, paper folding, and composition while probing fluid intelligence beyond surface perception.",
-    meta: ["8 tasks", "Rotation · Folding", "Fluid reasoning"],
+    name: "Visual Cognition",
+    layer: "Evaluation layer",
+    body: "Measures abstraction, mental transformation, composition, and fluid visual reasoning across eight diagnostic task families. Mind's Eye supplies this framework module.",
+    meta: ["Mind's Eye module", "8 task families", "799 release"],
+    linkLabel: "Explore the cognition module",
     theme: {
       art: "!border-border !bg-[color-mix(in_srgb,var(--me)_5%,var(--surface))] !text-me group-hover:!border-border-strong",
       label: "!text-me",
@@ -42,10 +59,11 @@ const overviewBenchmarks = [
     to: "/benchmarks/spatial",
     n: "03",
     art: "perspective",
-    name: "Spatial & CoT Robustness",
-    layer: "Spatial Reasoning",
-    body: "13 spatial datasets, one policy. CoT, shortcut, and hallucination diagnostics expose how reasoning shortcuts distort spatial scores.",
-    meta: ["13 datasets", "CoT diagnostics", "4 conditions"],
+    name: "Reasoning Analysis",
+    layer: "Evaluation layer",
+    body: "Analyzes how chain-of-thought and visual-evidence interventions change model behavior across 13 spatial datasets and six controlled conditions. Spatial Reasoning & Robustness supplies this framework module.",
+    meta: ["Spatial module", "13 datasets", "6 conditions"],
+    linkLabel: "Explore the reasoning module",
     theme: {
       art: "!border-border !bg-[color-mix(in_srgb,var(--spatial)_5%,var(--surface))] !text-spatial group-hover:!border-border-strong",
       label: "!text-spatial",
@@ -55,12 +73,13 @@ const overviewBenchmarks = [
   },
 ];
 
-const benchmarkFindings = [
+const frameworkFindings = [
   {
     score: { primary: "95.8%", operator: "Vs.", secondary: "<50%" },
     title: "Humans see; models don't",
     body: "Humans hit 95.8%; the best MLLMs average below 50%. The gap widens sharply with difficulty.",
     source: "Do You See Me",
+    paperUrl: "https://arxiv.org/abs/2506.02022",
     domain: "Visual Perception",
     accent: "text-dysm",
   },
@@ -69,6 +88,7 @@ const benchmarkFindings = [
     title: "Right answer, wrong reasons",
     body: "29% of correct reasoning answers still hid fundamental perception errors. Final accuracy is misleading.",
     source: "Do You See Me",
+    paperUrl: "https://arxiv.org/abs/2506.02022",
     domain: "Visual Perception",
     accent: "text-dysm",
   },
@@ -77,6 +97,7 @@ const benchmarkFindings = [
     title: "MCQ shortcuts inflate scores",
     body: "MCQ reformulation nearly doubled accuracy (23 → 42%). Models exploit answer options, not the image.",
     source: "Do You See Me",
+    paperUrl: "https://arxiv.org/abs/2506.02022",
     domain: "Visual Perception",
     accent: "text-dysm",
   },
@@ -85,6 +106,7 @@ const benchmarkFindings = [
     title: "Chain of Thought degrades vision",
     body: "CoT lowers spatial accuracy by about 3% on average and by as much as 23% for some reasoning models.",
     source: "CoT degrades spatial reasoning",
+    paperUrl: "https://arxiv.org/abs/2604.16060",
     domain: "Spatial Reasoning",
     accent: "text-spatial",
   },
@@ -93,6 +115,7 @@ const benchmarkFindings = [
     title: "Reasoning models lose to backbones",
     body: "7 of 8 reasoning models failed to beat the backbone they were distilled from on spatial benchmarks.",
     source: "CoT degrades spatial reasoning",
+    paperUrl: "https://arxiv.org/abs/2604.16060",
     domain: "Spatial Reasoning",
     accent: "text-spatial",
   },
@@ -101,6 +124,7 @@ const benchmarkFindings = [
     title: "Visual cognition trails humans most",
     body: "On Mind's Eye, humans average 80% while top models stay below 50%, with the biggest deficits on mental transformation tasks.",
     source: "Mind's Eye",
+    paperUrl: "https://arxiv.org/abs/2604.16054",
     domain: "Visual Cognition",
     accent: "text-me",
   },
@@ -108,67 +132,85 @@ const benchmarkFindings = [
 
 const evaluationSteps = [
   {
-    phase: "Input",
-    title: "Generate responses",
-    body: "Run the model on released questions. For Spatial, use the harness to generate all six required evaluation conditions.",
+    phase: "Identity & runs",
+    title: "Pin one model profile",
+    body: "Register one canonical model identity and record its revision, prompting, decoding, and run provenance before evaluating any module.",
   },
   {
-    phase: "Package",
-    title: "Submit predictions",
-    body: "Upload one JSONL file for each visual benchmark and one ZIP package for Spatial. Evaluation remains fully offline and isolated from private answers.",
+    phase: "Capability modules",
+    title: "Generate framework outputs",
+    body: "Run the perception and cognition modules, then execute the six controlled reasoning-analysis conditions under the same declared model profile.",
   },
   {
-    phase: "Validation",
-    title: "Validate coverage",
-    body: "Every released question ID must appear exactly once for each required condition.",
+    phase: "Evidence contract",
+    title: "Validate complete evidence",
+    body: "Normalize outputs into module-specific contracts and verify identifiers, sample coverage, conditions, hashes, counts, and provenance.",
   },
   {
-    phase: "Evaluation",
-    title: "Score and publish",
-    body: "Compute accuracy, macro averages, random baselines, and spatial diagnostics, then publish benchmark tables and the combined Visual Perception and Cognition Index.",
+    phase: "Integrated report",
+    title: "Build the capability profile",
+    body: "Publish perception, cognition, VPCI, and reasoning diagnostics together while retaining the scientifically valid scoring and verification method for each module.",
+  },
+];
+
+const verificationLevels = [
+  {
+    scope: "Capability evaluation",
+    title: "Ground-truth scored",
+    body: "The perception and cognition modules are scored by the service against private ground truth.",
+  },
+  {
+    scope: "Reasoning analysis",
+    title: "Controlled interventions",
+    body: "The reasoning module compares behavior across six image-and-prompt conditions; artifact integrity, coverage, and score arithmetic are verified.",
+  },
+  {
+    scope: "Framework record",
+    title: "Unified evidence",
+    body: "Every result shares a stable model identity and run provenance. Visual answers remain private; accepted reasoning artifacts are publicly auditable.",
   },
 ];
 
 const faqs = [
   {
-    question: "How do I submit the same model to multiple benchmarks?",
+    question: "How does MS VISTA create one profile across evaluation modules?",
     answer:
-      "Register the model once in the submission workspace, then select that same model identity for each benchmark upload. Scores from Do You See Me, Mind's Eye, and Spatial are attached to one model record and shown together wherever the required results are available.",
+      "Register the model once, then attach every module run to that canonical identity. MS VISTA presents perception, cognition, VPCI, and controlled reasoning diagnostics together as one capability profile whenever the corresponding results are available.",
   },
   {
-    question: "What file should I upload for each benchmark?",
+    question: "What file should I upload for each evaluation module?",
     answer:
-      "Do You See Me and Mind's Eye each accept one UTF 8 JSONL file. Spatial accepts one ZIP package produced by the official harness. That package contains submission.jsonl, run_manifest.json, and leaderboard.json, so those files should not be uploaded separately.",
+      "The perception and cognition modules each accept one UTF-8 JSONL file. The reasoning-analysis module accepts track3_artifact_submission.zip from the official harness. It contains manifest.json, claimed_scores.json, answers.jsonl.gz, raw_outputs.jsonl.gz, and checksums.json; upload the ZIP unchanged rather than its members.",
   },
   {
     question: "Do submissions need reasoning text or only final answers?",
     answer:
-      "Only final answers are required for the visual benchmarks. Each released question ID must appear exactly once. The Spatial harness records final outputs for every required condition and adds provenance in the run manifest; free form reasoning traces are not required.",
+      "Only final answers are required for the visual capability modules. Each released question ID must appear exactly once. The reasoning-analysis harness records final outputs for every required condition and adds provenance in the run manifest; free form reasoning traces are not required.",
   },
   {
     question: "What does validation check before scoring?",
     answer:
-      "For visual benchmarks, validation checks the file format and complete sample coverage before deterministic scoring. For Spatial, it verifies the official harness version, package hashes, provenance, public sample coverage, scoring groups, and agreement between per sample correctness flags and aggregate scores. Spatial answers are not independently graded again by the server.",
+      "For the visual capability modules, validation checks the file format and complete sample coverage before deterministic scoring. For reasoning analysis, it verifies the official harness version, package hashes, provenance, public sample coverage, scoring groups, and agreement between per sample correctness flags and aggregate scores. Spatial answers are not independently graded again by the server.",
   },
   {
     question: "How are leaderboard scores and rankings calculated?",
     answer:
-      "Do You See Me uses a dimension balanced task macro. Mind's Eye uses an unweighted mean across its eight tasks. VPCI is the equally weighted mean of the perception and cognition scores and is shown only when both are available. Gap compares those two scores, while task spread summarizes variation across tasks and is better when lower.",
+      "Do You See Me uses a dimension-balanced task macro. Mind's Eye uses an unweighted mean across its eight tasks. VPCI is the equally weighted mean of those two visual capability scores and is shown only when both are available. Reasoning diagnostics are reported alongside that profile but do not enter VPCI because they measure intervention effects rather than the same accuracy construct. Gap compares the visual scores, while task spread summarizes variation across tasks and is better when lower.",
   },
   {
-    question: "Which models appear when I select a benchmark tab?",
+    question: "Which models appear in each framework view?",
     answer:
-      "A benchmark tab includes every model with a score for that benchmark, including models that also have results for other benchmarks. The combined visual view keeps all visual models visible, but VPCI is available only for models with both perception and cognition results.",
+      "Each evaluation view includes every model with a result for that module. The combined visual view keeps all visual models visible, but VPCI is available only for models with both perception and cognition results. The integrated comparison joins available module results under the same model identity.",
   },
   {
     question: "How often can I submit, and can I delete a result?",
     answer:
-      "Each verified account has one accepted submission per benchmark in a rolling 24 hour window. The three benchmarks have separate limits. You can delete your own result from Submission history, but deletion does not restore a consumed quota slot because the audit record must remain intact.",
+      "Each verified account has one accepted submission per evaluation module in a rolling 24 hour window. The modules have independent limits. You can delete your own result from Submission history, but deletion does not restore a consumed quota slot because the audit record must remain intact.",
   },
   {
     question: "Are private answers or submitted outputs exposed?",
     answer:
-      "Private ground truth never leaves the evaluation service. Visual benchmark response exports remain available only to the account owner and administrators. Spatial final answer evidence, its aggregate report, manifest, hashes, and original ZIP are public so anyone can audit a published spatial score. Free form reasoning traces are not required or published.",
+      "Private ground truth never leaves the evaluation service. Perception and cognition response exports remain available only to the account owner and administrators. Spatial final answer evidence, its aggregate report, manifest, hashes, and original ZIP are public so anyone can audit a published reasoning-analysis score. Free form reasoning traces are not required or published.",
   },
 ];
 
@@ -347,14 +389,14 @@ function OverviewMotif({ kind, active = false }) {
   return <PerspectiveOverviewMotif active={active} />;
 }
 
-function OverviewBenchmarkRow({ benchmark, index }) {
+function FrameworkLayerRow({ layer, index }) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const active = hovered || focused;
 
   return (
     <Link
-      to={benchmark.to}
+      to={layer.to}
       className="group grid min-w-0 md:min-h-[380px] md:grid-cols-2"
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
@@ -364,36 +406,36 @@ function OverviewBenchmarkRow({ benchmark, index }) {
       <div
         className={cn(
           "grid h-[300px] min-w-0 w-full place-items-center overflow-hidden border-b border-border bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:40px_40px] [&_svg]:block [&_svg]:h-[calc(100%-3rem)] [&_svg]:max-h-full [&_svg]:max-w-full [&_svg]:w-[calc(100%-3rem)] md:h-full md:min-h-[380px] md:border-b-0 md:border-r",
-          benchmark.theme.art,
+          layer.theme.art,
           index % 2 === 1 && "md:order-2 md:border-l md:border-r-0",
         )}
         aria-hidden="true"
       >
-        <OverviewMotif kind={benchmark.art} active={active} />
+        <OverviewMotif kind={layer.art} active={active} />
       </div>
       <div className="flex min-w-0 max-w-[60ch] flex-col justify-center px-6 py-10 lg:px-8">
         <span
-          className={`mb-3 block text-xs font-semibold uppercase ${benchmark.theme.label}`}
+          className={`mb-3 block text-xs font-semibold uppercase ${layer.theme.label}`}
         >
-          [{benchmark.n}] {benchmark.layer}
+          [{layer.n}] {layer.layer}
         </span>
         <h3 className="mb-3 font-display text-3xl font-bold">
-          {benchmark.name}
+          {layer.name}
         </h3>
         <p className="mb-4 text-sm leading-relaxed text-muted">
-          {benchmark.body}
+          {layer.body}
         </p>
         <div className="mb-5 flex flex-wrap gap-2">
-          {benchmark.meta.map((item) => (
-            <span className={cn(ui.badge, benchmark.theme.meta)} key={item}>
+          {layer.meta.map((item) => (
+            <span className={cn(ui.badge, layer.theme.meta)} key={item}>
               {item}
             </span>
           ))}
         </div>
         <span
-          className={`mt-3 inline-flex text-sm font-medium ${benchmark.theme.arrow}`}
+          className={`mt-3 inline-flex text-sm font-medium ${layer.theme.arrow}`}
         >
-          Explore benchmark →
+          {layer.linkLabel} →
         </span>
       </div>
     </Link>
@@ -401,8 +443,16 @@ function OverviewBenchmarkRow({ benchmark, index }) {
 }
 
 export function Home() {
-  const [questions, setQuestions] = useState("Loading");
-  const [models, setModels] = useState("Loading");
+  const [questions, setQuestions] = useState(() =>
+    snapshotVisualReleaseItems > 0
+      ? snapshotVisualReleaseItems.toLocaleString()
+      : "Pending",
+  );
+  const [models, setModels] = useState(() =>
+    Number.isInteger(snapshotRankedModels) && snapshotRankedModels >= 0
+      ? snapshotRankedModels.toLocaleString()
+      : "Pending",
+  );
   useEffect(() => {
     Promise.allSettled([
       getJSON("/api/statistics/overview"),
@@ -427,12 +477,16 @@ export function Home() {
       setQuestions(
         allVisualInfoLoaded && total > 0
           ? total.toLocaleString()
-          : "Unavailable",
+          : snapshotVisualReleaseItems > 0
+            ? snapshotVisualReleaseItems.toLocaleString()
+            : "Pending",
       );
       setModels(
         Number.isInteger(stats.ranked_models) && stats.ranked_models >= 0
           ? stats.ranked_models.toLocaleString()
-          : "Unavailable",
+          : Number.isInteger(snapshotRankedModels) && snapshotRankedModels >= 0
+            ? snapshotRankedModels.toLocaleString()
+            : "Pending",
       );
     });
   }, []);
@@ -447,19 +501,19 @@ export function Home() {
               [
                 "01",
                 "3",
-                "Evaluation tracks covering perception, cognition, and spatial robustness",
+                "Evaluation layers spanning perception, cognition, and reasoning analysis",
               ],
               [
                 "02",
                 questions,
-                "Scored items across the two visual leaderboard tracks",
+                "Scored items across the framework's visual capability modules",
               ],
               [
                 "03",
                 "13",
-                "Spatial datasets evaluated under controlled conditions",
+                "Datasets used for controlled reasoning analysis",
               ],
-              ["04", models, "Unique models currently ranked across all tracks"],
+              ["04", models, "Unique models profiled by MS VISTA"],
               [
                 "05",
                 "95.8%",
@@ -494,24 +548,26 @@ export function Home() {
         <div className="container !px-0">
           <div className={ui.sectionBand}>
             <div className="max-w-copy">
-              <div className={ui.sectionTag}>Overview</div>
+              <div className={ui.sectionTag}>Framework architecture</div>
               <h2 className={ui.heading2}>
-                One leaderboard. Three benchmarks.
+                One framework. Three evaluation layers.
               </h2>
               <p className={cn(ui.lede, "mt-4")}>
-                MS VISTA runs three complementary benchmarks that probe
-                perception, visual cognition, and spatial reasoning. Together
-                they pinpoint <em>where</em> and <em>how</em> each model breaks
-                down under one reproducible protocol.
+                MS VISTA evaluates visual intelligence as a connected capability
+                profile: what a model perceives, what it can infer and transform
+                visually, and how reasoning strategies change that behavior.
+                Published research suites supply the evaluation modules; shared
+                model identity, provenance, evidence, diagnostics, and reporting
+                make them one framework.
               </p>
             </div>
           </div>
           <div className="flex flex-col divide-y divide-border-strong">
-            {overviewBenchmarks.map((benchmark, index) => (
-              <OverviewBenchmarkRow
-                benchmark={benchmark}
+            {frameworkLayers.map((layer, index) => (
+              <FrameworkLayerRow
+                layer={layer}
                 index={index}
-                key={benchmark.name}
+                key={layer.name}
               />
             ))}
           </div>
@@ -522,17 +578,18 @@ export function Home() {
         <div className={ui.sectionFrame}>
           <div className={ui.sectionBand}>
             <div className="max-w-copy">
-              <div className={ui.sectionTag}>What the benchmarks reveal</div>
-              <h2 className={ui.heading2}>Six consistent failures</h2>
+              <div className={ui.sectionTag}>Evidence across framework layers</div>
+              <h2 className={ui.heading2}>What MS VISTA reveals</h2>
               <p className={cn(ui.lede, "mt-4")}>
-                One pattern recurs across all three benchmarks: techniques that
-                boost text reasoning often <em>hurt</em> visual accuracy, while
-                strong headline scores can hide broken perception.
+                Connecting perception, cognition, and controlled reasoning
+                diagnostics separates capability failures from reasoning-induced
+                artifacts. Each statistic remains linked to its source study;
+                MS VISTA does not collapse them into one pooled accuracy.
               </p>
             </div>
           </div>
           <div className="divide-y divide-border-strong">
-            {benchmarkFindings.map((finding, index) => (
+            {frameworkFindings.map((finding, index) => (
               <article
                 className="grid min-w-0 grid-cols-[56px_minmax(0,1fr)] lg:grid-cols-[72px_minmax(0,1fr)]"
                 key={finding.title}
@@ -580,14 +637,18 @@ export function Home() {
                     <span className="text-xs font-semibold uppercase text-faint">
                       {finding.domain}
                     </span>
-                    <span
+                    <a
                       className={cn(
-                        "text-right text-sm font-semibold lg:text-left",
+                        "text-right text-sm font-semibold underline decoration-border-strong underline-offset-4 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand lg:text-left",
                         finding.accent,
                       )}
+                      href={finding.paperUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      aria-label={`${finding.source} source paper`}
                     >
                       {finding.source}
-                    </span>
+                    </a>
                   </div>
                 </div>
               </article>
@@ -600,15 +661,41 @@ export function Home() {
         <div className={ui.sectionFrame}>
           <div className={ui.sectionBand}>
             <div className="max-w-copy">
-              <div className={ui.sectionTag}>How it works</div>
-              <h2 className={ui.heading2}>How scoring works</h2>
+              <div className={ui.sectionTag}>Unified evaluation pipeline</div>
+              <h2 className={ui.heading2}>One framework, scientifically valid scoring</h2>
               <p className={cn(ui.lede, "mt-4")}>
-                JSONL submissions containing final answers. Matching against
-                private ground truth. Three benchmarks unified into comparable
-                rankings.
+                MS VISTA unifies model identity, run provenance, output
+                contracts, evidence retention, diagnostics, and reporting. Each
+                evaluation layer keeps the scoring method required by its source
+                task, so unification does not erase scientific differences.
               </p>
             </div>
           </div>
+
+          <dl className="grid border-b border-border-strong md:grid-cols-3">
+            {verificationLevels.map((level, index) => (
+              <div
+                className={cn(
+                  "min-w-0 px-6 py-7 lg:px-8",
+                  index < verificationLevels.length - 1 &&
+                    "border-b border-border-strong md:border-b-0 md:border-r",
+                )}
+                key={level.title}
+              >
+                <dt className="text-xs font-semibold uppercase text-faint">
+                  {level.scope}
+                </dt>
+                <dd className="mt-2">
+                  <div className="font-display text-lg font-bold">
+                    {level.title}
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                    {level.body}
+                  </p>
+                </dd>
+              </div>
+            ))}
+          </dl>
 
           <ol className="grid list-none p-0 md:grid-cols-2">
             {evaluationSteps.map((step, index) => (

@@ -100,7 +100,7 @@ function healthIssueMessage(payload) {
   }
   if (components.ground_truth === "unhealthy") {
     issues.push(
-      "One or more enabled benchmark answer sets could not be loaded.",
+      "One or more enabled visual-module answer sets could not be loaded.",
     );
   }
   return issues.slice(0, 2).join(" ");
@@ -535,14 +535,14 @@ export function Layout() {
                 </span>
               </Link>
               <p className="text-sm leading-relaxed text-muted">
-                MS VISTA is a unified evaluation faithful to each paper for
-                multimodal LLM visual perception, visual cognition, and spatial
-                reasoning across three Microsoft Research benchmarks.
+                MS VISTA is a unified evaluation framework for visual
+                perception, visual cognition, and reasoning-behavior analysis
+                in multimodal models.
               </p>
             </div>
             <div className="flex flex-col gap-1">
               <h5 className="mb-1 text-xs font-semibold uppercase text-faint">
-                Benchmarks
+                Evaluation modules
               </h5>
               <Link
                 className="text-sm text-muted hover:text-brand-strong"
@@ -579,12 +579,12 @@ export function Layout() {
               >
                 Submit a model
               </Link>
-              <a
+              <Link
                 className="text-sm text-muted hover:text-brand-strong"
-                href="/#findings"
+                to="/#findings"
               >
                 Key findings
-              </a>
+              </Link>
             </div>
             <div className="flex flex-col gap-1">
               <h5 className="mb-1 text-xs font-semibold uppercase text-faint">
@@ -679,7 +679,7 @@ export function Layout() {
             </nav>
             <div className="flex flex-wrap items-center justify-between gap-3 max-sm:items-start">
               <span>
-                Benchmarks © Microsoft Research. Leaderboard for noncommercial
+                MS VISTA evaluation modules are provided for noncommercial
                 research use.
               </span>
               <div className="flex items-center gap-2.5">

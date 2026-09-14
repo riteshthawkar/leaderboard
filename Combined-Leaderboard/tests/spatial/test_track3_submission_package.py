@@ -1,4 +1,5 @@
 import hashlib
+import gzip
 import json
 import zipfile
 from pathlib import Path
@@ -33,6 +34,7 @@ from spatial_harness.submission_contract import (
     condition_for,
     public_question_id,
 )
+from spatial_harness.artifact_package import ARCHIVE_MEMBERS, read_artifact_package
 
 
 def _write_json(path: Path, value) -> None:
@@ -58,6 +60,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path]:
     run_config = {
         "schema_version": 5,
         "harness_contract": HARNESS_CONTRACT,
+        "created_at": "2026-07-25T22:00:46.694353+00:00",
         "model": "example/model",
         "model_revision": "abc123",
         "datasets": list(DATASETS),
@@ -271,7 +274,7 @@ def test_public_vqa_answer_commits_oversized_evidence_without_truncating():
     assert len(commitment) < 2_048
 
 
-def test_package_contains_only_public_evidence_and_three_archive_members(tmp_path):
+def test_package_contains_only_the_canonical_artifact_archive(tmp_path):
     input_dir, contract_dir = _fixture(tmp_path)
     output_dir = tmp_path / "package"
 
@@ -283,11 +286,9 @@ def test_package_contains_only_public_evidence_and_three_archive_members(tmp_pat
     )
 
     with zipfile.ZipFile(archive_path) as archive:
-        assert set(archive.namelist()) == {
-            "submission.jsonl",
-            "run_manifest.json",
-            "leaderboard.json",
-        }
+        assert tuple(archive.namelist()) == ARCHIVE_MEMBERS
+    assert archive_path.name == "track3_artifact_submission.zip"
+    assert not (output_dir / "spatial_reasoning_submission.zip").exists()
     evidence = [
         json.loads(line)
         for line in (output_dir / "submission.jsonl").read_text(
@@ -345,6 +346,48 @@ def test_package_contains_only_public_evidence_and_three_archive_members(tmp_pat
         "judge": 0,
         "missing_outputs": 0,
     }
+
+
+def test_harness_emits_artifact_backed_package_with_sanitized_raw_outputs(tmp_path):
+    input_dir, contract_dir = _fixture(tmp_path)
+    output_dir = tmp_path / "package"
+
+    archive_path = package_submission(
+        input_dir,
+        contract_dir,
+        output_dir,
+        "Example Model",
+    )
+
+    assert archive_path.name == "track3_artifact_submission.zip"
+    package = read_artifact_package(archive_path)
+    assert len(package.answer_rows) == package.manifest["evidence"]["answer_rows"]
+    assert package.manifest["score_source"] == "submitter_claimed"
+    raw_rows = [
+        json.loads(line)
+        for line in gzip.decompress(
+            package.members["raw_outputs.jsonl.gz"]
+        ).splitlines()
+    ]
+    assert len(raw_rows) == len(package.answer_rows)
+    assert all("raw_output" in row for row in raw_rows)
+    assert all("gt" not in row and "options" not in row for row in raw_rows)
+    assert package.manifest["created_at"] == "2026-07-25T22:00:46.694353+00:00"
+    assert set(package.manifest["source_evidence"]) == {
+        "run_config_sha256",
+        "judged_sha256",
+        "audit_manifest_sha256",
+        "audit_report_sha256",
+    }
+
+
+def test_harness_packaging_is_deterministic_for_a_completed_run(tmp_path):
+    input_dir, contract_dir = _fixture(tmp_path)
+
+    first = package_submission(input_dir, contract_dir, tmp_path / "first")
+    second = package_submission(input_dir, contract_dir, tmp_path / "second")
+
+    assert first.read_bytes() == second.read_bytes()
 
 
 def test_package_preserves_explicit_inference_failure_as_incorrect(tmp_path):
@@ -443,32 +486,28 @@ def test_package_preserves_explicit_inference_failure_as_incorrect(tmp_path):
     }
     assert manifest["inference_failure_policy"]["condition_rows"] == 1
 
-    submission_bytes, manifest_bytes, report_bytes = (
-        spatial_submission.read_spatial_submission_archive(
-            archive_path.read_bytes()
-        )
+    package = spatial_submission.read_spatial_artifact_archive(
+        archive_path.read_bytes()
     )
-    records, computed_report, _benchmark_manifest = (
-        spatial_submission.parse_spatial_evidence(
-            submission_bytes,
+    records, computed_report, _benchmark_manifest, metadata = (
+        spatial_submission.parse_spatial_artifact_evidence(
+            package,
+            "example/model",
             contract_dir / "manifest.json",
             contract_dir / "submission_template.jsonl",
             contract_dir / "questions.jsonl",
         )
     )
-    spatial_submission.validate_spatial_report(
-        report_bytes,
-        "example/model",
-        computed_report,
+    parsed_failed = next(
+        row
+        for row in records
+        if row["dataset"] == "BLINK"
+        and row["question_id"] == "BLINK:mcq"
+        and row["condition"] == "main_cot"
     )
-    metadata = spatial_submission.validate_run_manifest(
-        manifest_bytes,
-        submission_bytes,
-        report_bytes,
-        "example/model",
-        records,
-        contract_dir / "manifest.json",
-    )
+    assert parsed_failed["claimed_credit"] == 0
+    assert parsed_failed["correct"] is False
+    assert computed_report["summary"]["main_cot"] < 1.0
     assert metadata["harness_contract"] == HARNESS_CONTRACT
 
 
@@ -481,14 +520,13 @@ def test_backend_accepts_the_paper_aligned_public_package(tmp_path):
         output_dir,
         "Example Model",
     )
-    submission_bytes, manifest_bytes, report_bytes = (
-        spatial_submission.read_spatial_submission_archive(
-            archive_path.read_bytes()
-        )
+    package = spatial_submission.read_spatial_artifact_archive(
+        archive_path.read_bytes()
     )
-    records, computed_report, benchmark_manifest = (
-        spatial_submission.parse_spatial_evidence(
-            submission_bytes,
+    records, computed_report, benchmark_manifest, metadata = (
+        spatial_submission.parse_spatial_artifact_evidence(
+            package,
+            "Example Model",
             contract_dir / "manifest.json",
             contract_dir / "submission_template.jsonl",
             contract_dir / "questions.jsonl",
@@ -496,18 +534,6 @@ def test_backend_accepts_the_paper_aligned_public_package(tmp_path):
     )
     assert benchmark_manifest["benchmark_version"] == "test-paper-v5"
     assert {row["answer_type"] for row in records} == {"mcq", "vqa"}
-    spatial_submission.validate_spatial_report(
-        report_bytes,
-        "Example Model",
-        computed_report,
-    )
-    metadata = spatial_submission.validate_run_manifest(
-        manifest_bytes,
-        submission_bytes,
-        report_bytes,
-        "Example Model",
-        records,
-        contract_dir / "manifest.json",
-    )
+    assert computed_report["summary"]["main_noncot"] == 1.0
     assert metadata["harness_contract"] == HARNESS_CONTRACT
     assert metadata["judge_revision"] == PAPER_JUDGE_REVISION

@@ -14,19 +14,33 @@ function isHttpOrigin(value) {
   }
 }
 
+function normalizeBasePath(value) {
+  const candidate = (value || "/").trim();
+  if (
+    !candidate.startsWith("/")
+    || !candidate.endsWith("/")
+    || candidate.includes("//")
+    || /[?#\\]/.test(candidate)
+  ) {
+    throw new Error("VITE_BASE_PATH must start and end with one slash, for example /leaderboard/.");
+  }
+  return candidate;
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const isStatic = (process.env.VITE_STATIC || env.VITE_STATIC) === "1";
   const isSameOrigin = (process.env.VITE_SAME_ORIGIN || env.VITE_SAME_ORIGIN) === "1";
   const isTest = mode === "test";
   const apiBaseUrl = (process.env.VITE_API_BASE_URL || env.VITE_API_BASE_URL || "").trim();
+  const basePath = normalizeBasePath(process.env.VITE_BASE_PATH || env.VITE_BASE_PATH || "/");
   if (!isStatic && !isSameOrigin && !isTest && !isHttpOrigin(apiBaseUrl)) {
     throw new Error(
       "VITE_API_BASE_URL must be an absolute HTTP(S) backend origin unless VITE_SAME_ORIGIN=1.",
     );
   }
   return {
-    base: "/",
+    base: basePath,
     plugins: [react()],
     build: {
       outDir: isStatic ? "dist-static" : "dist",

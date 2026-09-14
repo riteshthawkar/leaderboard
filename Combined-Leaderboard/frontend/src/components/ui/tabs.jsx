@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 
-export function TabBar({ tabs, active, onChange, className }) {
+export function TabBar({ tabs, active, onChange, className, ariaLabel = "Evaluation views" }) {
   const tabRefs = useRef([]);
 
   function moveFocus(event, index) {
@@ -18,7 +18,7 @@ export function TabBar({ tabs, active, onChange, className }) {
   }
 
   return (
-    <div className={cn("inline-flex flex-wrap border border-border bg-surface p-1.5", className)} role="tablist" aria-label="Tracks">
+    <div className={cn("inline-flex flex-wrap border border-border bg-surface p-1.5", className)} role="tablist" aria-label={ariaLabel}>
       {tabs.map((tab, index) => (
         <button
           key={tab.id}

@@ -4,13 +4,20 @@ export const benchmarkPages = {
     path: "/benchmarks/do-you-see-me",
     title: "Do You See Me",
     navLabel: "Do You See Me",
-    eyebrow: "Visual Perception",
+    eyebrow: "MS VISTA · Visual Perception Module",
     arxiv: "2506.02022",
     paperUrl: "https://arxiv.org/abs/2506.02022",
     authors: "Aditya Kanade · Tanuja Ganu",
     cta: "Perception rankings",
     subtitle:
       "Isolates whether a model perceived the image correctly before higher level reasoning can mask the error, across seven psychology inspired skills in controlled 2D and photorealistic 3D scenes.",
+    project: {
+      abstract: "Multimodal language models are commonly judged by final-answer accuracy, but a correct response can conceal an incorrect reading of the image. Do You See Me isolates visual perception from downstream reasoning through seven psychology-inspired skills, procedurally controlled 2D and photorealistic 3D scenes, and explicit changes in clutter, occlusion, transformation, and object scale. The project measures where model perception diverges from human performance and uses targeted ablations to identify shortcuts and representation limits.",
+      researchQuestion: "Can multimodal language models reliably perceive shapes, features, letters, spatial arrangements, figure-ground structure, and incomplete forms before higher-level reasoning begins?",
+      artifact: "A controlled visual perception module with twelve task variants, programmatic ground truth, human comparison data, diagnostic ablations, and 4,500 questions in the current MS VISTA release.",
+      frameworkRole: "Visual perception module",
+      studyDesign: "Procedural 2D and 3D stimuli, eleven MLLMs, and a 15-participant human comparison.",
+    },
     stats: [
       ["7", "Perceptual skills evaluated across controlled scenes"],
       ["12", "Task variants spanning 2D and photorealistic 3D scenes"],
@@ -18,7 +25,7 @@ export const benchmarkPages = {
       ["95.8%", "Human macro accuracy in the paper study"],
     ],
     premise: {
-      tag: "Why this benchmark exists",
+      tag: "Role in the framework",
       title: "A correct answer can hide a perception error",
       body: "In the paper's preliminary study, 29% of Claude Sonnet 3.5 responses with a correct reasoning answer still contained a visual perception error. Do You See Me therefore evaluates core perception independently of downstream reasoning.",
       thesis: "Final answer accuracy cannot show whether the visual evidence was perceived correctly.",
@@ -56,7 +63,7 @@ export const benchmarkPages = {
     samples: {
       tag: "Benchmark samples",
       title: "Verified samples from the bundled question file",
-      body: "These cards illustrate the benchmark families. Official scoring uses the released JSONL question set keyed by question_id.",
+      body: "These cards illustrate the module's task families. Official scoring uses the released JSONL question set keyed by question_id.",
       cards: [
         { sampleId: "do_you_see_me:visual_spatial:0000", imagePath: "Do-You-See-Me/2D_DoYouSeeMe/dataset/visual_spatial/224.svg", task: "visual_spatial", capability: "spatial_relation", label: "visual_spatial", title: "Spatial relation", prompt: "In grid 1, starting from the white triangle at position (row 3, column 4), how many white circles are there left of it in the same row?", detail: "Exact VQA prompt from the local public question file.", chips: ["2D", "VQA", "spatial_relation"] },
         { sampleId: "do_you_see_me:visual_closure:0000", imagePath: "Do-You-See-Me/2D_DoYouSeeMe/dataset/visual_closure/145.png", task: "visual_closure", capability: "visual_closure", label: "visual_closure", title: "Visual closure", prompt: "Identify the complete object or shape suggested by the partial image.", detail: "Exact VQA prompt from the local public question file.", chips: ["2D", "VQA", "visual_closure"] },
@@ -83,11 +90,11 @@ export const benchmarkPages = {
     findings: {
       tag: "Findings",
       title: "Diagnostics behind the perception gap",
-      body: "The paper uses targeted ablations to test why benchmark scores remain low. Each result below is tied to the stated model, task, and experimental condition.",
+      body: "The paper uses targeted ablations to test why perception scores remain low. Each result below is tied to the stated model, task, and experimental condition.",
       cards: [
         ["23.2 → 41.8", "Answer choices reveal shortcuts", "Recasting one GPT-4o shape discrimination task as multiple choice raised accuracy from 23.19% to 41.80%."],
         ["CoT ↓", "Verbalization is task dependent", "CoT helps highly verbalizable tasks such as letters and spatial grids but hurts holistic tasks such as form constancy and visual closure."],
-        ["+10.8 pts", "Fine tuning gives modest gains", "Training Qwen2.5 VL 7B on about 67,000 benchmark conformant pairs raised average accuracy from 40.91% to 51.75%, still far below people."],
+        ["+10.8 pts", "Fine tuning gives modest gains", "Training Qwen2.5 VL 7B on about 67,000 module-conformant pairs raised average accuracy from 40.91% to 51.75%, still far below people."],
         ["0% below 4×", "Patch scale creates a resolution boundary", "In one Claude Sonnet 3.5 rotation diagnostic, detection was zero below four times the encoder's 14 px patch and reached 100% at four times."],
         ["83 → 33%", "SVG reconstruction loses detail", "GPT-4o form constancy accuracy fell from 83.33% to 33.33% when it first reconstructed the image as SVG and then answered from that code."],
         ["2D ≠ 3D", "Performance changes with visual context", "Llama 3.2 11B averaged 16.84% in 2D and 49.91% in 3D, showing that performance in one rendering regime does not predict the other."],
@@ -140,7 +147,7 @@ export const benchmarkPages = {
       ],
     },
     pipeline: {
-      tag: "How the benchmark is built",
+      tag: "How this module is built",
       title: "How Do You See Me items are generated",
       body: "Do You See Me is built around procedural control: each subtask starts from a perceptual faculty, renders images with known ground truth, then increases visual complexity in measurable ways.",
       steps: [
@@ -152,10 +159,10 @@ export const benchmarkPages = {
       ],
     },
     scoring: {
-      tag: "Scoring on this leaderboard",
+      tag: "Scoring in MS VISTA",
       title: "How submissions are graded",
       body: "Submit final answers in JSONL; the backend matches each question_id and answer exactly against private ground truth.",
-      specs: [["Submission", "JSONL final answers"], ["Match", "Exact label / numeric equality"], ["Headline metric", "Dimension balanced task macro"], ["Leaderboard release", "4,500 questions: 3,000 in 2D and 1,500 in 3D"], ["Paper reference", "2,612 questions in the published evaluation set"], ["Ranks into", "Visual Perception and Cognition Index (with Mind's Eye)"]],
+      specs: [["Submission", "JSONL final answers"], ["Match", "Exact label / numeric equality"], ["Headline metric", "Dimension balanced task macro"], ["Module release", "4,500 questions: 3,000 in 2D and 1,500 in 3D"], ["Paper reference", "2,612 questions in the published evaluation set"], ["Ranks into", "Visual Perception and Cognition Index (with Mind's Eye)"]],
       taskId: "do_you_see_me",
       getStarted: "Download the question set, run your model, upload the response file.",
     },
@@ -183,16 +190,23 @@ export const benchmarkPages = {
     path: "/benchmarks/minds-eye",
     title: "Mind's Eye",
     navLabel: "Mind's Eye",
-    eyebrow: "Visual Cognition",
+    eyebrow: "MS VISTA · Visual Cognition Module",
     arxiv: "2604.16054",
     paperUrl: "https://arxiv.org/abs/2604.16054",
     authors: "Rohit Sinha · Aditya Kanade · Sai Srinivas Kancheti · Vineeth N Balasubramanian · Tanuja Ganu",
     cta: "Visual cognition rankings",
     subtitle:
       "Evaluates eight visuocognitive tasks that require a model to infer latent rules, map visual relations, or predict transformed states that are not shown in the input.",
+    project: {
+      abstract: "Mind's Eye studies visual cognition beyond recognition by asking models to infer latent rules, map structural relations, and predict transformed visual states. The project organizes eight tasks through the Abstraction, Relation, and Transformation taxonomy, generates controlled variations of each task, and uses error-keyed distractors and human-calibrated difficulty to make failures interpretable. Its analyses distinguish attention to relevant visual evidence from the ability to reason correctly over that evidence.",
+      researchQuestion: "Can multimodal language models induce abstract visual rules, map relations, and mentally transform or compose states that are not explicitly shown?",
+      artifact: "An eight-task visual cognition module organized by the ART taxonomy, with factorial item generation, diagnostic distractors, a 30-participant human study, and 799 validated questions in the current MS VISTA release.",
+      frameworkRole: "Visual cognition module",
+      studyDesign: "Eight controlled tasks, eighteen MLLMs, and human-calibrated easy, medium, and hard conditions.",
+    },
     stats: [["8", "Visual cognition tasks across abstraction, relation, and transformation"], ["3", "ART dimensions for controlled diagnosis"], ["799", "Validated questions in the current leaderboard release"], ["80%", "Human mean accuracy in the 30 participant study"]],
     premise: {
-      tag: "Why this benchmark exists",
+      tag: "Role in the framework",
       title: "Recognizing a scene does not test whether a model can transform it",
       body: "Mind's Eye targets visual states that must be inferred rather than read directly: latent patterns, structural correspondences, rotations, folds, and compositions. The paper treats these as behavioral tests of visuocognitive operations under controlled stimuli.",
       thesis: "The task is to infer or transform a visual state that is not explicitly shown.",
@@ -232,7 +246,7 @@ export const benchmarkPages = {
     samples: {
       tag: "Benchmark samples",
       title: "Verified samples from the bundled question file",
-      body: "These cards illustrate the benchmark families. Official scoring uses the released JSONL question set keyed by question_id; options are drawn inside each image.",
+      body: "These cards illustrate the module's task families. Official scoring uses the released JSONL question set keyed by question_id; options are drawn inside each image.",
       cards: [
         { sampleId: "t2_analogies_0000", imagePath: "Mind-s-Eye/data/analogies/vra_0000.png", task: "analogies", capability: "analogical_reasoning", label: "analogies", title: "Visual relation abstraction", prompt: "Analyze the six figures labeled A, B, C, D, E, and F in the image. Identify the visual concept shared by the majority and determine which figure does not follow it.", detail: "Exact Visual Relation Abstraction row from the released leaderboard question file.", chips: ["Abstraction", "6 option MCQ", "analogical_reasoning"] },
         { sampleId: "minds_eye:mental_rotation:0000", imagePath: "Mind-s-Eye/data/mental_rotation/TripleArm_34.png", task: "mental_rotation", capability: "mental_rotation", label: "mental_rotation", title: "Mental rotation", prompt: "Analyze the four figures labeled A, B, C, D in the image. Your goal is to identify which of these options is the correct rotational transformation of the figure labeled original shape. Reason step by step for answering.", detail: "Exact MCQ prompt from the local public question file.", chips: ["3D", "MCQ", "mental_rotation"] },
@@ -291,8 +305,8 @@ export const benchmarkPages = {
         },
       ],
     },
-    pipeline: { tag: "How the benchmark is built", title: "How cognitive constructs become diagnostic items", body: "Mind's Eye combines a formal ART taxonomy with factorial generation, human calibrated difficulty, and distractors tied to recognizable error types.", steps: [["Map each task to ART", "Each task is assigned to Abstraction, Relation, or Transformation so scores can be interpreted by the operation under test."], ["Generate factorial variations", "Structural factors such as hierarchy depth, fold length, rotation axes, color, and layout are varied independently."], ["Key distractors to errors", "Wrong options encode reflections, parity mistakes, correspondence swaps, and superficial feature matches."], ["Calibrate with human consensus", "Five responses per item define easy, medium, and hard groups, with agreement checked across the task suite."], ["Randomize and score options", "Option order is randomized, answer keys are balanced, and the diagnostic set contains 100 items for each of eight tasks."]] },
-    scoring: { tag: "Scoring on this leaderboard", title: "How submissions are graded", body: "Submit final MCQ labels in JSONL; the backend matches each question_id and answer exactly against private ground truth.", specs: [["Submission", "JSONL final answers"], ["Format", "Multiple choice (4 or 6 options)"], ["Headline metric", "Unweighted mean of eight task accuracies"], ["Chance baseline", "16.7% for six options; 25% for four"], ["Leaderboard release", "799 validated questions; Visual Conceptual Slippage contains 99"], ["Paper reference", "800 items in the published diagnostic set"], ["Ranks into", "Visual Perception and Cognition Index (with Do You See Me)"]], taskId: "minds_eye", getStarted: "Download the question set, run your model, upload the JSONL response file." },
+    pipeline: { tag: "How this module is built", title: "How cognitive constructs become diagnostic items", body: "Mind's Eye combines a formal ART taxonomy with factorial generation, human calibrated difficulty, and distractors tied to recognizable error types.", steps: [["Map each task to ART", "Each task is assigned to Abstraction, Relation, or Transformation so scores can be interpreted by the operation under test."], ["Generate factorial variations", "Structural factors such as hierarchy depth, fold length, rotation axes, color, and layout are varied independently."], ["Key distractors to errors", "Wrong options encode reflections, parity mistakes, correspondence swaps, and superficial feature matches."], ["Calibrate with human consensus", "Five responses per item define easy, medium, and hard groups, with agreement checked across the task suite."], ["Randomize and score options", "Option order is randomized, answer keys are balanced, and the diagnostic set contains 100 items for each of eight tasks."]] },
+    scoring: { tag: "Scoring in MS VISTA", title: "How submissions are graded", body: "Submit final MCQ labels in JSONL; the backend matches each question_id and answer exactly against private ground truth.", specs: [["Submission", "JSONL final answers"], ["Format", "Multiple choice (4 or 6 options)"], ["Headline metric", "Unweighted mean of eight task accuracies"], ["Chance baseline", "16.7% for six options; 25% for four"], ["Module release", "799 validated questions; Visual Conceptual Slippage contains 99"], ["Paper reference", "800 items in the published diagnostic set"], ["Ranks into", "Visual Perception and Cognition Index (with Do You See Me)"]], taskId: "minds_eye", getStarted: "Download the question set, run your model, upload the JSONL response file." },
     citation: { title: "Mind's Eye: A Benchmark of Visual Abstraction, Transformation and Composition for Multimodal LLMs", id: "cite-me", authors: "Rohit Sinha, Aditya Kanade, Sai Srinivas Kancheti, Vineeth N. Balasubramanian, and Tanuja Ganu", venue: "arXiv", arxiv: "2604.16054", year: "2026", paperUrl: "https://arxiv.org/abs/2604.16054", reference: "Sinha, R., Kanade, A., Kancheti, S. S., Balasubramanian, V. N., and Ganu, T. (2026). Mind's Eye: A Benchmark of Visual Abstraction, Transformation and Composition for Multimodal LLMs. arXiv:2604.16054.", bibtex: `@article{mindseye2026,
   title   = {Mind's Eye: A Benchmark of Visual
              Abstraction, Transformation and
@@ -306,17 +320,24 @@ export const benchmarkPages = {
   spatial: {
     id: "spatial",
     path: "/benchmarks/spatial",
-    title: "When chain of thought hurts spatial reasoning",
+    title: "Chain-of-Thought Degrades Visual Spatial Reasoning",
     navLabel: "Spatial Reasoning",
-    eyebrow: "Visual Spatial Reasoning",
+    eyebrow: "MS VISTA · Reasoning Analysis Module",
     arxiv: "2604.16060",
     paperUrl: "https://arxiv.org/abs/2604.16060",
     authors: "Sai Srinivas Kancheti · Aditya Kanade · Vineeth N Balasubramanian · Tanuja Ganu",
     cta: "Spatial rankings",
     subtitle: "Evaluates whether 17 models stay grounded across 13 spatial datasets, using direct, CoT, No Image, and No Image++ conditions to expose shortcuts when visual evidence is removed.",
+    project: {
+      abstract: "Chain-of-Thought Degrades Visual Spatial Reasoning Capabilities of Multimodal LLMs tests whether longer reasoning traces improve spatial answers or encourage models to reconstruct an answer from language priors. Seventeen models are evaluated across thirteen spatial datasets under six controlled conditions that vary image availability and prompting style. By pairing direct and chain-of-thought prompts with Main, No Image, and No Image++ inputs, the project separates task accuracy from evidence that an answer remains grounded in the image.",
+      researchQuestion: "Does chain-of-thought prompting improve visual spatial reasoning, and do model explanations remain grounded when visual evidence is absent?",
+      artifact: "A standardized spatial reasoning harness spanning thirteen datasets and six intervention conditions, with deterministic decoding, artifact-backed outputs, and package-level integrity checks.",
+      frameworkRole: "Reasoning analysis module",
+      studyDesign: "Seventeen models, thirteen spatial datasets, three image modes, and two prompting modes.",
+    },
     stats: [["13", "Spatial datasets unified under one evaluation policy"], ["6", "Controlled conditions across image and prompt modes"], ["17", "Models evaluated in the paper study"], ["3.0 pts", "Average accuracy decrease with Chain of Thought in the paper study"]],
     premise: {
-      tag: "Why this benchmark exists",
+      tag: "Role in the framework",
       title: "A fluent reasoning trace can drift away from the image",
       body: "Across thirteen datasets, adding CoT lowers average accuracy by three points. No Image++ then shows that many reasoning models continue to make confident spatial claims when the image is blank and Cannot determine is the correct option.",
       thesis: "The relevant question is whether each reasoning step remains grounded in visual evidence.",
@@ -331,7 +352,7 @@ export const benchmarkPages = {
       chips: ["Qwen2.5-VL family", "GThinker", "Vision-R1", "ViGoRL", "Qwen3-VL", "+12 more models"],
     },
     evaluation: { tag: "Evaluation design", title: "Six controlled conditions", body: "The paper separates visual grounding from language priors by combining three image modes with direct and chain of thought prompting.", steps: [["Main non CoT", "Answer directly from the real image with greedy deterministic decoding."], ["Main CoT", "Reason step by step over the same real image and measure the accuracy change."], ["No Image non CoT", "Replace the visual input with a gray image and answer directly."], ["No Image CoT", "Reason step by step without visual evidence to expose textual shortcuts."], ["No Image++ non CoT", "Add Cannot determine as the correct option and test direct abstention."], ["No Image++ CoT", "Test whether a longer reasoning trace helps or prevents correct abstention."]] },
-    pipeline: { tag: "How the benchmark is built", title: "How the spatial harness runs the benchmark", body: "Thirteen existing datasets are normalized under one prompt and scoring policy, then evaluated under controlled interventions that separate image evidence from textual priors.", steps: [["Collect spatial datasets", "Static 2D, 3D geometry, temporal, and dynamic spatial tasks are referenced from official sources rather than redistributed."], ["Normalize prompts", "Questions, options, answers, and metadata are adapted into a shared manifest so models see a consistent interface."], ["Create interventions", "Each selected item is expanded across three image modes and two prompt modes."], ["Run deterministic decoding", "Models are evaluated with greedy pass@1 settings so score changes reflect the condition rather than sampling noise."], ["Judge and verify", "The pinned judge emits final option letters, and the backend verifies all IDs, hashes, conditions, and private answers."]] },
+    pipeline: { tag: "How this module is built", title: "How the spatial harness runs reasoning analysis", body: "Thirteen existing datasets are normalized under one prompt and scoring policy, then evaluated under controlled interventions that separate image evidence from textual priors.", steps: [["Collect spatial datasets", "Static 2D, 3D geometry, temporal, and dynamic spatial tasks are referenced from official sources rather than redistributed."], ["Normalize prompts", "Questions, options, answers, and metadata are adapted into a shared manifest so models see a consistent interface."], ["Create interventions", "Each selected item is expanded across three image modes and two prompt modes."], ["Run deterministic decoding", "Models are evaluated with greedy pass@1 settings so score changes reflect the condition rather than sampling noise."], ["Judge and package", "The pinned judge emits final option letters and claimed credit; the harness packages all six conditions with manifests, outputs, and checksums for server verification."]] },
     samples: {
       tag: "Benchmark samples",
       title: "Real spatial items and harness conditions",
@@ -357,7 +378,7 @@ export const benchmarkPages = {
         { label: "No Image++ backbone", value: "76.4%", score: 76.4, tone: "pos", note: "The plain Qwen2.5 VL backbone selects Cannot determine far more often than the reasoning models." },
       ],
     },
-    findings: { tag: "Findings", title: "Three tests of visual grounding", body: "Together, the diagnostics distinguish benchmark accuracy from evidence that a response is grounded in the image.", cards: [["3 pts lower", "CoT is not a free improvement", "CoT lowers accuracy by three points on average. The 23.14 point GThinker outlier is excluded because its non CoT output degenerates."], ["No Image", "Text priors can answer without vision", "Above chance accuracy with a gray image measures how strongly question wording, options, and world knowledge drive the response."], ["No Image++", "Reasoning models resist abstention", "When Cannot determine is correct, the plain backbone reaches 76.41% while specialized reasoning models range from 5.55% to 47.73%."]] },
+    findings: { tag: "Findings", title: "Three tests of visual grounding", body: "Together, the diagnostics distinguish spatial task accuracy from evidence that a response is grounded in the image.", cards: [["3 pts lower", "CoT is not a free improvement", "CoT lowers accuracy by three points on average. The 23.14 point GThinker outlier is excluded because its non CoT output degenerates."], ["No Image", "Text priors can answer without vision", "Above chance accuracy with a gray image measures how strongly question wording, options, and world knowledge drive the response."], ["No Image++", "Reasoning models resist abstention", "When Cannot determine is correct, the plain backbone reaches 76.41% while specialized reasoning models range from 5.55% to 47.73%."]] },
     figures: {
       tag: "The evidence",
       title: "Three signatures of the reasoning trap",
@@ -393,7 +414,7 @@ export const benchmarkPages = {
         },
       ],
     },
-    scoring: { tag: "Scoring on this leaderboard", title: "How submissions are verified", body: "Upload the single spatial submission ZIP package. The backend verifies its official harness provenance, complete public sample evidence, package hashes, and score arithmetic, then publishes the retained evidence for independent review. It does not independently compare the answers with private ground truth.", specs: [["Upload", "spatial_reasoning_submission.zip"], ["Metric", "Macro average across 13 datasets"], ["Coverage", "All six conditions required"], ["Evidence", "Public per sample results and package hashes"]], taskId: "spatial", getStarted: "Run spatial_harness/run_eval.sh, then upload the generated ZIP package unchanged." },
+    scoring: { tag: "Scoring in MS VISTA", title: "How submissions are verified", body: "Upload the single self-reported, artifact-backed Track 3 ZIP. The backend verifies complete public sample coverage, package hashes, and agreement between per-sample claimed credit and aggregate counts. It does not compare answers with reference answers.", specs: [["Upload", "track3_artifact_submission.zip"], ["Metric", "Macro average across 13 datasets"], ["Coverage", "All six conditions required"], ["Evidence", "Final answers, claimed credit, compressed model outputs, and hashes"]], taskId: "spatial", getStarted: "Run spatial_harness/run_eval.sh, then upload the generated ZIP package unchanged." },
     citation: { title: "Chain-of-Thought Degrades Visual Spatial Reasoning Capabilities of Multimodal LLMs", id: "cite-sp", authors: "Sai Srinivas Kancheti, Aditya Kanade, Vineeth N. Balasubramanian, and Tanuja Ganu", venue: "arXiv", arxiv: "2604.16060", year: "2026", paperUrl: "https://arxiv.org/abs/2604.16060", reference: "Kancheti, S. S., Kanade, A., Balasubramanian, V. N., and Ganu, T. (2026). Chain-of-Thought Degrades Visual Spatial Reasoning Capabilities of Multimodal LLMs. arXiv:2604.16060.", bibtex: `@article{cotspatial2026,
   title   = {Chain-of-Thought Degrades Visual
              Spatial Reasoning Capabilities of
@@ -407,7 +428,7 @@ export const benchmarkPages = {
 };
 
 export const submitTasks = [
-  { id: "do_you_see_me", label: "Do You See Me", section: "Perception", harness: false },
-  { id: "minds_eye", label: "Mind's Eye", section: "Visual Cognition", harness: false },
-  { id: "spatial", label: "Spatial Reasoning", section: "Task 3 (13 benchmarks)", harness: true },
+  { id: "do_you_see_me", label: "Do You See Me", section: "Visual perception module", harness: false },
+  { id: "minds_eye", label: "Mind's Eye", section: "Visual cognition module", harness: false },
+  { id: "spatial", label: "Spatial Reasoning", section: "Reasoning analysis · 13 datasets", harness: true },
 ];

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({
+  apiUrl: (value) => value,
   errorMessage: (error, fallback) => error?.message || fallback,
   getJSON: vi.fn(),
 }));
@@ -77,6 +78,7 @@ const defaultSpatialRows = [
   {
     model_name: "Model Alpha",
     model_meta: { organization: "Org One", params_b: 7 },
+    evidence_url: "/api/public/submissions/spatial-alpha/evidence",
     accuracy: 0.61,
     macro_accuracy: 0.59,
     accuracy_std: 0.04,
@@ -242,8 +244,8 @@ describe("leaderboard filter contracts", () => {
     const user = userEvent.setup();
     render(<ResearchLeaderboard />);
 
-    await user.click(await screen.findByRole("tab", { name: "Spatial Reasoning and Robustness" }));
-    const benchmarkSelect = await screen.findByLabelText("Benchmark");
+    await user.click(await screen.findByRole("tab", { name: "Reasoning Analysis" }));
+    const benchmarkSelect = await screen.findByLabelText("Dataset");
     const rankSelect = screen.getByLabelText("Rank by");
 
     expect(within(rankSelect).queryByRole("option", { name: /selected dataset/i })).not.toBeInTheDocument();
@@ -260,11 +262,37 @@ describe("leaderboard filter contracts", () => {
     expect(screen.queryByText(/59\.0% ±/)).not.toBeInTheDocument();
   });
 
+  it("shows public evidence in a dedicated compact column", async () => {
+    const user = userEvent.setup();
+    render(<ResearchLeaderboard />);
+
+    await user.click(await screen.findByRole("tab", { name: "Reasoning Analysis" }));
+
+    expect(screen.getByText("4/6 conditions")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Evidence" })).toHaveAttribute(
+      "title",
+      "Open the public artifacts retained for this Track 3 submission.",
+    );
+    const evidenceLink = screen.getByRole("link", {
+      name: "View public evidence for Model Alpha",
+    });
+    expect(evidenceLink).toHaveAttribute(
+      "href",
+      "/api/public/submissions/spatial-alpha/evidence",
+    );
+    expect(evidenceLink).toHaveAttribute("target", "_blank");
+    expect(
+      within(screen.getByRole("button", { name: "View model report for Model Alpha" }).closest("td"))
+        .queryByRole("link"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("No public evidence for Model Gamma")).toBeInTheDocument();
+  });
+
   it("changes comparison columns with the selected benchmark scope", async () => {
     const user = userEvent.setup();
     render(<ResearchLeaderboard />);
 
-    await user.click(await screen.findByRole("tab", { name: "Compare Models" }));
+    await user.click(await screen.findByRole("tab", { name: "Integrated Comparison" }));
     expect(await screen.findByRole("heading", { name: "Selected model comparison" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /Spatial/ })).toBeInTheDocument();
 
@@ -284,7 +312,7 @@ describe("leaderboard filter contracts", () => {
     const user = userEvent.setup();
     render(<ResearchLeaderboard />);
 
-    await user.click(await screen.findByRole("tab", { name: "Compare Models" }));
+    await user.click(await screen.findByRole("tab", { name: "Integrated Comparison" }));
     expect(await screen.findByRole("heading", { name: "Selected model comparison" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Spatial" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: /Spatial/ })).not.toBeInTheDocument();
@@ -296,7 +324,7 @@ describe("leaderboard filter contracts", () => {
     const user = userEvent.setup();
     render(<ResearchLeaderboard />);
 
-    await user.click(await screen.findByRole("tab", { name: "Spatial Reasoning and Robustness" }));
+    await user.click(await screen.findByRole("tab", { name: "Reasoning Analysis" }));
     expect(await screen.findByText("No spatial submissions are published yet.")).toBeVisible();
     expect(screen.queryByText("No models match these filters.")).not.toBeInTheDocument();
   });

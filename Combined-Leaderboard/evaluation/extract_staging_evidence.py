@@ -140,7 +140,9 @@ def _write_final_artifacts(
     inference_rows: list[dict[str, Any]],
     candidates: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    audit, contract = load_completed_audit(args.evidence, candidates)
+    audit, contract, source_audit_sha256 = load_completed_audit(
+        args.evidence, candidates
+    )
     diagnostics = []
     for inference, candidate in zip(inference_rows, candidates, strict=True):
         evidence = audit[candidate_key(candidate)]
@@ -151,6 +153,9 @@ def _write_final_artifacts(
                 "extractor_model": evidence["extractor_model"],
                 "extractor_revision": evidence["extractor_revision"],
                 "extractor_contract_sha256": contract,
+                "extractor_evidence_validation_method": str(
+                    evidence["evidence_validation_method"]
+                ),
                 "extractor_output": str(evidence.get("extractor_output") or ""),
                 "extractor_evidence": str(evidence.get("evidence") or ""),
                 "extractor_verdict": str(evidence.get("extractor_verdict") or ""),
@@ -159,6 +164,7 @@ def _write_final_artifacts(
                 "extractor_completion_tokens": evidence.get("completion_tokens"),
                 "extractor_source_diagnostics": args.source.name,
                 "extractor_source_output_sha256": evidence["response_sha256"],
+                "extractor_source_audit_sha256": source_audit_sha256,
                 "extractor_ground_truth_loaded": False,
                 "extractor_ground_truth_supplied": False,
                 "extracted_answer": _answer_from_evidence(evidence),
@@ -189,6 +195,7 @@ def _write_final_artifacts(
         "evidence_path": str(args.evidence),
         "evidence_sha256": hashlib.sha256(args.evidence.read_bytes()).hexdigest(),
         "extractor_contract_sha256": contract,
+        "source_audit_sha256": source_audit_sha256,
         "status_counts": {
             status: sum(row["status"] == status for row in audit.values())
             for status in sorted(FINAL_STATUSES)

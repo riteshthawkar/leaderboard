@@ -67,11 +67,15 @@ conditions, judges every completed response, and packages:
 
 ```text
 <TRACK3_ROOT>/results/<model>/submission_package/
-  spatial_reasoning_submission.zip
+  track3_artifact_submission.zip
 ```
 
-Upload that ZIP unchanged. Debug runs, partial dataset runs, edited packages,
-unjudged rows, incompatible revisions, and provenance mismatches are rejected.
+Upload that ZIP unchanged. It contains submitter-claimed per-sample credit,
+aggregate integer counts, compact final answers, compressed original model
+responses, and SHA-256 checksums. The leaderboard checks package integrity,
+public sample coverage, and score arithmetic; it does not compare answers with
+reference answers. Debug runs, partial dataset runs, edited packages, unjudged
+rows, incompatible revisions, and provenance mismatches are rejected.
 Explicit terminal context-limit failures use the versioned failure policy and
 are scored incorrect without asking the judge to invent an answer.
 

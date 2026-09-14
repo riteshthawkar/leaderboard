@@ -45,7 +45,7 @@ describe("profile quota summary", () => {
 
     expect(
       await screen.findByText(
-        "1 per benchmark every 24 hours · 1 quota slot remaining across all tracks. Track availability is shown on the submission page.",
+        "1 per module every 24 hours · 1 quota slot remaining across the framework. Module availability is shown on the submission page.",
       ),
     ).toBeInTheDocument();
   });

@@ -21,10 +21,11 @@ from evaluation.common.vllm_runner import _answer_is_supported_by_output
 from evaluation.evidence_contract import (
     DEFAULT_EXTRACTOR_MODEL,
     DEFAULT_EXTRACTOR_REVISION,
-    EXTRACTOR_RESPONSE_FORMAT,
     METHOD,
     SYSTEM_PROMPT,
+    expected_answer_domain,
     extractor_contract_sha256,
+    extractor_response_format,
 )
 from visual_answer_contract import (
     INVALID_FORMAT_TOKEN,
@@ -37,8 +38,8 @@ DEFAULT_EXCLUDED_VARIANTS = (
     "qwen-35-thinking-disabled",
     "qwen35-thinking-enabled",
 )
-TERMINAL_FALLBACK_METHOD = "deterministic-terminal-response-classifier-v1"
 FAIL_CLOSED_FALLBACK_METHOD = "persistent-extractor-failure-fail-closed-v1"
+EVIDENCE_VALIDATION_METHOD = "format-aware-verbatim-evidence-validator-v2"
 VERDICTS = {"COMMITTED", "UNRESOLVED"}
 BLOCKING_EXTRACTOR_STATUSES = {
     "request_error",
@@ -276,8 +277,37 @@ def commitment_verdict(answer: str, gold_answer: str, answer_type: str) -> str:
     )
 
 
+def _evidence_pattern_text(evidence: str) -> str:
+    """Remove Markdown emphasis only for semantic evidence checks."""
+    return re.sub(r"[*`~]", "", evidence)
+
+
+def _normalized_evidence_quote(value: str) -> str:
+    """Normalize presentation-only changes an extractor may make to a quote."""
+    normalized = _evidence_pattern_text(value)
+    for _ in range(3):
+        updated = re.sub(
+            r"\\(?:textbf|mathbf|mathrm|text|boxed)\{([^{}]*)\}",
+            r"\1",
+            normalized,
+        )
+        if updated == normalized:
+            break
+        normalized = updated
+    normalized = normalized.replace(r"\(", "$").replace(r"\)", "$")
+    normalized = re.sub(r'["\u201c\u201d]', "", normalized)
+    return " ".join(normalized.split())
+
+
 def _evidence_states_answer(evidence: str, answer: str, answer_type: str) -> bool:
     if _answer_is_supported_by_output(evidence, answer, answer_type):
+        return True
+    evidence = _evidence_pattern_text(evidence)
+    if answer_type in {"mcq_letter", "mcq_index_1_4"} and re.fullmatch(
+        rf"\s*[\[(]?{re.escape(answer)}[\])]?\s*[.,:]?\s*",
+        evidence,
+        flags=re.I,
+    ):
         return True
     if answer_type == "integer":
         value = int(answer)
@@ -305,25 +335,39 @@ def _evidence_states_answer(evidence: str, answer: str, answer_type: str) -> boo
         names = {"1": "first", "2": "second", "3": "third", "4": "fourth"}
         return bool(
             re.search(
-                rf"(?i)\b(?:option|choice|answer|figure)\s*(?:is\s*)?[\[(]?{answer}[\])]?\b"
+                rf"(?i)\b(?:option|choice|answer|figure)\s*"
+                rf"(?:(?:is|:|=|-)\s*)?[\[(]?{answer}[\])]?\b"
                 rf"|<answer>\s*{answer}\b"
                 rf"|\\boxed\{{\s*{answer}\s*\}}"
                 rf"|\bonly\s+[\[(]?{answer}[\])]?(?:\s+\w+){{0,3}}\s+(?:matches|fits|corresponds)\b"
-                rf"|\b{names[answer]}\s+(?:option|choice|figure)\b",
+                rf"|\b{names[answer]}\s+(?:option|choice|figure)\b"
+                rf"|\b(?:the\s+)?correct\s+(?:option|choice|answer|figure)\b"
+                rf".{{0,160}}?\b(?:is|:|=|-)\s*[\[(]?{answer}[\])]?(?=\W|$)",
                 evidence,
             )
         )
     if answer_type == "mcq_letter":
         return bool(
             re.search(
-                rf"(?i)\b(?:option|choice|answer|figure)\s*(?:is\s*)?[\[(]?{answer}[\])]?(?=\W|$)"
+                rf"(?i)\b(?:option|choice|answer|figure)\s*"
+                rf"(?:(?:is|:|=|-)\s*)?[\[(]?{answer}[\])]?(?=\W|$)"
                 rf"|<answer>\s*{answer}(?=\W|$)"
                 rf"|<answer>\s*{answer}\s*answer>"
                 rf"|\\boxed\{{\s*{answer}\s*\}}"
                 rf"|\*{{1,2}}answer\s*:?\*{{1,2}}\s*:?\s*[\[(]?{answer}[\])]?(?=\W|$)"
                 rf"|\bonly\s+[\[(]?{answer}[\])]?(?:\s+\w+){{0,3}}\s+(?:matches|fits|corresponds)\b"
                 rf"|\b(?:the\s+)?figure\s+that\s+does\s+not\s+(?:adhere|follow)"
-                rf".{{0,180}}?\s+is\s+\*{{0,2}}(?:figure\s+)?[\[(]?{answer}[\])]?\*{{0,2}}(?=\W|$)"
+                rf".{{0,180}}?\s+(?:is\s*[:=\-]?|[:=\-])\s*"
+                rf"(?:figure\s+)?[\[(]?{answer}[\])]?(?=\W|$)"
+                rf"|\b(?:the\s+)?correct\s+(?:option|choice|answer|figure)\b"
+                rf".{{0,160}}?\b(?:is|:|=|-)\s*[\[(]?{answer}[\])]?(?=\W|$)"
+                rf"|\bodd\s+one\s+out\s*(?:is|:|=|-)?\s*"
+                rf"[\[(]?{answer}[\])]?(?=\W|$)"
+                rf"|\boutlier\s*(?:is|:|=|-)?\s*"
+                rf"[\[(]?{answer}[\])]?(?=\W|$)"
+                rf"|\b(?:fifth|next|resulting|final)\s+(?:image|figure)\s+"
+                rf"(?:is|:|=|-)\s*(?:option|choice|figure)?\s*"
+                rf"[\[(]?{answer}[\])]?(?=\W|$)"
                 rf"|\b{answer}\s+(?:is|does|would|appears|seems)\b",
                 evidence,
             )
@@ -349,6 +393,8 @@ def _evidence_states_answer(evidence: str, answer: str, answer_type: str) -> boo
 def _evidence_is_commitment(
     response: str, evidence: str, answer: str, answer_type: str
 ) -> bool:
+    quoted_evidence = evidence
+    evidence = _evidence_pattern_text(evidence)
     if re.search(r"(?i)\b(?:could|might|may|possibly|perhaps|unsure|unclear)\b", evidence):
         return False
     if answer_type in {"mcq_letter", "mcq_index_1_4"}:
@@ -370,12 +416,19 @@ def _evidence_is_commitment(
         evidence,
     ):
         return False
+    if answer_type in {"mcq_letter", "mcq_index_1_4"} and re.search(
+        rf"(?i)\b(?:does\s+not|doesn't|fails\s+to|cannot|can't)\s+"
+        rf"(?:match|fit|correspond(?:\s+to)?)\s+(?:the\s+)?"
+        rf"(?:option|choice|figure)\s*[\[(]?{escaped}[\])]?(?=\W|$)",
+        evidence,
+    ):
+        return False
 
     normalized_evidence_answer = final_answer(evidence, answer_type)
     if normalized_evidence_answer and answers_equal(
         normalized_evidence_answer, answer, answer_type
     ):
-        stripped_evidence = evidence.strip()
+        stripped_evidence = quoted_evidence.strip()
         if response.rstrip().endswith(stripped_evidence):
             return True
         escaped_evidence = re.escape(stripped_evidence)
@@ -392,7 +445,7 @@ def _evidence_is_commitment(
         )
     )
     if bare_token and response.rstrip().casefold().endswith(
-        evidence.strip().casefold()
+        quoted_evidence.strip().casefold()
     ):
         return True
     if bare_token and re.search(
@@ -412,6 +465,8 @@ def _evidence_is_commitment(
             rf"|\*{{1,2}}answer\s*:?\*{{1,2}}\s*:?\s*[\[(]?{escaped}(?=\W|$)"
             rf"|\b(?:final\s+)?(?:answer|response)\s*(?:is|:|=|-)?\s*[\[(]?{escaped}(?=\W|$)"
             rf"|\b(?:the\s+)?correct\s+(?:option|choice|answer|figure)\s*(?:is|:|=|-)?\s*[\[(]?{escaped}(?=\W|$)"
+            rf"|\b(?:the\s+)?correct\s+(?:option|choice|answer|figure)\b"
+            rf".{{0,160}}?\b(?:is|:|=|-)\s*[\[(]?{escaped}[\])]?(?=\W|$)"
             rf"|\b(?:choose|select(?:ed)?|pick(?:ed)?|conclude|go\s+with)\s*(?:option|choice|figure)?\s*[\[(]?{escaped}(?=\W|$)",
             evidence,
         )
@@ -432,7 +487,8 @@ def _evidence_is_commitment(
                 rf"(?:common\s+|underlying\s+|recursive\s+)?(?:visual\s+)?concept)?"
                 rf"\s+is\s+(?:figure\s+)?[\[(]?{escaped}[\])]?(?=\W|$)"
                 rf"|\b(?:the\s+)?figure\s+that\s+does\s+not\s+(?:adhere|follow)"
-                rf".{{0,180}}?\s+is\s+\*{{0,2}}(?:figure\s+)?[\[(]?{escaped}[\])]?\*{{0,2}}(?=\W|$)"
+                rf".{{0,180}}?\s+(?:is\s*[:=\-]?|[:=\-])\s*"
+                rf"(?:figure\s+)?[\[(]?{escaped}[\])]?(?=\W|$)"
                 rf"|\bfigure\s+\*{{0,2}}[\[(]?{escaped}[\])]?\*{{0,2}}\s+"
                 rf"is\s+the\s+one\s+that\s+does\s+not\s+(?:adhere|follow)\b"
                 rf"|\b(?:the\s+)?correct\s+rotational\s+transformation"
@@ -440,7 +496,24 @@ def _evidence_is_commitment(
                 rf"|\b(?:the\s+)?figure\s+that\s+can\s+be\s+constructed"
                 rf".{{0,160}}?\s+is\s+(?:option\s+)?[\[(]?{escaped}[\])]?(?=\W|$)"
                 rf"|\bfigure\s*[\[(]?{escaped}[\])]?\s+"
-                r"(?:does\s+not|fails\s+to|violates|is\s+(?:the\s+)?(?:odd|different|asymmetric))\b",
+                r"(?:does\s+not|fails\s+to|violates|is\s+(?:the\s+)?(?:odd|different|asymmetric))\b"
+                rf"|\b(?:only|sole)\s+(?:option|choice|figure)\s*"
+                rf"[\[(]?{escaped}[\])]?(?=\W|$)"
+                rf"|\b(?:matches|matching|fits|corresponds(?:\s+to)?)\b"
+                rf".{{0,80}}?\b(?:option|choice|figure)\s*"
+                rf"[\[(]?{escaped}[\])]?(?=\W|$)"
+                rf"|\b(?:configuration|result|image|figure)\s+shown\s+in\s+"
+                rf"(?:option|choice|figure)?\s*[\[(]?{escaped}[\])]?(?=\W|$)"
+                rf"|\b(?:fifth|next|resulting|final)\s+(?:image|figure)\s+"
+                rf"(?:is|:|=|-)\s*(?:option|choice|figure)?\s*"
+                rf"[\[(]?{escaped}[\])]?(?=\W|$)"
+                rf"|\bodd\s+one\s+out\s*(?:is|:|=|-)?\s*"
+                rf"[\[(]?{escaped}[\])]?(?=\W|$)"
+                rf"|\boutlier\s*(?:is|:|=|-)?\s*"
+                rf"[\[(]?{escaped}[\])]?(?=\W|$)"
+                rf"|\b(?:folded|folding|fold)\b.{{0,160}}?\b"
+                rf"(?:form|construct(?:ed)?)\s+(?:option|choice|figure)?\s*"
+                rf"[\[(]?{escaped}[\])]?(?=\W|$)",
                 evidence,
             )
         )
@@ -454,8 +527,12 @@ def _evidence_is_commitment(
                 r"(?i)\b(?:the\s+)?answer\s+(?:should|would)\s+be\b",
                 evidence,
             )
+            or re.search(rf"(?i)^\s*{escaped}\s+[A-Za-z]", evidence)
             or (answer == "0" and re.search(r"(?i)\b(?:no|none|without)\b", evidence))
         )
+    if answer_type == "text" and answer.casefold() in {"yes", "no"}:
+        if re.search(rf"(?i)^\s*{escaped}(?:\b|[.,;:])", evidence):
+            return True
     return bool(
         re.search(r"(?i)\b(?:final\s+)?(?:answer|response)\s*(?:is|:|=)", evidence)
         or re.search(
@@ -476,14 +553,22 @@ def _evidence_is_commitment(
             r"(?:is|are|spell|spells|seen|visible|appear|appears|can\s+be\s+seen)\b",
             evidence,
         )
-        or response.rstrip().casefold().endswith(evidence.strip().casefold())
+        or response.rstrip().casefold().endswith(quoted_evidence.strip().casefold())
     )
 
 
 def evidence_supports(
     response: str, evidence: str, answer: str, answer_type: str
 ) -> bool:
-    if not evidence or evidence not in response:
+    if not evidence:
+        return False
+    quote_is_exact = evidence in response
+    normalized_quote = _normalized_evidence_quote(evidence)
+    quote_is_formatting_equivalent = bool(
+        normalized_quote
+        and normalized_quote in _normalized_evidence_quote(response)
+    )
+    if not quote_is_exact and not quote_is_formatting_equivalent:
         return False
     return _evidence_states_answer(
         evidence, answer, answer_type
@@ -567,7 +652,9 @@ def classify_extractor_output(
                     )
                     answer = canonical.value
                     status = (
-                        "committed" if canonical.valid else "invalid_format_committed"
+                        "committed"
+                        if canonical.valid and not canonical.transformed
+                        else "invalid_format_committed"
                     )
 
         if status in {"unsupported_by_evidence", "unresolved_truncated_response"}:
@@ -603,90 +690,44 @@ def classify_extractor_output(
     return result
 
 
-def terminal_source_classification(candidate: dict[str, Any]) -> dict[str, Any] | None:
-    """Classify only literal terminal commitments after extractor retries fail."""
-    response = str(candidate.get("response") or "").strip()
-    if not response:
-        return None
-    answer_type = str(candidate.get("answer_type") or "text")
-    task = str(candidate.get("task") or "")
+_CLASSIFICATION_FIELDS = {
+    "answer",
+    "evidence",
+    "extractor_verdict",
+    "proposed_answer",
+    "status",
+    "submission_comparison",
+}
 
-    closed_matches = []
-    for pattern in (
-        r"(?is)<answer>\s*(.*?)\s*</answer>",
-        r"(?is)<\|begin_of_box\|>\s*(.*?)\s*<\|end_of_box\|>",
-        r"(?is)\\boxed\{\s*([^{}]+?)\s*\}",
-    ):
-        closed_matches.extend(
-            match
-            for match in re.finditer(pattern, response)
-            if not re.sub(r"[\s`*_#.,;:!?]+", "", response[match.end() :])
-        )
-    if closed_matches:
-        match = max(closed_matches, key=lambda item: item.start())
-        proposed = match.group(1).strip()
-        canonical = canonicalize_extracted_answer(
-            proposed,
-            answer_type=answer_type,
-            task=task,
-        )
-        return {
-            "extractor_verdict": "COMMITTED",
-            "answer": canonical.value,
-            "proposed_answer": proposed,
-            "evidence": match.group(0),
-            "status": (
-                "committed" if canonical.valid else "invalid_format_committed"
-            ),
+
+def revalidate_extractor_row(
+    candidate: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    source_audit_sha256: str,
+) -> dict[str, Any]:
+    """Recheck a stored LLM decision without deriving a replacement answer."""
+    if row.get("terminal_fallback_method"):
+        classification = {
+            field: row[field]
+            for field in _CLASSIFICATION_FIELDS
+            if field in row
         }
-
-    no_answer_patterns = [
-        r"(?is)((?:none\s+of\s+the\s+(?:options|choices)[^\n]*"
-        r"|there\s+is\s+no\s+correct\s+answer[^\n]*))$",
-    ]
-    if answer_type == "text" and task == "letter_disambiguation":
-        no_answer_patterns.append(
-            r"(?is)(there\s+are\s+no\s+(?:recognizable\s+)?letters?[^\n]*[.!]?)$"
+    else:
+        classification = classify_extractor_output(
+            candidate,
+            str(row.get("extractor_output") or ""),
+            str(row.get("error") or "") or None,
         )
-    for pattern in no_answer_patterns:
-        match = re.search(pattern, response)
-        if match:
-            return {
-                "extractor_verdict": "COMMITTED",
-                "answer": INVALID_FORMAT_TOKEN,
-                "evidence": match.group(1).strip(),
-                "status": "invalid_format_committed",
-            }
-
-    if answer_type == "text" and task == "letter_disambiguation":
-        direct_symbol_string = not bool(re.search(r"\s", response))
-        direct_list = explicit_letter_report = False
-        if len(response) <= 800:
-            direct_list = bool(
-                re.fullmatch(r"\[\s*['\"][A-Za-z]['\"].*\]", response, re.S)
-            )
-            explicit_letter_report = bool(
-                re.fullmatch(
-                    r"(?is)(?:(?:on|in)\b[^.\n]{0,100}\bletters?\b[^.\n]{0,100}"
-                    r"\b(?:visible|shown|present|can\s+be\s+seen)\b[.!]?\s*)+",
-                    response,
-                )
-            )
-        if direct_list or direct_symbol_string or explicit_letter_report:
-            canonical = canonicalize_extracted_answer(
-                response,
-                answer_type=answer_type,
-                task=task,
-            )
-            if not canonical.valid:
-                return {
-                    "extractor_verdict": "COMMITTED",
-                    "answer": INVALID_FORMAT_TOKEN,
-                    "proposed_answer": response,
-                    "evidence": response,
-                    "status": "invalid_format_committed",
-                }
-    return None
+    revalidated = {
+        key: value
+        for key, value in row.items()
+        if key not in _CLASSIFICATION_FIELDS
+    }
+    revalidated.update(classification)
+    revalidated["evidence_validation_method"] = EVIDENCE_VALIDATION_METHOD
+    revalidated["source_audit_sha256"] = source_audit_sha256
+    return revalidated
 
 
 def finalize_persistent_extractor_failure(
@@ -696,17 +737,12 @@ def finalize_persistent_extractor_failure(
         return None
     if not row.get("extractor_attempts"):
         return None
-    classification = terminal_source_classification(candidate)
-    if classification is None:
-        classification = {
-            "extractor_verdict": "UNRESOLVED",
-            "answer": "",
-            "evidence": "",
-            "status": "unresolved",
-        }
-        fallback_method = FAIL_CLOSED_FALLBACK_METHOD
-    else:
-        fallback_method = TERMINAL_FALLBACK_METHOD
+    classification = {
+        "extractor_verdict": "UNRESOLVED",
+        "answer": "",
+        "evidence": "",
+        "status": "unresolved",
+    }
     return {
         **row,
         "extractor_attempts": [
@@ -714,7 +750,7 @@ def finalize_persistent_extractor_failure(
             _checkpoint_attempt(row),
         ],
         **classification,
-        "terminal_fallback_method": fallback_method,
+        "terminal_fallback_method": FAIL_CLOSED_FALLBACK_METHOD,
         "terminal_fallback_from_status": str(row.get("status") or ""),
     }
 
@@ -1051,6 +1087,9 @@ def extractor_payload(candidate: dict[str, Any]) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "question": str(candidate["question"]),
         "answer_type": str(candidate["answer_type"]),
+        "expected_answer_domain": expected_answer_domain(
+            str(candidate["answer_type"]), str(candidate.get("task") or "")
+        ),
         "candidate_response": str(candidate["response"]),
     }
     if candidate.get("task"):
@@ -1122,7 +1161,9 @@ async def extract_evidence_candidate(
                 top_p=1,
                 seed=0,
                 max_tokens=max_tokens,
-                response_format=EXTRACTOR_RESPONSE_FORMAT,
+                response_format=extractor_response_format(
+                    str(candidate["answer_type"]), str(candidate.get("task") or "")
+                ),
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {
@@ -1169,6 +1210,7 @@ async def extract_evidence_candidate(
         )
     } | {
         "method": METHOD,
+        "evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
         "extractor_contract_sha256": extractor_contract,
         "ground_truth_loaded": False,
         "ground_truth_supplied_to_extractor": False,

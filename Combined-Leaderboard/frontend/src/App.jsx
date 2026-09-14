@@ -12,10 +12,12 @@ import { Privacy } from "@/pages/Privacy";
 import { NotFound } from "@/pages/NotFound";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 
+const routerBase = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
+
 export default function App() {
   return (
     <AppErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={routerBase}>
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />

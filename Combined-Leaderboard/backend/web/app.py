@@ -49,6 +49,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from sqlalchemy.engine import make_url
 from werkzeug.middleware.proxy_fix import ProxyFix
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 import requests
 
 from config import (
@@ -84,6 +85,11 @@ from auth_db import (
     is_valid_email,
     normalize_email,
     password_policy_status,
+    issue_refresh_token,
+    rotate_refresh_token,
+    revoke_refresh_token,
+    issue_oauth_exchange_code,
+    consume_oauth_exchange_code,
     MAX_EMAIL_LENGTH,
     MIN_PASSWORD_LENGTH,
     MAX_PASSWORD_LENGTH,
@@ -91,6 +97,13 @@ from auth_db import (
 from emailer import send_password_reset_email, send_verification_email
 from scoring.task_scorer import SubmissionValidationError, TaskScorer
 from spatial_submission import (
+    SPATIAL_ARTIFACT_ANSWERS_MEMBER,
+    SPATIAL_ARTIFACT_ARCHIVE_MEMBERS,
+    SPATIAL_ARTIFACT_ARCHIVE_NAME,
+    SPATIAL_ARTIFACT_CHECKSUMS_MEMBER,
+    SPATIAL_ARTIFACT_MANIFEST_MEMBER,
+    SPATIAL_ARTIFACT_PUBLIC_NAMES,
+    SPATIAL_ARTIFACT_SCORES_MEMBER,
     SPATIAL_ARCHIVE_MEMBERS,
     SPATIAL_MANIFEST_MEMBER,
     SPATIAL_PUBLIC_ARTIFACT_NAMES,
@@ -98,7 +111,10 @@ from spatial_submission import (
     SPATIAL_SUBMISSION_ARCHIVE_NAME,
     SPATIAL_SUBMISSION_MEMBER,
     build_spatial_task_score,
+    is_artifact_backed_spatial_archive,
+    parse_spatial_artifact_evidence,
     parse_spatial_evidence,
+    read_spatial_artifact_archive,
     read_spatial_submission_archive,
     spatial_bundle_health as inspect_spatial_bundle,
     validate_run_manifest,
@@ -263,7 +279,8 @@ _session_lifetime_days = _nonnegative_int_env("SESSION_LIFETIME_DAYS", 7)
 if _session_lifetime_days <= 0:
     raise RuntimeError("SESSION_LIFETIME_DAYS must be a positive whole number.")
 
-# Session cookie hardening (auth is cookie-session based; there are no API tokens).
+# Session cookie hardening. Cookie auth remains available for same-site
+# deployments even when bearer auth is also enabled for a static frontend.
 app.config.update(
     SESSION_COOKIE_NAME=os.getenv("SESSION_COOKIE_NAME", "ms_vista_session").strip()
     or "ms_vista_session",
@@ -275,10 +292,10 @@ app.config.update(
 )
 
 logger.info(
-    "Task submissions use deterministic ground-truth matching; spatial final answers also require a verified harness judge manifest."
+    "Task submissions use deterministic ground-truth matching; Track 3 spatial scores are submitter-claimed and validated through artifact integrity, public coverage, and arithmetic checks."
 )
 
-# CORS configuration. Credentialed browser requests require exact frontend
+# CORS configuration. Both cookie and bearer clients require exact frontend
 # origins; wildcard origins are intentionally unsupported.
 CORS_ORIGINS = [origin.rstrip("/") for origin in _csv_env(
     "CORS_ORIGINS",
@@ -286,7 +303,7 @@ CORS_ORIGINS = [origin.rstrip("/") for origin in _csv_env(
 )]
 if "*" in CORS_ORIGINS:
     raise RuntimeError(
-        "CORS_ORIGINS cannot contain '*' because the API uses credentialed session cookies."
+        "CORS_ORIGINS cannot contain '*' for an authenticated deployment."
     )
 invalid_cors_origins = []
 for origin in CORS_ORIGINS:
@@ -307,7 +324,13 @@ CORS(app, resources={
     r"/api(?:/.*)?$": {
         "origins": CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["Accept", "Content-Type", "X-CSRF-Token"],
+        "allow_headers": [
+            "Accept",
+            "Authorization",
+            "Content-Type",
+            "X-Auth-Transport",
+            "X-CSRF-Token",
+        ],
         "expose_headers": ["Content-Disposition", "Retry-After", "X-Request-Id"],
         "supports_credentials": True,
         "max_age": 600,
@@ -359,17 +382,31 @@ _health_cache = {
 _email_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="auth-email")
 atexit.register(_email_executor.shutdown, wait=False, cancel_futures=True)
 
-# Authentication — cookie session based (no API tokens).
+# Authentication. Cookie sessions are the default; ``dual`` additionally
+# permits explicit bearer sessions for a cross-site static frontend.
 SUBMISSION_AUTH_DISABLED = _env_bool("DISABLE_SUBMISSION_AUTH", False)
 TEST_SUBMISSION_USER = os.getenv("TEST_SUBMISSION_USER", "local-test@ms-vista.local")
 AUTH_DEV_MODE = _env_bool("AUTH_DEV_MODE", False)
 ADMIN_EMAILS = {email.lower() for email in _csv_env("ADMIN_EMAILS", "")}
+AUTH_TRANSPORT = os.getenv("AUTH_TRANSPORT", "cookie").strip().lower() or "cookie"
+if AUTH_TRANSPORT not in {"cookie", "bearer", "dual"}:
+    raise RuntimeError("AUTH_TRANSPORT must be cookie, bearer, or dual.")
+ACCESS_TOKEN_TTL_SECONDS = _nonnegative_int_env("ACCESS_TOKEN_TTL_SECONDS", 900)
+REFRESH_TOKEN_TTL_DAYS = _nonnegative_int_env("REFRESH_TOKEN_TTL_DAYS", 7)
+OAUTH_EXCHANGE_TTL_SECONDS = _nonnegative_int_env("OAUTH_EXCHANGE_TTL_SECONDS", 60)
+if not 60 <= ACCESS_TOKEN_TTL_SECONDS <= 3600:
+    raise RuntimeError("ACCESS_TOKEN_TTL_SECONDS must be between 60 and 3600.")
+if not 1 <= REFRESH_TOKEN_TTL_DAYS <= 30:
+    raise RuntimeError("REFRESH_TOKEN_TTL_DAYS must be between 1 and 30.")
+if not 30 <= OAUTH_EXCHANGE_TTL_SECONDS <= 300:
+    raise RuntimeError("OAUTH_EXCHANGE_TTL_SECONDS must be between 30 and 300.")
 
 OAUTH_STATE_COOKIE = "vista_oauth_state"
 OAUTH_STATE_MAX_AGE = 600
 CSRF_SESSION_KEY = "csrf_token"
 AUTH_SESSION_VERSION_KEY = "auth_session_version"
 OAUTH_PKCE_SESSION_KEY = "oauth_pkce_verifier"
+AUTH_TRANSPORT_HEADER = "X-Auth-Transport"
 CSRF_HEADER = "X-CSRF-Token"
 CSRF_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 CSRF_EXEMPT_ENDPOINTS = {
@@ -379,6 +416,8 @@ CSRF_EXEMPT_ENDPOINTS = {
     "auth_forgot_password",
     "auth_reset_password",
     "auth_resend",
+    "auth_token_exchange",
+    "auth_token_refresh",
     "auth_oauth_start",
     "auth_oauth_callback",
 }
@@ -529,6 +568,146 @@ def _error_response(
     return response
 
 
+def _bearer_transport_enabled() -> bool:
+    return AUTH_TRANSPORT in {"bearer", "dual"}
+
+
+def _cookie_transport_enabled() -> bool:
+    return AUTH_TRANSPORT in {"cookie", "dual"}
+
+
+def _requested_auth_transport() -> str:
+    requested = (
+        request.headers.get(AUTH_TRANSPORT_HEADER)
+        or request.args.get("transport")
+        or ""
+    )
+    return requested.strip().lower()
+
+
+def _selected_auth_transport() -> Optional[str]:
+    requested = _requested_auth_transport()
+    if requested:
+        if requested == "bearer" and _bearer_transport_enabled():
+            return "bearer"
+        if requested == "cookie" and _cookie_transport_enabled():
+            return "cookie"
+        return None
+    if AUTH_TRANSPORT == "bearer":
+        return "bearer"
+    return "cookie"
+
+
+def _auth_transport_error():
+    return _error_response(
+        "The frontend requested an authentication mode that this API does not enable. Contact the leaderboard administrator.",
+        "auth_transport_unavailable",
+        409,
+    )
+
+
+def _access_token_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(app.secret_key, salt="vista-access-token-v1")
+
+
+def _issue_access_token(email: str) -> str:
+    account = get_user(email)
+    if not account or not account.get("email_verified"):
+        raise RuntimeError("verified account unavailable")
+    return _access_token_serializer().dumps({
+        "typ": "access",
+        "sub": account["email"],
+        "sv": int(account.get("session_version") or 0),
+        "jti": secrets.token_hex(16),
+    })
+
+
+def _bearer_token_from_header() -> tuple[Optional[str], str]:
+    header = (request.headers.get("Authorization") or "").strip()
+    if not header:
+        return None, "missing"
+    if len(header) > 4096:
+        return None, "invalid"
+    scheme, separator, token = header.partition(" ")
+    if not separator or scheme.lower() != "bearer" or not token.strip():
+        return None, "invalid"
+    return token.strip(), "present"
+
+
+def _access_token_identity() -> tuple[Optional[str], str]:
+    token, status = _bearer_token_from_header()
+    if token is None:
+        return None, status
+    if not _bearer_transport_enabled():
+        return None, "disabled"
+    try:
+        payload = _access_token_serializer().loads(
+            token,
+            max_age=ACCESS_TOKEN_TTL_SECONDS,
+        )
+    except SignatureExpired:
+        return None, "expired"
+    except BadSignature:
+        return None, "invalid"
+    if not isinstance(payload, dict) or payload.get("typ") != "access":
+        return None, "invalid"
+    email = normalize_email(payload.get("sub") or "")
+    try:
+        token_version = int(payload.get("sv"))
+    except (TypeError, ValueError):
+        return None, "invalid"
+    account = get_user(email)
+    if (
+        not account
+        or not account.get("email_verified")
+        or token_version != int(account.get("session_version") or 0)
+    ):
+        return None, "revoked"
+    return account["email"], "ok"
+
+
+def _issue_auth_response(email: str, *, status: int = 200, extra: Optional[dict] = None):
+    """Create either a cookie session or a bearer-token response."""
+    transport = _selected_auth_transport()
+    if transport is None:
+        return _auth_transport_error()
+    payload = dict(extra or {})
+    payload["email"] = email
+    payload["auth_transport"] = transport
+    if transport == "bearer":
+        refresh_token = issue_refresh_token(email, REFRESH_TOKEN_TTL_DAYS)
+        if not refresh_token:
+            raise RuntimeError("verified account unavailable")
+        access_token = _issue_access_token(email)
+        session.clear()
+        payload.update({
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "Bearer",
+            "expires_in": ACCESS_TOKEN_TTL_SECONDS,
+        })
+    else:
+        payload["csrf_token"] = _establish_user_session(email)
+    return jsonify(payload), status
+
+
+def _auth_subject_key() -> str:
+    """Rate-limit a credential target independently of the source address."""
+    try:
+        data = request.get_json(silent=True)
+    except Exception:
+        data = None
+    email = normalize_email(data.get("email") if isinstance(data, dict) else "")
+    if not email:
+        return "ip:" + get_remote_address()
+    digest = hmac.new(
+        app.secret_key.encode("utf-8"),
+        email.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return "account:" + digest
+
+
 def _csrf_token() -> str:
     token = session.get(CSRF_SESSION_KEY)
     if not token:
@@ -544,7 +723,7 @@ def _rotate_csrf_token() -> str:
 
 
 def _csrf_payload() -> dict:
-    if SUBMISSION_AUTH_DISABLED:
+    if SUBMISSION_AUTH_DISABLED or _selected_auth_transport() == "bearer":
         return {}
     return {"csrf_token": _csrf_token()}
 
@@ -563,6 +742,15 @@ def _csrf_protect_request():
     if SUBMISSION_AUTH_DISABLED:
         return None
     if request.endpoint in CSRF_EXEMPT_ENDPOINTS:
+        return None
+    bearer_token, bearer_status = _bearer_token_from_header()
+    if (
+        bearer_token is not None
+        and bearer_status == "present"
+        and _bearer_transport_enabled()
+    ):
+        # Authorization headers are explicit credentials and are not attached
+        # by the browser to cross-site requests, so cookie CSRF does not apply.
         return None
     if not session.get("user_email"):
         return None
@@ -667,7 +855,6 @@ def _establish_user_session(email: str) -> str:
 
 
 def _oauth_serializer():
-    from itsdangerous import URLSafeTimedSerializer
     return URLSafeTimedSerializer(app.secret_key, salt="vista-oauth-state")
 
 
@@ -727,9 +914,25 @@ def _login_redirect(next_path: str, fragment: Optional[Dict[str, str]] = None):
 
 
 def current_user_email() -> Optional[str]:
-    """Return the signed-in, verified account email from the session, or None."""
+    """Return the verified identity from an explicit bearer or cookie session."""
+    bearer_token, bearer_status = _bearer_token_from_header()
+    if bearer_token is not None or bearer_status == "invalid":
+        email, status = _access_token_identity()
+        g.auth_transport = "bearer"
+        g.auth_error = status
+        return email
+    if _selected_auth_transport() == "bearer":
+        g.auth_transport = "bearer"
+        g.auth_error = "missing"
+        return None
+    if not _cookie_transport_enabled():
+        g.auth_transport = "cookie"
+        g.auth_error = "disabled"
+        return None
     email = session.get("user_email")
     if not email:
+        g.auth_transport = "cookie"
+        g.auth_error = "missing"
         return None
     user = get_user(email)
     session_version = session.get(AUTH_SESSION_VERSION_KEY)
@@ -747,7 +950,11 @@ def current_user_email() -> Optional[str]:
         or not version_matches
     ):
         session.clear()
+        g.auth_transport = "cookie"
+        g.auth_error = "revoked"
         return None
+    g.auth_transport = "cookie"
+    g.auth_error = "ok"
     return user["email"]
 
 
@@ -794,7 +1001,10 @@ def admin_required(func):
 
 def _identity_key() -> str:
     """Rate-limit key: the signed-in account when present, else the client IP."""
-    email = session.get("user_email")
+    try:
+        email = current_user_email()
+    except Exception:
+        email = None
     return ("user:" + email) if email else ("ip:" + get_remote_address())
 
 
@@ -918,25 +1128,6 @@ def _rescore_stored_submission(score_submission_id: str):
         )
         if task_id == "spatial":
             artifacts = stored.get("artifacts") or {}
-            required_artifacts = set(SPATIAL_PUBLIC_ARTIFACT_NAMES)
-            if set(artifacts) != required_artifacts:
-                raise ValueError(
-                    "Stored spatial evidence artifacts are missing or incomplete"
-                )
-            archive_submission, archive_manifest, archive_report = (
-                read_spatial_submission_archive(
-                    artifacts[SPATIAL_SUBMISSION_ARCHIVE_NAME]
-                )
-            )
-            for artifact_name, archive_value in (
-                (SPATIAL_SUBMISSION_MEMBER, archive_submission),
-                (SPATIAL_MANIFEST_MEMBER, archive_manifest),
-                (SPATIAL_REPORT_MEMBER, archive_report),
-            ):
-                if not hmac.compare_digest(artifacts[artifact_name], archive_value):
-                    raise ValueError(
-                        f"Stored spatial artifact {artifact_name} does not match the retained archive"
-                    )
             stored_contract = stored.get("spatial_contract")
             if stored_contract:
                 benchmark_manifest_source = stored_contract["manifest"]
@@ -949,25 +1140,74 @@ def _rescore_stored_submission(score_submission_id: str):
                 benchmark_manifest_source = SPATIAL_MANIFEST_FILE
                 template_source = TASKS["spatial"]["paths"]["template_jsonl"]
                 questions_source = TASKS["spatial"]["paths"]["questions_jsonl"]
-            records, computed_report, _manifest = parse_spatial_evidence(
-                archive_submission,
-                benchmark_manifest_source,
-                template_source,
-                questions_source,
-            )
-            run_metadata = validate_run_manifest(
-                archive_manifest,
-                archive_submission,
-                archive_report,
-                stored.get("model_name") or "",
-                records,
-                benchmark_manifest_source,
-            )
-            report = validate_spatial_report(
-                archive_report,
-                stored.get("model_name") or "",
-                computed_report,
-            )
+            if SPATIAL_ARTIFACT_ARCHIVE_NAME in artifacts:
+                if set(artifacts) != set(SPATIAL_ARTIFACT_PUBLIC_NAMES):
+                    raise ValueError(
+                        "Stored artifact-backed spatial evidence is missing or incomplete"
+                    )
+                artifact_package = read_spatial_artifact_archive(
+                    artifacts[SPATIAL_ARTIFACT_ARCHIVE_NAME]
+                )
+                for artifact_name in (
+                    SPATIAL_ARTIFACT_MANIFEST_MEMBER,
+                    SPATIAL_ARTIFACT_SCORES_MEMBER,
+                    SPATIAL_ARTIFACT_ANSWERS_MEMBER,
+                    SPATIAL_ARTIFACT_CHECKSUMS_MEMBER,
+                ):
+                    if not hmac.compare_digest(
+                        artifacts[artifact_name],
+                        artifact_package.members[artifact_name],
+                    ):
+                        raise ValueError(
+                            f"Stored spatial artifact {artifact_name} does not match the retained archive"
+                        )
+                records, report, _manifest, run_metadata = (
+                    parse_spatial_artifact_evidence(
+                        artifact_package,
+                        stored.get("model_name") or "",
+                        benchmark_manifest_source,
+                        template_source,
+                        questions_source,
+                    )
+                )
+            else:
+                if set(artifacts) != set(SPATIAL_PUBLIC_ARTIFACT_NAMES):
+                    raise ValueError(
+                        "Stored spatial evidence artifacts are missing or incomplete"
+                    )
+                archive_submission, archive_manifest, archive_report = (
+                    read_spatial_submission_archive(
+                        artifacts[SPATIAL_SUBMISSION_ARCHIVE_NAME]
+                    )
+                )
+                for artifact_name, archive_value in (
+                    (SPATIAL_SUBMISSION_MEMBER, archive_submission),
+                    (SPATIAL_MANIFEST_MEMBER, archive_manifest),
+                    (SPATIAL_REPORT_MEMBER, archive_report),
+                ):
+                    if not hmac.compare_digest(artifacts[artifact_name], archive_value):
+                        raise ValueError(
+                            f"Stored spatial artifact {artifact_name} does not match the retained archive"
+                        )
+                records, computed_report, _manifest = parse_spatial_evidence(
+                    archive_submission,
+                    benchmark_manifest_source,
+                    template_source,
+                    questions_source,
+                )
+                run_metadata = validate_run_manifest(
+                    archive_manifest,
+                    archive_submission,
+                    archive_report,
+                    stored.get("model_name") or "",
+                    records,
+                    benchmark_manifest_source,
+                )
+                report = validate_spatial_report(
+                    archive_report,
+                    stored.get("model_name") or "",
+                    computed_report,
+                )
             score = build_spatial_task_score(
                 report,
                 stored.get("model_name") or "",
@@ -1361,8 +1601,8 @@ def _submission_validation_response(
     if spatial_archive:
         field = "file"
         correction = (
-            "Rerun the current spatial harness and upload its unchanged "
-            f"{SPATIAL_SUBMISSION_ARCHIVE_NAME} package."
+            "Regenerate the Track 3 artifact package and upload its unchanged "
+            f"{SPATIAL_ARTIFACT_ARCHIVE_NAME} file."
         )
     else:
         correction = (
@@ -1672,18 +1912,22 @@ def _auth_service_health() -> tuple[str, dict]:
     microsoft_tenant_ready = bool(MICROSOFT_TENANT_ID)
     verified_admins = get_verified_admin_emails(ADMIN_EMAILS)
     admin_ready = bool(ADMIN_EMAILS) and bool(verified_admins)
+    oauth_ready = providers["microsoft"]["configured"] and microsoft_tenant_ready
     healthy = (
         not incomplete
-        and providers["microsoft"]["configured"]
-        and microsoft_tenant_ready
         and not _secret_is_placeholder
         and len(app.secret_key or "") >= 32
-        and (not PUBLIC_DEPLOYMENT or admin_ready)
+        and (not PUBLIC_DEPLOYMENT or (oauth_ready and admin_ready))
     )
     return ("healthy" if healthy else "unhealthy"), {
         "enabled": True,
+        "transport": AUTH_TRANSPORT,
+        "access_token_ttl_seconds": ACCESS_TOKEN_TTL_SECONDS,
+        "refresh_token_ttl_days": REFRESH_TOKEN_TTL_DAYS,
+        "oauth_exchange_ttl_seconds": OAUTH_EXCHANGE_TTL_SECONDS,
         "providers": providers,
         "incomplete_providers": incomplete,
+        "oauth_required": PUBLIC_DEPLOYMENT,
         "microsoft_ready": providers["microsoft"]["configured"],
         "microsoft_tenant_ready": microsoft_tenant_ready,
         "session_secret_ready": not _secret_is_placeholder and len(app.secret_key or "") >= 32,
@@ -1716,6 +1960,8 @@ def _deployment_configuration_health() -> tuple[str, dict]:
     same_site = bool(frontend_site and api_site and frontend_site == api_site)
     cookie_samesite = app.config["SESSION_COOKIE_SAMESITE"]
     credential_cookie_ready = same_site or cookie_samesite == "None"
+    bearer_transport_ready = _bearer_transport_enabled()
+    credential_transport_ready = bearer_transport_ready or credential_cookie_ready
     url_shapes_ready = all(
         details["configured"] and (details["secure"] or details["local"])
         for details in urls.values()
@@ -1726,7 +1972,7 @@ def _deployment_configuration_health() -> tuple[str, dict]:
         url_shapes_ready
         and cors_ready
         and secure_cookie_ready
-        and credential_cookie_ready
+        and credential_transport_ready
     )
     public_ready = (
         base_ready
@@ -1749,6 +1995,9 @@ def _deployment_configuration_health() -> tuple[str, dict]:
         "session_cookie_samesite": cookie_samesite,
         "frontend_api_same_site": same_site,
         "credential_cookie_ready": credential_cookie_ready,
+        "auth_transport": AUTH_TRANSPORT,
+        "bearer_transport_ready": bearer_transport_ready,
+        "credential_transport_ready": credential_transport_ready,
         "mode": DEPLOYMENT_MODE,
         "detected_mode": "local" if local_mode else "public",
         "mode_matches_configuration": mode_ready,
@@ -1950,6 +2199,7 @@ def server_error(error):
 # ------------------------------------------------------------------ auth
 @app.route("/api/auth/register", methods=["POST"])
 @limiter.limit("5 per hour")
+@limiter.limit("5 per hour", key_func=_auth_subject_key)
 def auth_register():
     """Register a new email/password account and email a verification link."""
     data, body_error = _auth_json_body()
@@ -2091,7 +2341,10 @@ def auth_verify():
                 400,
             )
         try:
-            csrf_token = _establish_user_session(email)
+            return _issue_auth_response(
+                email,
+                extra={"status": "verified"},
+            )
         except Exception as exc:
             logger.error(
                 "Verified account session creation failed: %s",
@@ -2105,11 +2358,6 @@ def auth_verify():
                 503,
                 retryable=True,
             )
-        return jsonify({
-            "status": "verified",
-            "email": email,
-            "csrf_token": csrf_token,
-        }), 200
 
     # Backward-compatible redirect for links issued before fragment-based
     # verification was introduced.
@@ -2137,6 +2385,7 @@ def auth_verify():
 
 @app.route("/api/auth/login", methods=["POST"])
 @limiter.limit("10 per hour")
+@limiter.limit("30 per hour", key_func=_auth_subject_key)
 def auth_login():
     """Sign in with email + password. Sets a session cookie."""
     data, body_error = _auth_json_body()
@@ -2206,7 +2455,7 @@ def auth_login():
             401,
         )
     try:
-        csrf_token = _establish_user_session(email)
+        return _issue_auth_response(email)
     except Exception as exc:
         logger.error(
             "Sign-in session creation failed: %s",
@@ -2220,11 +2469,11 @@ def auth_login():
             503,
             retryable=True,
         )
-    return jsonify({"email": email, "csrf_token": csrf_token}), 200
 
 
 @app.route("/api/auth/forgot-password", methods=["POST"])
 @limiter.limit("5 per hour")
+@limiter.limit("5 per hour", key_func=_auth_subject_key)
 def auth_forgot_password():
     """Send a password reset link if the account exists."""
     data, body_error = _auth_json_body()
@@ -2360,10 +2609,150 @@ def auth_reset_password():
     return jsonify({"status": "password_reset"}), 200
 
 
+@app.route("/api/auth/token/exchange", methods=["POST"])
+@limiter.limit("20 per hour")
+def auth_token_exchange():
+    """Exchange a one-time OAuth handoff code for a bearer session."""
+    if _selected_auth_transport() != "bearer":
+        return _auth_transport_error()
+    data, body_error = _auth_json_body()
+    if body_error is not None:
+        return body_error
+    code, field_error = _auth_string(data, "code")
+    if field_error is not None:
+        return field_error
+    try:
+        email = consume_oauth_exchange_code(code)
+    except Exception as exc:
+        logger.error(
+            "OAuth handoff exchange failed: %s",
+            exc,
+            extra={"request_id": getattr(g, "request_id", None)},
+            exc_info=True,
+        )
+        return _error_response(
+            "Sign-in could not be completed because the account service is temporarily unavailable. Restart Microsoft sign-in and try again.",
+            "oauth_exchange_unavailable",
+            503,
+            retryable=True,
+        )
+    if not email:
+        return _error_response(
+            "This sign-in handoff is invalid, expired, or has already been used. Restart sign-in.",
+            "invalid_oauth_exchange",
+            400,
+        )
+    try:
+        return _issue_auth_response(email)
+    except Exception as exc:
+        logger.error(
+            "OAuth bearer-session creation failed: %s",
+            exc,
+            extra={"request_id": getattr(g, "request_id", None)},
+            exc_info=True,
+        )
+        return _error_response(
+            "Your identity was accepted, but the leaderboard session could not be created. Restart sign-in and try again.",
+            "session_creation_failed",
+            503,
+            retryable=True,
+        )
+
+
+@app.route("/api/auth/token/refresh", methods=["POST"])
+@limiter.limit("60 per hour")
+def auth_token_refresh():
+    """Rotate a refresh credential and issue a new short-lived access token."""
+    if _selected_auth_transport() != "bearer":
+        return _auth_transport_error()
+    data, body_error = _auth_json_body()
+    if body_error is not None:
+        return body_error
+    refresh_token, field_error = _auth_string(data, "refresh_token")
+    if field_error is not None:
+        return field_error
+    try:
+        status, email, replacement = rotate_refresh_token(
+            refresh_token,
+            REFRESH_TOKEN_TTL_DAYS,
+        )
+    except Exception as exc:
+        logger.error(
+            "Refresh-token rotation failed: %s",
+            exc,
+            extra={"request_id": getattr(g, "request_id", None)},
+            exc_info=True,
+        )
+        return _error_response(
+            "Your session could not be refreshed because the account service is temporarily unavailable. Retry shortly.",
+            "token_refresh_unavailable",
+            503,
+            retryable=True,
+        )
+    if status == "reused":
+        return _error_response(
+            "This session credential was already used. For safety, this browser session has been revoked; sign in again.",
+            "refresh_token_reused",
+            401,
+        )
+    if status != "ok" or not email or not replacement:
+        return _error_response(
+            "Your browser session has expired or was revoked. Sign in again.",
+            "invalid_refresh_token",
+            401,
+        )
+    try:
+        access_token = _issue_access_token(email)
+    except Exception as exc:
+        logger.error(
+            "Access-token issuance failed after refresh: %s",
+            exc,
+            extra={"request_id": getattr(g, "request_id", None)},
+            exc_info=True,
+        )
+        return _error_response(
+            "Your session was refreshed, but a new access credential could not be created. Sign in again.",
+            "token_issuance_failed",
+            503,
+            retryable=False,
+        )
+    session.clear()
+    return jsonify({
+        "email": email,
+        "auth_transport": "bearer",
+        "access_token": access_token,
+        "refresh_token": replacement,
+        "token_type": "Bearer",
+        "expires_in": ACCESS_TOKEN_TTL_SECONDS,
+    }), 200
+
+
 @app.route("/api/auth/logout", methods=["POST"])
 @limiter.limit("30 per minute", key_func=_identity_key)
 def auth_logout():
-    """Clear the session."""
+    """Clear the cookie session or revoke this browser's refresh token."""
+    if _selected_auth_transport() == "bearer":
+        data, body_error = _optional_json_object()
+        if body_error is not None:
+            return body_error
+        refresh_token, field_error = _auth_string(data, "refresh_token")
+        if field_error is not None:
+            return field_error
+        try:
+            revoke_refresh_token(refresh_token)
+        except Exception as exc:
+            logger.error(
+                "Refresh-token revocation failed: %s",
+                exc,
+                extra={"request_id": getattr(g, "request_id", None)},
+                exc_info=True,
+            )
+            return _error_response(
+                "The local session can be cleared, but the server could not confirm token revocation. Retry sign-out shortly.",
+                "logout_unavailable",
+                503,
+                retryable=True,
+            )
     session.clear()
     return jsonify({"status": "ok"}), 200
 
@@ -2512,6 +2901,15 @@ def auth_me():
             retryable=True,
         )
     if not email:
+        if (
+            getattr(g, "auth_transport", None) == "bearer"
+            and getattr(g, "auth_error", "missing") != "missing"
+        ):
+            return _error_response(
+                "Your access credential is invalid, expired, or revoked. Refresh the browser session or sign in again.",
+                "invalid_access_token",
+                401,
+            )
         session.pop(CSRF_SESSION_KEY, None)
         return jsonify({"authenticated": False}), 200
     try:
@@ -2562,6 +2960,7 @@ def auth_me():
 
 @app.route("/api/auth/resend", methods=["POST"])
 @limiter.limit("5 per hour")
+@limiter.limit("5 per hour", key_func=_auth_subject_key)
 def auth_resend():
     """Resend the verification link for an unverified account."""
     data, body_error = _auth_json_body()
@@ -2653,6 +3052,11 @@ def auth_oauth_start(provider):
     provider = provider.strip().lower()
     config = _oauth_config(provider)
     next_path = _safe_next_path(request.args.get("next"))
+    transport = _selected_auth_transport()
+    if transport is None:
+        return _login_redirect(next_path, {
+            "oauth_error": "This frontend authentication mode is not enabled on the API.",
+        })
     if not config:
         return _login_redirect(next_path, {"oauth_error": "Unsupported sign-in provider."})
     client_id = os.getenv(config["client_id_env"], "").strip()
@@ -2661,7 +3065,12 @@ def auth_oauth_start(provider):
     nonce = secrets.token_urlsafe(24)
     code_verifier = secrets.token_urlsafe(64)
     session[OAUTH_PKCE_SESSION_KEY] = code_verifier
-    state = _oauth_serializer().dumps({"provider": provider, "next": next_path, "nonce": nonce})
+    state = _oauth_serializer().dumps({
+        "provider": provider,
+        "next": next_path,
+        "nonce": nonce,
+        "transport": transport,
+    })
     params = {
         "client_id": client_id,
         "redirect_uri": _oauth_redirect_uri(provider),
@@ -2687,7 +3096,7 @@ def auth_oauth_start(provider):
 @app.route("/api/auth/oauth/<provider>/callback", methods=["GET"])
 @limiter.limit("20 per hour")
 def auth_oauth_callback(provider):
-    """Complete OAuth login/register and establish the signed session cookie."""
+    """Complete OAuth and establish a cookie or one-time bearer handoff."""
     provider = provider.strip().lower()
     config = _oauth_config(provider)
     fallback_next = _safe_next_path(request.args.get("next"))
@@ -2705,6 +3114,15 @@ def auth_oauth_callback(provider):
     except Exception:
         return _login_redirect(fallback_next, {"oauth_error": "Sign-in session expired. Please try again."})
     next_path = _safe_next_path(state.get("next"))
+    transport = state.get("transport") or "cookie"
+    if (
+        transport not in {"cookie", "bearer"}
+        or (transport == "cookie" and not _cookie_transport_enabled())
+        or (transport == "bearer" and not _bearer_transport_enabled())
+    ):
+        return _login_redirect(next_path, {
+            "oauth_error": "This frontend authentication mode is no longer enabled. Restart sign-in.",
+        })
     if state.get("provider") != provider or state.get("nonce") != request.cookies.get(OAUTH_STATE_COOKIE):
         return _login_redirect(next_path, {"oauth_error": "Sign-in session could not be verified."})
     code_verifier = session.pop(OAUTH_PKCE_SESSION_KEY, None)
@@ -2766,6 +3184,27 @@ def auth_oauth_callback(provider):
         return _login_redirect(next_path, {"oauth_error": "The identity provider signed you in, but the leaderboard could not create your local session. Please try again shortly."})
     if not account_email:
         return _login_redirect(next_path, {"oauth_error": f"{config['label']} did not return a usable, stable account identity."})
+    if transport == "bearer":
+        try:
+            exchange_code = issue_oauth_exchange_code(
+                account_email,
+                OAUTH_EXCHANGE_TTL_SECONDS,
+            )
+        except Exception as exc:
+            logger.error(
+                "OAuth exchange-code creation failed for %s: %s",
+                provider,
+                exc,
+                extra={"request_id": getattr(g, "request_id", None)},
+                exc_info=True,
+            )
+            exchange_code = None
+        if not exchange_code:
+            return _login_redirect(next_path, {
+                "oauth_error": "The account was accepted, but its browser handoff could not be created. Please restart sign-in.",
+            })
+        session.clear()
+        return _login_redirect(next_path, {"oauth_code": exchange_code})
     try:
         _establish_user_session(account_email)
     except Exception as exc:
@@ -2791,6 +3230,7 @@ def _service_metadata() -> dict:
         "liveness": "/api/health/live",
         "readiness": "/api/readiness",
         "frontend": _frontend_base_url(),
+        "auth_transport": AUTH_TRANSPORT,
         "request_id": getattr(g, "request_id", None),
     }
 
@@ -3354,7 +3794,7 @@ def task_info(task_id):
             "score_provenance": (
                 "leaderboard_release_suite"
                 if task_id != "spatial"
-                else "harness_report_with_public_evidence"
+                else "submitter_claimed_artifact_backed"
             ),
         }
         # Advertise the track-specific verification contract before upload.
@@ -3363,14 +3803,14 @@ def task_info(task_id):
         if gcfg:
             info["grading"] = {
                 "method": (
-                    "harness_reported_public_evidence"
+                    "submitter_claimed_artifact_evidence"
                     if task_id == "spatial"
                     else gcfg.get("method")
                 ),
                 "paper": gcfg.get("paper"),
                 "random_baseline": task_scorers[task_id].random_baseline(),
                 "submission_format": (
-                    "spatial_evidence_zip" if task_id == "spatial" else "jsonl"
+                    "track3_artifact_submission_v1" if task_id == "spatial" else "jsonl"
                 ),
                 "server_ground_truth_evaluation": task_id != "spatial",
             }
@@ -3381,11 +3821,13 @@ def task_info(task_id):
             info["submission_ready"] = spatial_status == "healthy"
             info["bundle_status"] = spatial_status
             info["bundle_details"] = spatial_details
-            info["required_uploads"] = [SPATIAL_SUBMISSION_ARCHIVE_NAME]
+            info["required_uploads"] = [SPATIAL_ARTIFACT_ARCHIVE_NAME]
             info["upload_processing"] = "in_memory"
             info["max_upload_bytes"] = MAX_SPATIAL_ARCHIVE_BYTES
             info["public_evidence"] = True
-            info["archive_members"] = list(SPATIAL_ARCHIVE_MEMBERS)
+            info["verification_level"] = "self_reported_artifact_backed"
+            info["reference_answer_evaluation"] = False
+            info["archive_members"] = list(SPATIAL_ARTIFACT_ARCHIVE_MEMBERS)
             info["harness_url"] = "/api/spatial/harness"
             info["manifest_url"] = "/api/spatial/manifest"
         return jsonify({**info, "request_id": request_id}), 200
@@ -3634,7 +4076,7 @@ def submit_task(task_id):
                 )
         if "file" not in request.files:
             expected_file = (
-                f"{SPATIAL_SUBMISSION_ARCHIVE_NAME} package"
+                f"{SPATIAL_ARTIFACT_ARCHIVE_NAME} package"
                 if task_id == "spatial"
                 else "JSONL response file"
             )
@@ -3649,7 +4091,7 @@ def submit_task(task_id):
             or len(request.files.getlist("file")) != 1
         ):
             return _error_response(
-                f"Upload one {SPATIAL_SUBMISSION_ARCHIVE_NAME} package only. Do not upload submission.jsonl or run_manifest.json separately.",
+                f"Upload one {SPATIAL_ARTIFACT_ARCHIVE_NAME} package only. Do not upload its members separately.",
                 "invalid_spatial_upload_parts",
                 400,
                 field_errors={"file": "Select the single ZIP package produced by the harness."},
@@ -3660,16 +4102,16 @@ def submit_task(task_id):
             if (
                 not archive_name
                 or len(archive_name) > 255
-                or Path(archive_name).suffix.lower() != ".zip"
+                or archive_name != SPATIAL_ARTIFACT_ARCHIVE_NAME
                 or "\x00" in archive_name
                 or "/" in archive_name
                 or "\\" in archive_name
             ):
                 return _error_response(
-                    f"The spatial submission filename is invalid. Select {SPATIAL_SUBMISSION_ARCHIVE_NAME} produced by the current harness.",
+                    f"The spatial submission filename is invalid. Select {SPATIAL_ARTIFACT_ARCHIVE_NAME} produced by the current harness.",
                     "invalid_spatial_archive_file",
                     400,
-                    field_errors={"file": "Use the harness-generated .zip package."},
+                    field_errors={"file": f"Use the unchanged {SPATIAL_ARTIFACT_ARCHIVE_NAME} package."},
                 )
             file.stream.seek(0, 2)
             archive_size = file.stream.tell()
@@ -3756,37 +4198,48 @@ def submit_task(task_id):
                 field_errors={"file": "Upload the unchanged package produced by the harness."},
             )
         file_sha256 = hashlib.sha256(uploaded_bytes).hexdigest()
-        run_manifest_bytes = None
-        report_bytes = None
         submission_artifacts = None
+        spatial_artifact_package = None
+        spatial_run_metadata = None
         if task_id == "spatial":
             try:
-                (
-                    submission_bytes,
-                    run_manifest_bytes,
-                    report_bytes,
-                ) = read_spatial_submission_archive(uploaded_bytes)
+                if not is_artifact_backed_spatial_archive(uploaded_bytes):
+                    raise SubmissionValidationError(
+                        "legacy_spatial_package_not_accepted",
+                        "New Track 3 submissions must use the current artifact-backed package. Repackage the completed run with the current harness.",
+                        required_filename=SPATIAL_ARTIFACT_ARCHIVE_NAME,
+                    )
+                spatial_artifact_package = read_spatial_artifact_archive(
+                    uploaded_bytes
+                )
+                submission_bytes = spatial_artifact_package.members[
+                    SPATIAL_ARTIFACT_ANSWERS_MEMBER
+                ]
                 submission_artifacts = [
                     {
-                        "artifact_name": SPATIAL_SUBMISSION_ARCHIVE_NAME,
+                        "artifact_name": SPATIAL_ARTIFACT_ARCHIVE_NAME,
                         "media_type": "application/zip",
                         "content": uploaded_bytes,
                     },
-                    {
-                        "artifact_name": SPATIAL_SUBMISSION_MEMBER,
-                        "media_type": "application/x-ndjson",
-                        "content": submission_bytes,
-                    },
-                    {
-                        "artifact_name": SPATIAL_MANIFEST_MEMBER,
-                        "media_type": "application/json",
-                        "content": run_manifest_bytes,
-                    },
-                    {
-                        "artifact_name": SPATIAL_REPORT_MEMBER,
-                        "media_type": "application/json",
-                        "content": report_bytes,
-                    },
+                    *[
+                        {
+                            "artifact_name": artifact_name,
+                            "media_type": (
+                                "application/gzip"
+                                if artifact_name == SPATIAL_ARTIFACT_ANSWERS_MEMBER
+                                else "application/json"
+                            ),
+                            "content": spatial_artifact_package.members[
+                                artifact_name
+                            ],
+                        }
+                        for artifact_name in (
+                            SPATIAL_ARTIFACT_MANIFEST_MEMBER,
+                            SPATIAL_ARTIFACT_SCORES_MEMBER,
+                            SPATIAL_ARTIFACT_ANSWERS_MEMBER,
+                            SPATIAL_ARTIFACT_CHECKSUMS_MEMBER,
+                        )
+                    ],
                 ]
             except SubmissionValidationError as exc:
                 logger.info(
@@ -3818,12 +4271,15 @@ def submit_task(task_id):
                     answer_records,
                     computed_spatial_report,
                     _benchmark_manifest,
-                ) = parse_spatial_evidence(
-                    submission_bytes,
+                    spatial_run_metadata,
+                ) = parse_spatial_artifact_evidence(
+                    spatial_artifact_package,
+                    model_name,
                     spatial_contract["manifest"],
                     spatial_contract["template"],
                     spatial_contract["questions"],
                 )
+                validated_spatial_report = computed_spatial_report
             else:
                 try:
                     submission_text = submission_bytes.decode("utf-8-sig")
@@ -3870,46 +4326,6 @@ def submit_task(task_id):
                 400,
                 field_errors={"file": str(exc)},
             )
-
-        spatial_run_metadata = None
-        if task_id == "spatial":
-            try:
-                spatial_run_metadata = validate_run_manifest(
-                    run_manifest_bytes,
-                    submission_bytes,
-                    report_bytes,
-                    model_name,
-                    answer_records,
-                    spatial_contract["manifest"],
-                )
-                validated_spatial_report = validate_spatial_report(
-                    report_bytes,
-                    model_name,
-                    computed_spatial_report,
-                )
-            except SubmissionValidationError as exc:
-                logger.info(
-                    "Spatial run manifest validation failed (%s): %s",
-                    exc.code,
-                    exc,
-                    extra={"request_id": request_id},
-                )
-                _finalize_submission_safely(submission_id, False)
-                return _submission_validation_response(exc, spatial_archive=True)
-            except (OSError, ValueError) as exc:
-                logger.error(
-                    "Official spatial manifest validation failed: %s",
-                    exc,
-                    extra={"request_id": request_id},
-                    exc_info=True,
-                )
-                _finalize_submission_safely(submission_id, False)
-                return _error_response(
-                    "Spatial verification is temporarily unavailable because the server's official public benchmark contract could not be verified. Your submission was not published; contact the administrator with the request reference.",
-                    "spatial_manifest_verification_failed",
-                    503,
-                    retryable=True,
-                )
 
         try:
             if task_id == "spatial":
@@ -4135,7 +4551,10 @@ def public_spatial_evidence(submission_id):
                 404,
             )
         artifact_names = {item["name"] for item in evidence.get("artifacts") or []}
-        if artifact_names != set(SPATIAL_PUBLIC_ARTIFACT_NAMES):
+        if frozenset(artifact_names) not in {
+            frozenset(SPATIAL_PUBLIC_ARTIFACT_NAMES),
+            frozenset(SPATIAL_ARTIFACT_PUBLIC_NAMES),
+        }:
             return _error_response(
                 "This spatial submission predates public evidence retention or its evidence record is incomplete.",
                 "public_evidence_incomplete",
@@ -4167,7 +4586,10 @@ def _public_spatial_artifact_response(submission_id: str, artifact_name: str):
             "invalid_submission_id",
             400,
         )
-    if artifact_name not in SPATIAL_PUBLIC_ARTIFACT_NAMES:
+    if artifact_name not in {
+        *SPATIAL_PUBLIC_ARTIFACT_NAMES,
+        *SPATIAL_ARTIFACT_PUBLIC_NAMES,
+    }:
         return _error_response(
             "The requested public evidence artifact is not part of the spatial submission contract.",
             "invalid_evidence_artifact",
@@ -4226,12 +4648,19 @@ def public_spatial_artifact(submission_id, artifact_name):
 
 
 @app.route("/api/public/submissions/<submission_id>/answers.jsonl", methods=["GET"])
+@app.route("/api/public/submissions/<submission_id>/answers.jsonl.gz", methods=["GET"])
 @limiter.limit("60 per minute")
 def public_spatial_answers(submission_id):
-    return _public_spatial_artifact_response(
-        submission_id,
-        SPATIAL_SUBMISSION_MEMBER,
+    evidence = get_public_spatial_evidence(submission_id)
+    artifact_names = {
+        item["name"] for item in (evidence or {}).get("artifacts") or []
+    }
+    artifact_name = (
+        SPATIAL_ARTIFACT_ANSWERS_MEMBER
+        if SPATIAL_ARTIFACT_ANSWERS_MEMBER in artifact_names
+        else SPATIAL_SUBMISSION_MEMBER
     )
+    return _public_spatial_artifact_response(submission_id, artifact_name)
 
 
 @app.route("/api/submissions/mine", methods=["GET"])
@@ -4764,5 +5193,8 @@ if __name__ == "__main__":
                 # temporary file before Flask can apply the spatial route's
                 # in-memory stream factory.
                 inbuf_overflow=MAX_SPATIAL_MULTIPART_BYTES,
-                max_request_body_size=app.config["MAX_CONTENT_LENGTH"],
+                max_request_body_size=max(
+                    app.config["MAX_CONTENT_LENGTH"],
+                    MAX_SPATIAL_MULTIPART_BYTES,
+                ),
             )

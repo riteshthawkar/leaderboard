@@ -122,5 +122,5 @@ fi
   --output "$OUT/submission_package" \
   --public-model-name "${PUBLIC_MODEL_NAME:-$MODEL}"
 
-printf 'Track-3 v2 leaderboard: %s/leaderboard.json\n' "$OUT"
-printf 'Track-3 upload package: %s/submission_package/spatial_reasoning_submission.zip\n' "$OUT"
+printf 'Track-3 audit report: %s/leaderboard.json\n' "$OUT"
+printf 'Track-3 upload package: %s/submission_package/track3_artifact_submission.zip\n' "$OUT"

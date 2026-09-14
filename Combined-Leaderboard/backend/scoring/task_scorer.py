@@ -802,7 +802,7 @@ class TaskScorer:
                 message = (
                     "The spatial output file is missing required condition(s): "
                     f"{', '.join(missing_conditions)}. Run the official harness to completion and "
-                    "upload its unchanged spatial_reasoning_submission.zip package; all six conditions are required."
+                    "upload its unchanged track3_artifact_submission.zip package; all six conditions are required."
                 )
             else:
                 message = (

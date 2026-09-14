@@ -40,6 +40,23 @@ def test_model_only_extractor_answer_is_authoritative_without_raw_parsing():
     assert answer_provenance_counts(submission, diagnostics) == (1, 0, 0, 0)
 
 
+def test_legacy_v4_evidence_artifact_remains_verifiable():
+    submission = [{"question_id": "q1", "condition": "standard", "answer": "C"}]
+    diagnostics = {
+        "q1": {
+            "question_id": "q1",
+            "answer_type": "mcq_letter",
+            "output": "The final answer is B.",
+            "answer_extraction_method": (
+                "qwen3-8b-gold-blind-evidence-extractor-v4"
+            ),
+            "extracted_answer": "C",
+        }
+    }
+
+    assert answer_provenance_counts(submission, diagnostics) == (1, 0, 0, 0)
+
+
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(

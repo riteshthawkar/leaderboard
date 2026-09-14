@@ -44,7 +44,7 @@ vi.mock("@/lib/api", () => ({
       ? {
           grading: { method: "judged_jsonl_exact" },
           submission_ready: false,
-          required_uploads: ["spatial_reasoning_submission.zip"],
+          required_uploads: ["track3_artifact_submission.zip"],
           upload_processing: "in_memory",
           max_upload_bytes: 10 * 1024 * 1024,
         }
@@ -170,7 +170,7 @@ describe("spatial submission contract", () => {
     expect(spatialForm.querySelector('input[name="prompt_template"]')).toHaveValue(
       "Official spatial harness non-CoT and CoT prompts, verified by the packaged run manifest.",
     );
-    expect(screen.getByText("spatial_reasoning_submission.zip")).toBeInTheDocument();
+    expect(screen.getByText("track3_artifact_submission.zip")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Spatial submissions not open" })).toBeDisabled();
@@ -185,7 +185,7 @@ describe("spatial submission contract", () => {
     );
 
     expect((await screen.findAllByText("Registered Test Model")).length).toBeGreaterThan(0);
-    expect(screen.getByText("1 of 3 released benchmarks submitted")).toBeInTheDocument();
+    expect(screen.getByText("1 of 3 evaluation modules submitted")).toBeInTheDocument();
     expect(screen.getByText("Scored 50.0%")).toBeInTheDocument();
     const linkedInputs = [...document.querySelectorAll('input[name="model_id"]')];
     expect(linkedInputs).toHaveLength(3);
@@ -269,7 +269,7 @@ describe("spatial submission contract", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("2 tasks")).toBeInTheDocument();
+    expect(await screen.findByText("2 modules")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Do You See Me" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Mind's Eye" })).toBeInTheDocument();
     expect(document.querySelectorAll('input[name="file"][accept=".jsonl"]')).toHaveLength(2);

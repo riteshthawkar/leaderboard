@@ -4,7 +4,7 @@ import { PageHero } from "@/components/Hero";
 import { BenchmarkModelChart, BarChart } from "@/components/Charts";
 import { Citation } from "@/components/Citation";
 import { FindingGrid, Pipeline, ResultStrip, SampleGrid, ScoringBlock, SectionHead, StatBand } from "@/components/Sections";
-import { Eye, ScanSearch, SlidersHorizontal } from "lucide-react";
+import { ArrowUpRight, Eye, ScanSearch, SlidersHorizontal } from "lucide-react";
 import { benchmarkPages } from "@/data/benchmarks";
 import { errorMessage, getJSON } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,16 @@ const keyBySlug = { "do-you-see-me": "dysm", "minds-eye": "minds_eye", spatial: 
 const benchmarkTableClasses = "[&_thead_th]:!text-page-accent-muted [&_tbody_tr:hover]:!bg-page-accent-chip";
 const taskTableClasses = "[&_thead_th]:!py-4 [&_tbody_td]:!py-5";
 const benchmarkFrameClasses = "!border-page-accent-border";
+const paperSections = [
+  ["Overview", "overview"],
+  ["Research question", "research-question"],
+  ["Tasks & data", "tasks"],
+  ["Method", "method"],
+  ["Evidence", "results"],
+  ["Live results", "live-results"],
+  ["Submission", "submission"],
+  ["Citation", "cite"],
+];
 
 function BenchmarkSection({ head, children, bodyClassName, className, id, padded = false }) {
   return (
@@ -22,6 +32,84 @@ function BenchmarkSection({ head, children, bodyClassName, className, id, padded
       <div className={cn(ui.sectionFrame, benchmarkFrameClasses)}>
         <SectionHead {...head} accented banded />
         <div className={cn(padded && ui.sectionBody, bodyClassName)}>{children}</div>
+      </div>
+    </section>
+  );
+}
+
+function PaperProjectOverview({ page }) {
+  const { citation, project } = page;
+  return (
+    <section className="scroll-mt-24 bg-background" id="overview">
+      <div className={cn(ui.sectionFrame, benchmarkFrameClasses)}>
+        <nav className="flex min-w-0 items-center gap-6 overflow-x-auto border-b border-page-accent-border px-6 py-4 lg:px-8" aria-label={`${page.navLabel} paper sections`}>
+          <span className="shrink-0 text-xs font-semibold uppercase text-page-accent">On this page</span>
+          <div className="flex min-w-max items-center gap-5">
+            {paperSections.map(([label, anchor]) => (
+              <a className="whitespace-nowrap text-sm text-muted transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-page-accent" href={`#${anchor}`} key={anchor}>
+                {label}
+              </a>
+            ))}
+          </div>
+        </nav>
+
+        <div className="grid border-b border-page-accent-border lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.45fr)]">
+          <article className="min-w-0 border-b border-page-accent-border p-7 lg:border-b-0 lg:border-r lg:p-10">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-semibold uppercase">
+              <span className="text-page-accent">Research project</span>
+              <span className="text-faint">{citation.venue} · {citation.year}</span>
+            </div>
+            <h2 className="mt-6 max-w-[30ch] font-display text-3xl font-bold leading-tight text-foreground sm:text-4xl">
+              {citation.title}
+            </h2>
+            <p className="mt-5 max-w-[72ch] text-sm leading-relaxed text-muted sm:text-base">{citation.authors}</p>
+
+            <div className="mt-10 border-t border-page-accent-border pt-8">
+              <h3 className="text-xs font-semibold uppercase text-page-accent">Abstract</h3>
+              <p className="mt-4 max-w-[76ch] text-base leading-relaxed text-foreground sm:text-lg">{project.abstract}</p>
+            </div>
+
+            <div className="mt-9 grid border-l border-t border-page-accent-border sm:grid-cols-2">
+              <div className="min-w-0 border-b border-r border-page-accent-border p-5 sm:p-6">
+                <span className="text-xs font-semibold uppercase text-page-accent">Research question</span>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{project.researchQuestion}</p>
+              </div>
+              <div className="min-w-0 border-b border-r border-page-accent-border p-5 sm:p-6">
+                <span className="text-xs font-semibold uppercase text-page-accent">Project artifact</span>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{project.artifact}</p>
+              </div>
+            </div>
+          </article>
+
+          <aside className="min-w-0" aria-label="Paper details">
+            <div className="border-b border-page-accent-border px-6 py-5 lg:px-8">
+              <span className="text-xs font-semibold uppercase text-page-accent">Paper details</span>
+            </div>
+            <dl className="divide-y divide-page-accent-border">
+              <div className="px-6 py-5 lg:px-8">
+                <dt className="text-xs font-semibold uppercase text-faint">Framework role</dt>
+                <dd className="mt-2 text-sm font-medium leading-relaxed text-foreground">{project.frameworkRole}</dd>
+              </div>
+              <div className="px-6 py-5 lg:px-8">
+                <dt className="text-xs font-semibold uppercase text-faint">Study design</dt>
+                <dd className="mt-2 text-sm leading-relaxed text-muted">{project.studyDesign}</dd>
+              </div>
+              <div className="px-6 py-5 lg:px-8">
+                <dt className="text-xs font-semibold uppercase text-faint">Publication</dt>
+                <dd className="mt-2 text-sm leading-relaxed text-muted">{citation.venue} · {citation.year}</dd>
+              </div>
+              <div className="px-6 py-5 lg:px-8">
+                <dt className="text-xs font-semibold uppercase text-faint">Identifier</dt>
+                <dd className="mt-2 text-sm leading-relaxed text-muted">arXiv:{citation.arxiv}</dd>
+              </div>
+            </dl>
+            <div className="px-6 py-6 lg:px-8">
+              <a className="inline-flex min-h-10 items-center gap-2 border border-page-accent-border px-4 py-2 text-sm font-semibold text-page-accent transition-colors hover:bg-page-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-page-accent" href={citation.paperUrl} target="_blank" rel="noreferrer">
+                Read the paper <ArrowUpRight className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              </a>
+            </div>
+          </aside>
+        </div>
       </div>
     </section>
   );
@@ -39,7 +127,7 @@ const benchmarkChart = {
 
 function MindsEyePremiseSection({ page }) {
   return (
-    <BenchmarkSection head={page.premise}>
+    <BenchmarkSection head={page.premise} id="research-question" className="scroll-mt-24">
       <div className="grid border-b border-page-accent-border md:grid-cols-2">
         <article className="min-w-0 border-b border-page-accent-border p-7 md:border-b-0 md:border-r lg:p-10">
           <span className="text-xs font-medium uppercase text-page-accent">Core premise</span>
@@ -70,7 +158,7 @@ function MindsEyePremiseSection({ page }) {
 
 function SpatialPremiseSection({ page }) {
   return (
-    <BenchmarkSection head={page.premise}>
+    <BenchmarkSection head={page.premise} id="research-question" className="scroll-mt-24">
       <div className="border-b border-page-accent-border px-7 py-8 lg:px-10 lg:py-10">
         <span className="text-xs font-medium uppercase text-page-accent">Diagnostic premise</span>
         <p className="mt-5 max-w-[48ch] font-display text-xl font-medium leading-relaxed text-foreground lg:text-2xl">
@@ -111,7 +199,7 @@ function PremiseSection({ page }) {
   if (page.id === "dysm") {
     const contributionIcons = [Eye, SlidersHorizontal, ScanSearch];
     return (
-      <BenchmarkSection head={page.premise}>
+      <BenchmarkSection head={page.premise} id="research-question" className="scroll-mt-24">
         <div className="grid border-t border-page-accent-border md:grid-cols-2 lg:grid-cols-[minmax(280px,0.82fr)_repeat(2,minmax(0,1fr))]">
           <div className="flex min-w-0 flex-col justify-between border-b border-r border-page-accent-border p-6 md:col-span-2 lg:col-span-1 lg:row-span-2 lg:p-8">
             <span className="text-xs font-semibold uppercase text-page-accent">Diagnostic premise</span>
@@ -438,15 +526,16 @@ function FindingsFiguresSection({ page, className }) {
   );
 }
 
-function ModelPerformanceSection({ page, rows, className }) {
+function ModelPerformanceSection({ page, rows, className, id }) {
   const config = benchmarkChart[page.id];
   if (!config) return null;
   return (
     <BenchmarkSection
       className={className}
+      id={id}
       head={{
         tag: "Leaderboard",
-        title: "Model performance on this benchmark",
+        title: "Model performance in this module",
         body: `How ranked models score on ${page.navLabel}, measured by ${config.metricLabel.toLowerCase()} per submitted model.`,
       }}
     >
@@ -456,7 +545,7 @@ function ModelPerformanceSection({ page, rows, className }) {
           metricFor={(row) => config.metricFor?.(row) ?? row[config.metricKey]}
           metricLabel={config.metricLabel}
           color={config.color}
-          emptyMessage="Model scores will appear here once submissions are ranked for this benchmark."
+          emptyMessage="Model scores will appear here once submissions are ranked for this module."
         />
       </div>
     </BenchmarkSection>
@@ -465,7 +554,7 @@ function ModelPerformanceSection({ page, rows, className }) {
 
 function SpatialDataSection({ datasets }) {
   return (
-    <BenchmarkSection head={{ tag: "The data", title: "Thirteen spatial benchmarks, one policy", body: "Static 2D relations, 3D geometry, and dynamic or temporal understanding are unified under a single evaluation and scoring scheme. Datasets are downloaded from their official sources on your machine; none are redistributed here." }}>
+    <BenchmarkSection head={{ tag: "The data", title: "Thirteen spatial datasets, one policy", body: "Static 2D relations, 3D geometry, and dynamic or temporal understanding are unified under a single evaluation and scoring scheme. Datasets are downloaded from their official sources on your machine; none are redistributed here." }}>
       <div className={ui.tableWrap}><table className={`${ui.table} ${benchmarkTableClasses}`}><thead><tr><th>Dataset</th><th>Type</th><th className={ui.tableNumber}>Approx. n</th><th>Capabilities</th><th>License</th></tr></thead><tbody>{datasets.length ? datasets.map((dataset) => <tr key={dataset.name}><td><strong>{dataset.name}</strong></td><td>{dataset.type}</td><td className={ui.tableNumber}>{dataset.approx_n ? `~${dataset.approx_n}` : "N/A"}</td><td>{(dataset.tags || []).map((tag) => <span className="mr-1 inline-flex min-h-7 items-center border border-page-accent-chip-border bg-page-accent-chip px-2.5 py-1 text-xs text-muted" key={tag}>{tag}</span>)}</td><td>{dataset.license || "N/A"}</td></tr>) : <tr><td colSpan="5" className={ui.emptyRow}>Manifest unavailable.</td></tr>}</tbody></table></div>
     </BenchmarkSection>
   );
@@ -504,19 +593,28 @@ function BenchmarkContent({ page }) {
   return (
     <>
       <PageHero {...page} />
+      <PaperProjectOverview page={page} />
       <StatBand stats={page.stats} accented />
       <PremiseSection page={page} />
-      <ModelPerformanceSection page={page} rows={modelRows} />
-      <SamplesSection page={page} />
-      <TaxonomySection page={page} />
-      <TaskTableSection page={page} />
-      <EvaluationSection page={page} />
-      <BuildSection page={page} />
-      <ResultsSection page={page} />
-      <FindingsSection page={page} />
-      <FindingsFiguresSection page={page} />
-      {page.id === "spatial" && <SpatialDataSection datasets={datasets} />}
-      <ScoringBlock scoring={page.scoring} cardBottomBorders={page.id === "dysm" || page.id === "minds_eye"} />
+      <div className="scroll-mt-24" id="tasks">
+        <TaxonomySection page={page} />
+        <TaskTableSection page={page} />
+        {page.id === "spatial" && <SpatialDataSection datasets={datasets} />}
+        <SamplesSection page={page} />
+      </div>
+      <div className="scroll-mt-24" id="method">
+        <EvaluationSection page={page} />
+        <BuildSection page={page} />
+      </div>
+      <div className="scroll-mt-24" id="results">
+        <ResultsSection page={page} />
+        <FindingsSection page={page} />
+        <FindingsFiguresSection page={page} />
+      </div>
+      <ModelPerformanceSection className="scroll-mt-24" id="live-results" page={page} rows={modelRows} />
+      <div className="scroll-mt-24" id="submission">
+        <ScoringBlock scoring={page.scoring} cardBottomBorders={page.id === "dysm" || page.id === "minds_eye"} />
+      </div>
       <Citation citation={page.citation} />
     </>
   );

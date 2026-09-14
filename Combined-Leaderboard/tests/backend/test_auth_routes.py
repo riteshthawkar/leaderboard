@@ -112,6 +112,45 @@ def test_auth_endpoints_reject_wrong_field_types_and_oversized_bodies(auth_app):
     assert oversized.get_json()["code"] == "auth_request_too_large"
 
 
+def test_cors_preflight_allows_explicit_bearer_headers(auth_app):
+    client = auth_app.app.test_client()
+    origin = auth_app.CORS_ORIGINS[0]
+    response = client.options(
+        "/api/auth/me",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "Authorization, X-Auth-Transport",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["Access-Control-Allow-Origin"] == origin
+    allowed = response.headers["Access-Control-Allow-Headers"].lower()
+    assert "authorization" in allowed
+    assert "x-auth-transport" in allowed
+
+
+def test_auth_subject_rate_key_is_account_scoped_across_source_addresses(auth_app):
+    def subject_key(email, remote_addr):
+        with auth_app.app.test_request_context(
+            "/api/auth/login",
+            method="POST",
+            json={"email": email, "password": PASSWORD},
+            environ_base={"REMOTE_ADDR": remote_addr},
+        ):
+            return auth_app._auth_subject_key()
+
+    first = subject_key("Member@Example.com", "203.0.113.10")
+    second = subject_key("member@example.com", "198.51.100.24")
+    other = subject_key("other@example.com", "203.0.113.10")
+
+    assert first == second
+    assert first != other
+    assert first.startswith("account:")
+    assert "member@example.com" not in first
+
+
 def test_registration_and_reset_enforce_new_password_bounds(auth_app):
     client = auth_app.app.test_client()
 
@@ -180,6 +219,96 @@ def test_signup_verify_login_logout_and_cookie_security_contract(auth_app):
     )
     assert logged_out.status_code == 200
     assert client.get("/api/auth/me").get_json() == {"authenticated": False}
+
+
+def test_bearer_login_refresh_and_csrf_contract(auth_app, monkeypatch):
+    monkeypatch.setattr(auth_app, "AUTH_TRANSPORT", "dual")
+    client = auth_app.app.test_client()
+    registration = _register(client, "bearer-route@example.com")
+    token = parse_qs(urlparse(registration["dev_verify_url"]).fragment)["verify_token"][0]
+    verified = client.post(
+        "/api/auth/verify",
+        json={"token": token},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    )
+
+    assert verified.status_code == 200
+    credentials = verified.get_json()
+    assert credentials["auth_transport"] == "bearer"
+    assert credentials["token_type"] == "Bearer"
+    assert credentials["access_token"]
+    assert credentials["refresh_token"]
+    assert "csrf_token" not in credentials
+
+    auth_headers = {
+        auth_app.AUTH_TRANSPORT_HEADER: "bearer",
+        "Authorization": f"Bearer {credentials['access_token']}",
+    }
+    profile = client.get("/api/auth/me", headers=auth_headers).get_json()
+    assert profile["authenticated"] is True
+    assert profile["email"] == "bearer-route@example.com"
+    assert "csrf_token" not in profile
+    invalid_profile = client.get(
+        "/api/auth/me",
+        headers={
+            auth_app.AUTH_TRANSPORT_HEADER: "bearer",
+            "Authorization": "Bearer invalid-token",
+        },
+    )
+    assert invalid_profile.status_code == 401
+    assert invalid_profile.get_json()["code"] == "invalid_access_token"
+
+    refreshed = client.post(
+        "/api/auth/token/refresh",
+        json={"refresh_token": credentials["refresh_token"]},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    )
+    assert refreshed.status_code == 200
+    replacement = refreshed.get_json()
+    assert replacement["refresh_token"] != credentials["refresh_token"]
+
+    reused = client.post(
+        "/api/auth/token/refresh",
+        json={"refresh_token": credentials["refresh_token"]},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    )
+    assert reused.status_code == 401
+    assert reused.get_json()["code"] == "refresh_token_reused"
+    family_revoked = client.post(
+        "/api/auth/token/refresh",
+        json={"refresh_token": replacement["refresh_token"]},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    )
+    assert family_revoked.status_code == 401
+    assert family_revoked.get_json()["code"] == "invalid_refresh_token"
+
+
+def test_bearer_logout_does_not_require_cookie_csrf(auth_app, monkeypatch):
+    monkeypatch.setattr(auth_app, "AUTH_TRANSPORT", "dual")
+    client = auth_app.app.test_client()
+    registration = _register(client, "bearer-logout@example.com")
+    token = parse_qs(urlparse(registration["dev_verify_url"]).fragment)["verify_token"][0]
+    credentials = client.post(
+        "/api/auth/verify",
+        json={"token": token},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    ).get_json()
+
+    logged_out = client.post(
+        "/api/auth/logout",
+        json={"refresh_token": credentials["refresh_token"]},
+        headers={
+            auth_app.AUTH_TRANSPORT_HEADER: "bearer",
+            "Authorization": f"Bearer {credentials['access_token']}",
+        },
+    )
+    assert logged_out.status_code == 200
+    refresh = client.post(
+        "/api/auth/token/refresh",
+        json={"refresh_token": credentials["refresh_token"]},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    )
+    assert refresh.status_code == 401
 
 
 def test_legacy_get_verification_does_not_log_the_browser_in(auth_app):
@@ -350,6 +479,57 @@ def test_microsoft_oauth_uses_pkce_stable_subject_and_clears_state(auth_app, mon
     me = client.get("/api/auth/me").get_json()
     assert me["authenticated"] is True
     assert me["auth_provider"] == "microsoft"
+
+
+def test_microsoft_oauth_bearer_handoff_is_single_use(auth_app, monkeypatch):
+    monkeypatch.setattr(auth_app, "AUTH_TRANSPORT", "dual")
+    monkeypatch.setenv("MICROSOFT_CLIENT_ID", "client-id")
+    monkeypatch.setenv("MICROSOFT_CLIENT_SECRET", "client-secret")
+    client = auth_app.app.test_client()
+    started = client.get(
+        "/api/auth/oauth/microsoft?next=/submissions&transport=bearer",
+        follow_redirects=False,
+    )
+    state = parse_qs(urlparse(started.headers["Location"]).query)["state"][0]
+    assert auth_app._oauth_serializer().loads(state)["transport"] == "bearer"
+
+    monkeypatch.setattr(
+        auth_app.requests,
+        "post",
+        lambda _url, *, data, timeout: _FakeResponse({"access_token": "provider-token"}),
+    )
+    monkeypatch.setattr(
+        auth_app.requests,
+        "get",
+        lambda _url, *, headers, timeout: _FakeResponse({
+            "sub": "microsoft-bearer-subject",
+            "preferred_username": "oauth-bearer@example.com",
+        }),
+    )
+    callback = client.get(
+        f"/api/auth/oauth/microsoft/callback?code=code-1&state={state}",
+        follow_redirects=False,
+    )
+    callback_url = urlparse(callback.headers["Location"])
+    handoff = parse_qs(callback_url.fragment)["oauth_code"][0]
+    assert callback_url.path == "/login"
+    assert parse_qs(callback_url.query)["next"] == ["/submissions"]
+    assert client.get("/api/auth/me").get_json() == {"authenticated": False}
+
+    exchanged = client.post(
+        "/api/auth/token/exchange",
+        json={"code": handoff},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    )
+    assert exchanged.status_code == 200
+    assert exchanged.get_json()["access_token"]
+    reused = client.post(
+        "/api/auth/token/exchange",
+        json={"code": handoff},
+        headers={auth_app.AUTH_TRANSPORT_HEADER: "bearer"},
+    )
+    assert reused.status_code == 400
+    assert reused.get_json()["code"] == "invalid_oauth_exchange"
 
 
 def test_oauth_email_collision_preserves_existing_password_account(auth_app, monkeypatch):

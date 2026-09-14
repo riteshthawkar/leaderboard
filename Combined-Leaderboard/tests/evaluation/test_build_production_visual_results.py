@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -12,11 +13,16 @@ from evaluation.build_production_visual_results import (
 from evaluation.extract_canonical_answers import (
     DEFAULT_EXTRACTOR_MODEL,
     DEFAULT_EXTRACTOR_REVISION,
+    EVIDENCE_VALIDATION_METHOD,
     METHOD,
     classify_extractor_output,
 )
 from evaluation.finalize_visual_results import read_json, sha256, verify_canonical_results
-from scripts.import_canonical_visual_results import MODEL_CATALOG
+from scripts.import_canonical_visual_results import (
+    MODEL_CATALOG,
+    ModelImport,
+    _submission_model_meta,
+)
 
 
 def _write_json(path: Path, value: dict) -> None:
@@ -34,6 +40,46 @@ def test_qwen35_production_catalog_identity_is_pinned():
     }
 
 
+def test_closed_source_catalog_and_submission_metadata_are_not_open_weight_claims():
+    catalog = MODEL_CATALOG["gpt-5-2025-08-07"]
+    assert catalog == {
+        "repository": "gpt-5-2025-08-07",
+        "model_revision": "2025-08-07",
+        "display_name": "GPT-5 (2025-08-07)",
+        "organization": "OpenAI",
+        "parameter_count": "",
+        "reasoning_profile": "thinking",
+        "access": "closed",
+    }
+    model = ModelImport(
+        slug="gpt-5-2025-08-07",
+        catalog=catalog,
+        manifest={
+            "model_id": "gpt-5-2025-08-07",
+            "model_revision": "2025-08-07",
+            "weight_loading": "provider_managed",
+            "compute_dtype": "provider_managed",
+            "reasoning_profile": "thinking",
+            "evidence_extraction": {"method": METHOD},
+            "tracks": {
+                "do_you_see_me": {"generation": {"prompt_mode": "noncot"}}
+            },
+        },
+        manifest_sha256="a" * 64,
+        tracks={},
+    )
+
+    metadata = _submission_model_meta(model, "do_you_see_me")
+
+    assert metadata["access"] == "closed"
+    assert metadata["weight_loading"] == "provider_managed"
+    assert metadata["thinking_mode"] is True
+    assert "provider API outputs" in metadata["method_description"]
+    assert "original unquantized weights" not in metadata["method_description"]
+    assert "does not contain" in metadata["prompt_template"]
+    assert "prompt hash" in metadata["prompt_template"]
+
+
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -49,6 +95,8 @@ def _audit_row(candidate: dict, extractor_payload: dict, contract: str) -> dict:
         **candidate,
         **classified,
         "method": METHOD,
+        "evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
+        "source_audit_sha256": "a" * 64,
         "extractor_model": DEFAULT_EXTRACTOR_MODEL,
         "extractor_revision": DEFAULT_EXTRACTOR_REVISION,
         "extractor_contract_sha256": contract,
@@ -77,7 +125,7 @@ def test_builds_verified_v12_tree_from_complete_evidence_audit(tmp_path):
             "source_answer": "E T O N",
             "extractor": {
                 "verdict": "COMMITTED",
-                "answer": "E T O N",
+                "answer": "ETON",
                 "evidence": "The letters visible are E T O N",
             },
         },
@@ -222,6 +270,15 @@ def test_builds_verified_v12_tree_from_complete_evidence_audit(tmp_path):
     assert manifest["tracks"]["minds_eye"]["invalid_format_count"] == 1
     assert manifest["reasoning_profile"] == "thinking"
     assert manifest["evidence_extraction"]["extractor_model"] == DEFAULT_EXTRACTOR_MODEL
+    assert (
+        manifest["evidence_extraction"]["evidence_validation_method"]
+        == EVIDENCE_VALIDATION_METHOD
+    )
+    assert manifest["evidence_extraction"]["source_audit_sha256"] == "a" * 64
+    assert re.fullmatch(
+        r"[0-9a-f]{64}",
+        manifest["evidence_extraction"]["validated_audit_sha256"],
+    )
     assert manifest["evidence_extraction"]["ground_truth_loaded"] is False
     assert index["models"][0]["reasoning_profile"] == "thinking"
 
@@ -245,6 +302,8 @@ def test_completed_audit_rejects_spoofed_terminal_fallback_method(tmp_path):
             {
                 **candidate,
                 "method": METHOD,
+                "evidence_validation_method": EVIDENCE_VALIDATION_METHOD,
+                "source_audit_sha256": "a" * 64,
                 "extractor_model": DEFAULT_EXTRACTOR_MODEL,
                 "extractor_revision": DEFAULT_EXTRACTOR_REVISION,
                 "extractor_contract_sha256": "c" * 64,
@@ -264,3 +323,36 @@ def test_completed_audit_rejects_spoofed_terminal_fallback_method(tmp_path):
 
     with pytest.raises(ProductionBuildError, match="fallback method mismatch"):
         load_completed_audit(audit_path, [candidate])
+
+
+def test_production_audit_requires_parent_extractor_audit_hash(tmp_path):
+    response = "The final answer is C."
+    candidate = {
+        "model_slug": "model-a",
+        "track": "minds_eye",
+        "question_id": "q1",
+        "answer_type": "mcq_letter",
+        "task": "analogies",
+        "response": response,
+        "response_sha256": hashlib.sha256(response.encode("utf-8")).hexdigest(),
+        "current_submission_answer": "__UNRESOLVED__",
+    }
+    row = _audit_row(
+        candidate,
+        {
+            "verdict": "COMMITTED",
+            "answer": "C",
+            "evidence": "The final answer is C.",
+        },
+        "c" * 64,
+    )
+    row.pop("source_audit_sha256")
+    audit_path = tmp_path / "audit.jsonl"
+    _write_jsonl(audit_path, [row])
+
+    with pytest.raises(ProductionBuildError, match="source extractor audit hash"):
+        load_completed_audit(
+            audit_path,
+            [candidate],
+            require_source_audit_sha256=True,
+        )

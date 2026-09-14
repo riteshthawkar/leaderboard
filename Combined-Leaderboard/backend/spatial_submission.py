@@ -36,6 +36,19 @@ from constants import (
     MAX_SPATIAL_SUBMISSION_BYTES,
     MAX_SPATIAL_ZIP_COMPRESSION_RATIO,
 )
+from spatial_harness.artifact_package import (
+    ANSWERS_MEMBER as SPATIAL_ARTIFACT_ANSWERS_MEMBER,
+    ARCHIVE_MEMBERS as SPATIAL_ARTIFACT_ARCHIVE_MEMBERS,
+    ARCHIVE_NAME as SPATIAL_ARTIFACT_ARCHIVE_NAME,
+    CHECKSUMS_MEMBER as SPATIAL_ARTIFACT_CHECKSUMS_MEMBER,
+    MANIFEST_MEMBER as SPATIAL_ARTIFACT_MANIFEST_MEMBER,
+    SCORES_MEMBER as SPATIAL_ARTIFACT_SCORES_MEMBER,
+    ArtifactPackage,
+    ArtifactPackageError,
+    artifact_members_from_archive,
+    read_artifact_package,
+    report_from_claimed_scores,
+)
 
 
 _BUNDLE_HEALTH_CACHE = {}
@@ -51,6 +64,16 @@ SPATIAL_ARCHIVE_MEMBERS = (
 SPATIAL_PUBLIC_ARTIFACT_NAMES = (
     SPATIAL_SUBMISSION_ARCHIVE_NAME,
     *SPATIAL_ARCHIVE_MEMBERS,
+)
+SPATIAL_ARTIFACT_STORED_MEMBER_NAMES = (
+    SPATIAL_ARTIFACT_MANIFEST_MEMBER,
+    SPATIAL_ARTIFACT_SCORES_MEMBER,
+    SPATIAL_ARTIFACT_ANSWERS_MEMBER,
+    SPATIAL_ARTIFACT_CHECKSUMS_MEMBER,
+)
+SPATIAL_ARTIFACT_PUBLIC_NAMES = (
+    SPATIAL_ARTIFACT_ARCHIVE_NAME,
+    *SPATIAL_ARTIFACT_STORED_MEMBER_NAMES,
 )
 _SPATIAL_EVIDENCE_FIELDS = {
     "dataset",
@@ -246,6 +269,200 @@ def read_spatial_submission_archive(archive_bytes: bytes) -> tuple[bytes, bytes,
             f"The uploaded file is not a readable ZIP package. Upload {SPATIAL_SUBMISSION_ARCHIVE_NAME} produced by the current harness.",
         )
     return submission_bytes, manifest_bytes, report_bytes
+
+
+def is_artifact_backed_spatial_archive(archive_bytes: bytes) -> bool:
+    """Return whether a readable ZIP declares the lightweight v1 members."""
+    try:
+        members = artifact_members_from_archive(archive_bytes)
+    except ArtifactPackageError as exc:
+        _archive_error(exc.code, str(exc), **exc.details)
+    artifact_members = set(SPATIAL_ARTIFACT_ARCHIVE_MEMBERS)
+    if members & artifact_members:
+        if members != artifact_members:
+            _archive_error(
+                "invalid_artifact_archive_contents",
+                "The Track 3 artifact package is incomplete or contains unexpected files.",
+                expected=sorted(artifact_members),
+                received=sorted(members),
+            )
+        return True
+    return False
+
+
+def read_spatial_artifact_archive(archive_bytes: bytes) -> ArtifactPackage:
+    """Validate the lightweight package without grading submitted answers."""
+    try:
+        return read_artifact_package(archive_bytes)
+    except ArtifactPackageError as exc:
+        _archive_error(exc.code, str(exc), **exc.details)
+
+
+def _artifact_manifest_metadata(package: ArtifactPackage) -> dict:
+    manifest = package.manifest
+    evaluation = manifest["evaluation"]
+    judge = evaluation["judge"]
+    return {
+        "schema_version": manifest["schema_version"],
+        "package_format": "track3_artifact_submission_v1",
+        "benchmark_version": manifest["benchmark"]["version"],
+        "benchmark_manifest_sha256": manifest["benchmark"]["manifest_sha256"],
+        "harness_contract": evaluation["harness_contract"],
+        "harness_version": evaluation["harness_version"],
+        "harness_commit": evaluation.get("harness_commit"),
+        "configuration_sha256": evaluation["configuration_sha256"],
+        "judge_model": judge.get("name") or "",
+        "judge_revision": judge.get("revision") or "",
+        "judge_method_counts": {},
+        "verification_level": manifest["verification_level"],
+        "score_source": manifest["score_source"],
+        "server_ground_truth_evaluation": False,
+        "raw_output_scope": manifest["evidence"]["raw_output_scope"],
+        "answer_rows": manifest["evidence"]["answer_rows"],
+        "raw_output_rows": manifest["evidence"]["raw_output_rows"],
+    }
+
+
+def parse_spatial_artifact_evidence(
+    package: ArtifactPackage,
+    model_name: str,
+    benchmark_manifest_path: ContractSource,
+    template_path: ContractSource,
+    questions_path: ContractSource,
+) -> tuple[list[dict], dict, dict, dict]:
+    """Validate public IDs and claimed arithmetic, never semantic correctness."""
+    manifest, questions, expected_keys = _load_public_spatial_contract(
+        benchmark_manifest_path,
+        template_path,
+        questions_path,
+    )
+    selected_model = str(model_name or "").strip()
+    package_model = str(package.manifest["model"].get("name") or "").strip()
+    if package_model != selected_model:
+        _manifest_error(
+            "artifact_model_name_mismatch",
+            "The model name in manifest.json does not match the selected registered model.",
+            package_model_name=package_model,
+            selected_model_name=selected_model,
+        )
+    expected_manifest_sha256 = _contract_sha256(
+        benchmark_manifest_path,
+        "Spatial benchmark manifest",
+    )
+    benchmark = package.manifest["benchmark"]
+    if (
+        benchmark["manifest_sha256"] != expected_manifest_sha256
+        or benchmark["version"] != manifest.get("benchmark_version")
+    ):
+        _manifest_error(
+            "artifact_benchmark_version_mismatch",
+            "The artifact package targets a different public Track 3 benchmark release.",
+            expected_manifest_sha256=expected_manifest_sha256,
+            received_manifest_sha256=benchmark["manifest_sha256"],
+            expected_benchmark_version=manifest.get("benchmark_version"),
+            received_benchmark_version=benchmark["version"],
+        )
+    if package.claimed_scores.get("conditions") != EVAL_CONDITIONS:
+        _manifest_error(
+            "artifact_condition_set_mismatch",
+            "The artifact package must contain the six Track 3 conditions in canonical order.",
+        )
+    if set(package.claimed_scores.get("datasets") or {}) != set(SPATIAL_DATASET_KEYS):
+        _manifest_error(
+            "artifact_dataset_set_mismatch",
+            "The artifact package must contain all 13 Track 3 datasets in canonical order.",
+        )
+
+    seen: set[tuple[str, str]] = set()
+    condition_counts = Counter()
+    records = []
+    for source in package.answer_rows:
+        question_id = source["question_id"]
+        condition = source["condition"]
+        key = (condition, question_id)
+        question = questions.get(question_id)
+        if key not in expected_keys or question is None:
+            _manifest_error(
+                "unknown_artifact_answer_sample",
+                "answers.jsonl.gz contains a question and condition not present in the public template.",
+                line_number=source["line_number"],
+                question_id=question_id,
+                condition=condition,
+            )
+        if key in seen:
+            _manifest_error(
+                "duplicate_artifact_answer_sample",
+                f"answers.jsonl.gz repeats {condition}/{question_id}.",
+                line_number=source["line_number"],
+            )
+        if (
+            source["dataset"] != question["dataset"]
+            or source["evaluation_group"] != question["evaluation_group"]
+            or source["answer_type"] != question["answer_type"]
+        ):
+            _manifest_error(
+                "artifact_answer_metadata_mismatch",
+                "An answer row does not match the dataset, scoring group, or answer type in the public contract.",
+                line_number=source["line_number"],
+                question_id=question_id,
+            )
+        seen.add(key)
+        condition_counts[condition] += 1
+        records.append(
+            {
+                "row_index": source["row_index"],
+                "line_number": source["line_number"],
+                "question_id": question_id,
+                "condition": condition,
+                "answer": source["final_answer"],
+                "answer_type": source["answer_type"],
+                "dataset": source["dataset"],
+                "evaluation_group": source["evaluation_group"],
+                "correct": bool(source["claimed_credit"]),
+                "claimed_credit": source["claimed_credit"],
+            }
+        )
+    missing = expected_keys - seen
+    if missing:
+        _manifest_error(
+            "missing_artifact_answer_samples",
+            f"answers.jsonl.gz is missing {len(missing)} required public rows.",
+            missing_count=len(missing),
+            examples=[f"{condition}/{question_id}" for condition, question_id in sorted(missing)[:10]],
+        )
+    if dict(condition_counts) != manifest.get("condition_counts"):
+        _manifest_error(
+            "artifact_condition_count_mismatch",
+            "answers.jsonl.gz condition counts do not match the public contract.",
+            received=dict(condition_counts),
+            expected=manifest.get("condition_counts"),
+        )
+    for dataset in SPATIAL_DATASET_KEYS:
+        for condition in EVAL_CONDITIONS:
+            result = package.claimed_scores["datasets"][dataset][condition]
+            expected_total = manifest["dataset_condition_group_counts"][dataset][condition]
+            if result["total"] != expected_total:
+                _manifest_error(
+                    "artifact_group_count_mismatch",
+                    f"Claimed score totals for {dataset}/{condition} do not match the public scoring groups.",
+                    dataset=dataset,
+                    condition=condition,
+                    received=result["total"],
+                    expected=expected_total,
+                )
+
+    ordered_scores = {
+        **package.claimed_scores,
+        "datasets": {
+            dataset: package.claimed_scores["datasets"][dataset]
+            for dataset in SPATIAL_DATASET_KEYS
+        },
+    }
+    report = report_from_claimed_scores(
+        ordered_scores,
+        package.manifest["model"],
+    )
+    return records, report, manifest, _artifact_manifest_metadata(package)
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -1287,6 +1504,14 @@ def build_spatial_task_score(
     submission_id: str | None = None,
 ) -> TaskScore:
     """Build a leaderboard result from validated public evidence, without GT scoring."""
+    artifact_backed = (
+        run_metadata.get("package_format") == "track3_artifact_submission_v1"
+    )
+    archive_name = (
+        SPATIAL_ARTIFACT_ARCHIVE_NAME
+        if artifact_backed
+        else SPATIAL_SUBMISSION_ARCHIVE_NAME
+    )
     primary_rows = []
     groups = {}
     for row in report["datasets"]:
@@ -1334,28 +1559,48 @@ def build_spatial_task_score(
         groups=groups,
         diagnostics=diagnostics,
         grading={
-            "method": "harness_reported_public_evidence",
+            "method": (
+                "submitter_claimed_artifact_evidence"
+                if artifact_backed
+                else "harness_reported_public_evidence"
+            ),
             "judge_model": run_metadata.get("judge_revision"),
             "paper": GRADING["spatial"].get("paper"),
-            "backend": "public_evidence_consistency_validation",
+            "backend": "artifact_integrity_and_arithmetic_validation",
             "llm_graded": True,
             "server_ground_truth_evaluation": False,
             "method_counts": run_metadata.get("judge_method_counts") or {},
         },
         model_meta=dict(model_meta or {}),
         metadata={
-            "submission_format": "spatial_evidence_zip",
+            "submission_format": (
+                "track3_artifact_submission_v1"
+                if artifact_backed
+                else "spatial_evidence_zip"
+            ),
             "spatial_run": run_metadata,
             "public_evidence": {
                 "available": True,
-                "verification_level": "provenance_and_arithmetic",
+                "verification_level": (
+                    "self_reported_artifact_backed"
+                    if artifact_backed
+                    else "provenance_and_arithmetic"
+                ),
                 "server_ground_truth_evaluation": False,
                 "url": f"{evidence_base}/evidence",
-                "answers_url": f"{evidence_base}/answers.jsonl",
+                "answers_url": (
+                    f"{evidence_base}/answers.jsonl.gz"
+                    if artifact_backed
+                    else f"{evidence_base}/answers.jsonl"
+                ),
                 "archive_url": (
-                    f"{evidence_base}/artifacts/{SPATIAL_SUBMISSION_ARCHIVE_NAME}"
+                    f"{evidence_base}/artifacts/{archive_name}"
                 ),
                 "notice": (
+                    "The server validates package integrity, public sample coverage, and claimed score arithmetic. "
+                    "Correctness is self-reported and is not compared with reference answers."
+                    if artifact_backed
+                    else
                     "The server validates package provenance, public sample coverage, and score arithmetic. "
                     "It does not independently compare spatial answers with private ground truth."
                 ),

@@ -7,7 +7,7 @@ Evaluation tooling is isolated from the production API and frontend:
 - `spatial_reasoning/` produces the spatial reasoning proof bundle.
 - `common/` contains strict shared loading, inference, and export code.
 
-The public pipeline runs both visual benchmarks and writes submission-ready JSONL files. `Qwen/Qwen3-8B` at revision `b968826d9c46dd6066d109eabc6255188de91218` is the answer extractor with native thinking disabled. It receives only the evaluated model response and the expected answer format, and returns `{"answer":"..."}` or an empty answer for missing or ambiguous responses. There is no deterministic answer parser, recovery rule, evidence validator, or second extraction pass.
+The public pipeline runs both visual benchmarks and writes submission-ready JSONL files. `Qwen/Qwen3-8B` at revision `b968826d9c46dd6066d109eabc6255188de91218` is the answer extractor with native thinking disabled. It receives only the evaluated model response and the expected answer format, and returns an answer or an empty answer for missing or ambiguous responses. Deterministic code validates schema, canonical format, and response evidence, but never selects, repairs, or recovers an answer.
 
 ## Public quick start
 
@@ -351,3 +351,65 @@ PYTHONPATH="$PWD:$PWD/backend" \
 
 The packager and importer are the only steps in this legacy migration that load
 private ground truth. The source tree and extractor audit remain immutable.
+
+### Retained provider API outputs
+
+Operator-owned closed-source responses use the gold-blind v5 evidence audit,
+but remain explicitly marked as provider-managed rather than open-weight BF16
+runs. The preparation command validates exact model inventory, question coverage,
+task and answer-type metadata, preserves every raw response verbatim, and writes
+placeholder submissions that cannot be ranked before extraction completes:
+
+```bash
+python -m evaluation.prepare_closed_source_visual_results \
+  --bundle-root /path/to/retained-provider-outputs \
+  --output-root /path/to/frozen-provider-source
+
+SOURCE_ROOT=/path/to/frozen-provider-source \
+  AUDIT_ROOT=/path/to/provider-evidence-v5 \
+  EXTRACTOR_SNAPSHOT=/path/to/pinned-qwen3-8b-snapshot \
+  GPU_IDS=0 \
+  EXPECTED_CANDIDATES=42392 \
+  bash evaluation/run_canonical_v5_audit.sh
+
+python -m evaluation.revalidate_evidence_audit \
+  --source-root /path/to/frozen-provider-source \
+  --input-audit /path/to/provider-evidence-v5/audit.jsonl \
+  --output-audit /path/to/provider-evidence-v5/audit.revalidated-v2.jsonl
+
+python -m evaluation.build_production_visual_results \
+  --source-root /path/to/frozen-provider-source \
+  --audit /path/to/provider-evidence-v5/audit.revalidated-v2.jsonl \
+  --output-root /path/to/final-provider-results
+
+PYTHONPATH="$PWD:$PWD/backend" \
+  GROUND_TRUTHS_DIR=/path/to/private-ground-truth \
+  python scripts/import_canonical_visual_results.py \
+  --result-root /path/to/final-provider-results
+```
+
+Before the production build, preserve the raw extractor audit and revalidate its
+stored Qwen decisions with the pinned evidence validator. The revalidation makes
+no model call and derives no answer. It only rechecks the
+answer already returned by Qwen against its stored evidence, accepting exact or
+presentation-equivalent source quotes such as Markdown emphasis, whitespace, or
+equivalent LaTeX delimiters. Both the immutable extractor-audit hash and the
+validated-audit hash are recorded in every production manifest.
+
+The v5 extractor receives the question text, task, answer type, expected answer
+domain, response metadata, and retained candidate response. It never receives an
+image or ground truth. Its JSON schema constrains the answer to the benchmark's
+canonical domain, while its evidence remains an exact quote from the candidate
+response. Deterministic code verifies only schema, canonical format, quote
+provenance, and explicit commitment; it never selects or repairs an answer.
+Persistent model or schema failures are fail-closed as `UNRESOLVED`.
+
+The importer is still dry-run by default. It rejects a provider result if its
+exact API model identifier, revision, closed-source access status, or
+provider-managed execution metadata differs from the trusted catalog in
+`evaluation/closed_source_catalog.py`.
+
+Prompt mode and native reasoning mode are recorded separately. In particular,
+the dated GPT-5 family runs use a direct non-CoT benchmark prompt but retain the
+provider-default native reasoning mode, so their catalog profile is `thinking`
+while their per-track `cot_used` value is `No`.

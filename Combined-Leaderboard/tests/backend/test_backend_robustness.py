@@ -6,6 +6,7 @@ import os
 import sqlite3
 import zipfile
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -1047,9 +1048,13 @@ def test_spatial_info_remains_available_when_private_bundle_is_missing(monkeypat
     assert payload["bundle_status"] == "unhealthy"
     assert payload["total_samples"] == 0
     assert len(payload["conditions"]) == 6
-    assert payload["required_uploads"] == ["spatial_reasoning_submission.zip"]
+    assert payload["required_uploads"] == ["track3_artifact_submission.zip"]
     assert payload["upload_processing"] == "in_memory"
     assert payload["max_upload_bytes"] == web_app_module.MAX_SPATIAL_ARCHIVE_BYTES
+    assert payload["score_provenance"] == "submitter_claimed_artifact_backed"
+    assert payload["grading"]["method"] == "submitter_claimed_artifact_evidence"
+    assert payload["verification_level"] == "self_reported_artifact_backed"
+    assert payload["reference_answer_evaluation"] is False
 
 
 def test_visual_task_info_separates_paper_and_release_suite_counts():
@@ -1116,11 +1121,41 @@ def test_spatial_upload_stream_is_memory_only():
     with web_app_module.app.test_request_context(
         "/api/tasks/spatial/submit",
         method="POST",
-        data={"file": (io.BytesIO(package), "spatial_reasoning_submission.zip")},
+        data={"file": (io.BytesIO(package), "track3_artifact_submission.zip")},
     ):
         assert web_app_module.app.preprocess_request() is None
         assert isinstance(request.files["file"].stream, io.BytesIO)
         assert request.max_content_length == web_app_module.MAX_SPATIAL_MULTIPART_BYTES
+
+
+def test_spatial_submit_rejects_legacy_package_filename(monkeypatch):
+    web_app_module = importlib.import_module("web.app")
+    monkeypatch.setattr(web_app_module, "SUBMISSION_AUTH_DISABLED", True)
+    monkeypatch.setattr(
+        web_app_module,
+        "_spatial_bundle_health",
+        lambda: ("healthy", {"production_ready": True}),
+    )
+    web_app_module.app.config["TESTING"] = True
+
+    legacy_package = _make_spatial_package(
+        b'{"question_id":"q1","answer":"A"}\n'
+    )
+    with web_app_module.app.test_client() as client:
+        response = client.post(
+            "/api/tasks/spatial/submit",
+            data={
+                "model_name": "Legacy Spatial Model",
+                "file": (
+                    io.BytesIO(legacy_package),
+                    "spatial_reasoning_submission.zip",
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "invalid_spatial_archive_file"
 
 
 def test_spatial_harness_download_excludes_runtime_data():
@@ -1134,6 +1169,8 @@ def test_spatial_harness_download_excludes_runtime_data():
     with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
         names = archive.namelist()
     assert "spatial_harness/run_eval.sh" in names
+    assert "spatial_harness/artifact_package.py" in names
+    assert "spatial_harness/package_submission.py" in names
     assert "spatial_harness/submission_contract.py" in names
     assert all("__pycache__" not in name for name in names)
     assert all("/LMUData/" not in name and "/results/" not in name for name in names)
@@ -1178,6 +1215,12 @@ def test_spatial_single_zip_submission_reaches_scoring_and_storage(monkeypatch, 
     ]
     submission = ("\n".join(json.dumps(row) for row in answer_records) + "\n").encode("utf-8")
     upload_package = _make_spatial_package(submission)
+    artifact_members = {
+        web_app_module.SPATIAL_ARTIFACT_MANIFEST_MEMBER: b"{}\n",
+        web_app_module.SPATIAL_ARTIFACT_SCORES_MEMBER: b"{}\n",
+        web_app_module.SPATIAL_ARTIFACT_ANSWERS_MEMBER: b"\x1f\x8banswers",
+        web_app_module.SPATIAL_ARTIFACT_CHECKSUMS_MEMBER: b"{}\n",
+    }
     stored = {}
     operations = []
 
@@ -1187,21 +1230,28 @@ def test_spatial_single_zip_submission_reaches_scoring_and_storage(monkeypatch, 
     monkeypatch.setattr(web_app_module, "_enforce_quota", lambda _task_id, _model_name, _model_id: (None, None))
     monkeypatch.setattr(
         web_app_module,
-        "parse_spatial_evidence",
-        lambda *_args, **_kwargs: (answer_records, {"summary": {}}, {}),
+        "is_artifact_backed_spatial_archive",
+        lambda _archive: True,
     )
     monkeypatch.setattr(
         web_app_module,
-        "validate_run_manifest",
-        lambda *_args, **_kwargs: {
-            "schema_version": "ms-vista-spatial-run/v2",
-            "benchmark_version": "test-v1",
-        },
+        "read_spatial_artifact_archive",
+        lambda _archive: SimpleNamespace(members=artifact_members),
     )
     monkeypatch.setattr(
         web_app_module,
-        "validate_spatial_report",
-        lambda *_args, **_kwargs: {"summary": {"main_noncot": 1.0}},
+        "parse_spatial_artifact_evidence",
+        lambda *_args, **_kwargs: (
+            answer_records,
+            {"summary": {"main_noncot": 1.0}},
+            {},
+            {
+                "schema_version": "ms-vista-track3-artifact-package/v1",
+                "package_format": "track3_artifact_submission_v1",
+                "benchmark_version": "test-v1",
+                "verification_level": "self_reported_artifact_backed",
+            },
+        ),
     )
     monkeypatch.setattr(
         web_app_module,
@@ -1259,7 +1309,7 @@ def test_spatial_single_zip_submission_reaches_scoring_and_storage(monkeypatch, 
                 "model_name": "Spatial Test Model",
                 "file": (
                     io.BytesIO(upload_package),
-                    "spatial_reasoning_submission.zip",
+                    "track3_artifact_submission.zip",
                 ),
             },
             content_type="multipart/form-data",
@@ -1274,10 +1324,11 @@ def test_spatial_single_zip_submission_reaches_scoring_and_storage(monkeypatch, 
     assert len(stored["records"]) == len(conditions)
     assert stored["file_sha256"] == hashlib.sha256(upload_package).hexdigest()
     assert {artifact["artifact_name"] for artifact in stored["artifacts"]} == {
-        "spatial_reasoning_submission.zip",
-        "submission.jsonl",
-        "run_manifest.json",
-        "leaderboard.json",
+        "track3_artifact_submission.zip",
+        "manifest.json",
+        "claimed_scores.json",
+        "answers.jsonl.gz",
+        "checksums.json",
     }
     assert set(stored["spatial_contract"]) == {
         "manifest",
@@ -1353,6 +1404,56 @@ def test_public_spatial_evidence_routes_require_visibility_and_preserve_hashes(m
     assert cached_response.status_code == 304
     assert hidden_response.status_code == 404
     assert hidden_response.get_json()["code"] == "public_evidence_not_found"
+
+
+def test_artifact_backed_spatial_answers_route_returns_compressed_member(monkeypatch):
+    web_app_module = importlib.import_module("web.app")
+    submission_id = "spatial-artifact-public-1"
+    content = b"\x1f\x8bcompressed-answer-evidence"
+    digest = hashlib.sha256(content).hexdigest()
+    requested_artifacts = []
+
+    monkeypatch.setattr(
+        web_app_module,
+        "get_public_spatial_evidence",
+        lambda _submission_id: {
+            "submission_id": submission_id,
+            "model_name": "Artifact-backed Spatial Model",
+            "task_id": "spatial",
+            "artifacts": [
+                {"name": name, "url": f"/artifact/{name}"}
+                for name in web_app_module.SPATIAL_ARTIFACT_PUBLIC_NAMES
+            ],
+        },
+    )
+
+    def artifact_lookup(_submission_id, artifact_name):
+        requested_artifacts.append(artifact_name)
+        return {
+            "submission_id": submission_id,
+            "artifact_name": artifact_name,
+            "media_type": "application/gzip",
+            "size_bytes": len(content),
+            "sha256": digest,
+            "content": content,
+        }
+
+    monkeypatch.setattr(
+        web_app_module,
+        "get_public_spatial_artifact",
+        artifact_lookup,
+    )
+    web_app_module.app.config["TESTING"] = True
+
+    with web_app_module.app.test_client() as client:
+        response = client.get(
+            f"/api/public/submissions/{submission_id}/answers.jsonl.gz"
+        )
+
+    assert response.status_code == 200
+    assert response.data == content
+    assert response.content_type == "application/gzip"
+    assert requested_artifacts == [web_app_module.SPATIAL_ARTIFACT_ANSWERS_MEMBER]
 
 
 def test_scored_submission_is_not_refunded_when_cache_publication_fails(monkeypatch):
@@ -2160,6 +2261,21 @@ def test_public_auth_health_requires_a_verified_admin(monkeypatch):
     assert details["admin_addresses_configured"] == 1
     assert details["verified_admin_accounts"] == 0
     assert details["admin_ready"] is False
+
+
+def test_local_auth_health_allows_optional_oauth_to_be_unconfigured(monkeypatch):
+    web_app_module = importlib.import_module("web.app")
+    monkeypatch.setattr(web_app_module, "PUBLIC_DEPLOYMENT", False)
+    monkeypatch.delenv("MICROSOFT_CLIENT_ID", raising=False)
+    monkeypatch.delenv("MICROSOFT_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+    monkeypatch.delenv("GOOGLE_CLIENT_SECRET", raising=False)
+
+    status, details = web_app_module._auth_service_health()
+
+    assert status == "healthy"
+    assert details["oauth_required"] is False
+    assert details["microsoft_ready"] is False
 
 
 def test_schema_migrations_are_versioned_and_reject_newer_databases(tmp_path):

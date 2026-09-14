@@ -11,17 +11,17 @@ from evaluation.extract_canonical_answers import (
     commitment_verdict,
     contract_exact,
     evidence_supports,
-    EXTRACTOR_RESPONSE_FORMAT,
     FAIL_CLOSED_FALLBACK_METHOD,
+    METHOD,
     extractor_contract_sha256,
     extractor_payload,
+    extractor_response_format,
     finalize_audit_checkpoint,
     GroundTruthError,
     load_gold_answers,
     load_audit_checkpoint,
     parse_extractor_output,
     run,
-    terminal_source_classification,
     finalize_persistent_extractor_failure,
     valid_answer,
     wait_for_extractor_clients,
@@ -46,7 +46,7 @@ def test_checkpoint_retries_only_blocking_rows_and_preserves_attempts(tmp_path):
         },
     }
     common = {
-        "method": "qwen3-8b-gold-blind-evidence-extractor-v4",
+        "method": METHOD,
         "extractor_contract_sha256": contract,
         "ground_truth_loaded": False,
         "response_sha256": hashlib.sha256(response.encode()).hexdigest(),
@@ -106,7 +106,7 @@ def test_checkpoint_finalizer_atomically_terminalizes_persistent_failure(tmp_pat
         "response_sha256": response_hash,
     }
     row = {
-        "method": "qwen3-8b-gold-blind-evidence-extractor-v4",
+        "method": METHOD,
         "extractor_contract_sha256": contract,
         "ground_truth_loaded": False,
         "ground_truth_supplied_to_extractor": False,
@@ -130,8 +130,9 @@ def test_checkpoint_finalizer_atomically_terminalizes_persistent_failure(tmp_pat
     assert result["rows"] == 1
     assert result["terminalized"] == 1
     finalized = json.loads(checkpoint.read_text(encoding="utf-8"))
-    assert finalized["status"] == "committed"
-    assert finalized["answer"] == "4"
+    assert finalized["status"] == "unresolved"
+    assert finalized["answer"] == ""
+    assert finalized["terminal_fallback_method"] == FAIL_CLOSED_FALLBACK_METHOD
     assert len(finalized["extractor_attempts"]) == 2
 
 
@@ -194,7 +195,7 @@ def test_complete_checkpoint_exits_without_contacting_endpoints(tmp_path, monkey
         json.dumps(
             {
                 **candidate,
-                "method": "qwen3-8b-gold-blind-evidence-extractor-v4",
+                "method": METHOD,
                 "extractor_contract_sha256": contract,
                 "ground_truth_loaded": False,
                 "status": "committed",
@@ -295,6 +296,39 @@ def test_evidence_must_be_quoted_from_the_response():
     assert evidence_supports("Reasoning complete.\n1.", "1.", "1", "integer")
 
 
+def test_presentation_only_quote_changes_are_supported():
+    response = (
+        r"The correct option for the fifth image at \( t = 1.0 \) is **C**."
+    )
+    evidence = "The correct option for the fifth image at $ t = 1.0 $ is **C**."
+    assert evidence_supports(response, evidence, "C", "mcq_letter")
+
+    markdown_response = "Reasoning. **Odd one out: E.**"
+    assert evidence_supports(
+        markdown_response, "Odd one out: E.", "E", "mcq_letter"
+    )
+
+    multiline_response = "The correct option is:\n\n**D**"
+    assert evidence_supports(
+        multiline_response, "The correct option is: **D**", "D", "mcq_letter"
+    )
+
+    quoted_response = (
+        'The correct rotational transformation of the "Original Shape" is '
+        r"\textbf{Option B}."
+    )
+    quoted_evidence = (
+        "The correct rotational transformation of the Original Shape is "
+        "**Option B**."
+    )
+    assert evidence_supports(
+        quoted_response, quoted_evidence, "B", "mcq_letter"
+    )
+
+    changed_words = "The correct option for the final image is C."
+    assert not evidence_supports(response, changed_words, "C", "mcq_letter")
+
+
 def test_boxed_answer_tokens_are_explicit_commitments():
     native = "Reasoning complete. <|begin_of_box|>D<|end_of_box|>"
     assert evidence_supports(native, "D", "D", "mcq_letter")
@@ -333,6 +367,18 @@ def test_gold_mentions_and_rejected_options_are_not_commitments():
 def test_common_explicit_mcq_commitments_are_supported():
     direct = "The correct option is (d)."
     assert evidence_supports(direct, direct, "D", "mcq_letter")
+    qualified = "The correct option for the fifth image at t = 1.0 is C."
+    assert evidence_supports(qualified, qualified, "C", "mcq_letter")
+    qualified_markdown = (
+        "The correct option for the fifth image at t = 1.0 is **C**."
+    )
+    assert evidence_supports(
+        qualified_markdown, qualified_markdown, "C", "mcq_letter"
+    )
+    parenthesized_markdown = "The correct option is **(a)**."
+    assert evidence_supports(
+        parenthesized_markdown, parenthesized_markdown, "A", "mcq_letter"
+    )
     described = (
         "Option (a) shows the shape rotated further, which matches the expected "
         "transformation."
@@ -342,6 +388,16 @@ def test_common_explicit_mcq_commitments_are_supported():
     assert evidence_supports(
         f"Reasoning. {only_match}\n</done>", only_match, "D", "mcq_letter"
     )
+    reverse_match = "This configuration precisely matches option (a)."
+    assert evidence_supports(reverse_match, reverse_match, "A", "mcq_letter")
+    shown_in = "This produces precisely the configuration shown in option C."
+    assert evidence_supports(shown_in, shown_in, "C", "mcq_letter")
+    only_option = "Among the candidates, only option (d) shows the result."
+    assert evidence_supports(only_option, only_option, "D", "mcq_letter")
+    fifth_image = "Thus the fifth image is C."
+    assert evidence_supports(fifth_image, fifth_image, "C", "mcq_letter")
+    bare_markdown = "Reasoning complete.\n**D**"
+    assert evidence_supports(bare_markdown, "**D**", "D", "mcq_letter")
     odd_one_out = (
         "Therefore, the figure that does not adhere to the common visual concept "
         "is Figure C."
@@ -354,9 +410,16 @@ def test_common_explicit_mcq_commitments_are_supported():
     )
 
 
+def test_reverse_mcq_mismatch_is_not_a_commitment():
+    rejected = "This does not match option A."
+    assert not evidence_supports(rejected, rejected, "A", "mcq_letter")
+
+
 def test_direct_integer_and_text_commitments_are_supported():
     count = "That's 5 octagons."
     assert evidence_supports(count, count, "5", "integer")
+    leading_count = "0 spheres are to the left of the torus."
+    assert evidence_supports(leading_count, leading_count, "0", "integer")
     no_letters = "There are no letters visible in the image."
     assert evidence_supports(no_letters, no_letters, "no letters", "text")
     letters = 'The letters visible from left to right are "T".'
@@ -383,6 +446,8 @@ def test_direct_integer_and_text_commitments_are_supported():
         "no letters",
         "text",
     )
+    direct_no = "No, the two shapes do not have the same orientation."
+    assert evidence_supports(direct_no, direct_no, "No", "text")
 
 
 def test_bounded_visual_conclusions_are_supported():
@@ -403,6 +468,10 @@ def test_bounded_visual_conclusions_are_supported():
     )
     assert evidence_supports(
         f"Reasoning. {folding}\n</done>", folding, "A", "mcq_letter"
+    )
+    reversed_folding = "The original shape can be folded to form Figure D."
+    assert evidence_supports(
+        reversed_folding, reversed_folding, "D", "mcq_letter"
     )
     malformed = "<answer>Canswer>"
     assert evidence_supports(
@@ -477,7 +546,7 @@ def test_raw_extractor_classification_contains_no_correctness_verdict():
     assert "verdict" not in result
 
 
-def test_classifier_canonicalizes_task_specific_letter_sequences():
+def test_classifier_rejects_noncanonical_task_specific_letter_sequences():
     candidate = {
         "answer_type": "text",
         "task": "letter_disambiguation",
@@ -489,8 +558,8 @@ def test_classifier_canonicalizes_task_specific_letter_sequences():
         '{"verdict":"COMMITTED","answer":"E T O N",'
         '"evidence":"The letters visible are E T O N"}',
     )
-    assert result["status"] == "committed"
-    assert result["answer"] == "ETON"
+    assert result["status"] == "invalid_format_committed"
+    assert result["answer"] == "__INVALID_FORMAT__"
     assert result["proposed_answer"] == "E T O N"
 
 
@@ -545,92 +614,6 @@ def test_classifier_accepts_closed_answer_from_length_limited_response():
     assert result["answer"] == "B"
 
 
-@pytest.mark.parametrize(
-    ("candidate", "status", "answer"),
-    [
-        (
-            {
-                "answer_type": "mcq_letter",
-                "task": "paper_folding",
-                "response": "None of the options match. Therefore, there is no correct answer among the given options.",
-            },
-            "invalid_format_committed",
-            "__INVALID_FORMAT__",
-        ),
-        (
-            {
-                "answer_type": "text",
-                "task": "letter_disambiguation",
-                "response": "There are no letters visible in the image.",
-            },
-            "invalid_format_committed",
-            "__INVALID_FORMAT__",
-        ),
-        (
-            {
-                "answer_type": "text",
-                "task": "letter_disambiguation",
-                "response": 'On the left, the letters "H-R-E" are visible. In the middle, the letters "PHILIPS" are shown.',
-            },
-            "invalid_format_committed",
-            "__INVALID_FORMAT__",
-        ),
-        (
-            {
-                "answer_type": "mcq_index_1_4",
-                "task": "visual_closure",
-                "response": "Reasoning. **Final Answer**\n\n\\boxed{4}",
-            },
-            "committed",
-            "4",
-        ),
-    ],
-)
-def test_terminal_source_classification_is_literal_and_domain_aware(
-    candidate, status, answer
-):
-    result = terminal_source_classification(candidate)
-    assert result is not None
-    assert result["status"] == status
-    assert result["answer"] == answer
-    assert result["evidence"] in candidate["response"]
-
-
-def test_terminal_source_classification_refuses_ordinary_reasoning_mentions():
-    assert terminal_source_classification(
-        {
-            "answer_type": "mcq_letter",
-            "task": "mental_rotation",
-            "response": "Option A seems plausible, but I still need to inspect B and C.",
-        }
-    ) is None
-    assert terminal_source_classification(
-        {
-            "answer_type": "mcq_index_1_4",
-            "task": "visual_closure",
-            "response": "Maybe \\boxed{4}, but I still need to inspect option 3.",
-        }
-    ) is None
-
-
-def test_terminal_source_classification_rejects_long_direct_letter_stream():
-    response = "BBOLELLEL" + "SE" * 1000
-    result = terminal_source_classification(
-        {
-            "answer_type": "text",
-            "task": "letter_disambiguation",
-            "response": response,
-            "response_finish_reason": "length",
-        }
-    )
-
-    assert result is not None
-    assert result["status"] == "invalid_format_committed"
-    assert result["answer"] == "__INVALID_FORMAT__"
-    assert result["proposed_answer"] == response
-    assert result["evidence"] == response
-
-
 def test_terminal_fallback_requires_prior_retry_history():
     candidate = {
         "answer_type": "mcq_index_1_4",
@@ -644,10 +627,9 @@ def test_terminal_fallback_requires_prior_retry_history():
         {**row, "extractor_attempts": [{"status": "invalid_extractor_output"}]},
     )
     assert result is not None
-    assert result["status"] == "committed"
-    assert result["terminal_fallback_method"] == (
-        "deterministic-terminal-response-classifier-v1"
-    )
+    assert result["status"] == "unresolved"
+    assert result["answer"] == ""
+    assert result["terminal_fallback_method"] == FAIL_CLOSED_FALLBACK_METHOD
 
 
 def test_terminal_fallback_fail_closes_nonterminal_extractor_failure():
@@ -693,15 +675,19 @@ def test_extractor_payload_and_schema_are_strictly_gold_blind():
     assert payload == {
         "question": "Question text",
         "answer_type": "mcq_letter",
+        "expected_answer_domain": (
+            "exactly one uppercase option letter: A, B, C, D, E, or F"
+        ),
         "candidate_response": "The final answer is B.",
     }
-    schema = EXTRACTOR_RESPONSE_FORMAT["json_schema"]["schema"]
+    schema = extractor_response_format("mcq_letter")["json_schema"]["schema"]
     assert schema["properties"]["verdict"]["enum"] == [
         "COMMITTED",
         "UNRESOLVED",
     ]
     assert schema["additionalProperties"] is False
     assert schema["properties"]["answer"]["maxLength"] == 200
+    assert schema["properties"]["answer"]["pattern"] == r"^(?:|[A-F])$"
     assert schema["properties"]["evidence"]["maxLength"] == 800
     assert extractor_contract_sha256("model", 128) != extractor_contract_sha256(
         "model", 256

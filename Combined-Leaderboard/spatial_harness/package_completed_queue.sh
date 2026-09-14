@@ -46,7 +46,7 @@ build_contract_once() {
 package_ready_model() {
   local slug="$1"
   local result_root="$TRACK3_RUN_ROOT/results/$slug"
-  local package="$result_root/submission_package/spatial_reasoning_submission.zip"
+  local package="$result_root/submission_package/track3_artifact_submission.zip"
   if [[ -s "$package" ]]; then
     return 0
   fi

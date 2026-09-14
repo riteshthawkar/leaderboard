@@ -7,11 +7,11 @@ const sections = [
   },
   {
     title: "How information is used",
-    body: "Information is used to operate accounts, verify email addresses, process benchmark submissions, publish approved leaderboard results, investigate failures, prevent abuse, and maintain reproducible evaluation records.",
+    body: "Information is used to operate accounts, verify email addresses, process evaluation-module submissions, publish approved results, investigate failures, prevent abuse, and maintain reproducible evaluation records.",
   },
   {
     title: "Submission files",
-    body: "Visual benchmark response files are validated and scored in memory, with normalized final answers retained for owner and administrator audit. Spatial submissions are different: the original ZIP, per sample final answer evidence, run manifest, aggregate report, scores, and integrity hashes are retained in the database and made public with the leaderboard result. Raw reasoning traces are not required or published.",
+    body: "Visual capability response files are validated and scored in memory, with normalized final answers retained for owner and administrator audit. Reasoning-analysis submissions are different: the original ZIP, per sample final answer evidence, run manifest, aggregate report, scores, and integrity hashes are retained in the database and made public with the leaderboard result. Raw reasoning traces are not required or published.",
   },
   {
     title: "Storage and retention",

@@ -1,5 +1,174 @@
 {
-  "count": 0,
-  "leaderboard": [],
-  "request_id": "384db80e-d249-4e57-aecc-a3966bb8daa7"
+  "count": 1,
+  "leaderboard": [
+    {
+      "accuracy": 0.592,
+      "accuracy_std": 0.1866,
+      "correct_samples": 8015,
+      "diagnostics": {
+        "conditions_present": [
+          "main_noncot",
+          "main_cot",
+          "no_image_noncot",
+          "no_image_cot",
+          "no_image_plus_noncot",
+          "no_image_plus_cot"
+        ],
+        "cot_accuracy": 0.608295,
+        "cot_delta": 0.019784,
+        "hallucination_resistance": 0.419034,
+        "hallucination_resistance_cot": 0.344658,
+        "shortcut_score": 0.371173,
+        "shortcut_score_cot": 0.416858,
+        "standard_accuracy": 0.588511
+      },
+      "evidence_url": "/api/public/submissions/14cb39b3-b1c6-4acc-94af-a482b34d00ed/evidence",
+      "grading": {
+        "backend": "artifact_integrity_and_arithmetic_validation",
+        "judge_model": "0d7cf23991f47feeb3a57ecb4c9cee8ea4a17bfe",
+        "llm_graded": true,
+        "method": "submitter_claimed_artifact_evidence",
+        "method_counts": {},
+        "paper": "CoT Degrades Visual Spatial Reasoning (arXiv:2604.16060)",
+        "server_ground_truth_evaluation": false
+      },
+      "groups": {
+        "3DSRBench": {
+          "accuracy": 0.567619,
+          "correct_samples": 1490,
+          "meta": {
+            "dataset_key": "3DSRBench"
+          },
+          "name": "3DSRBench",
+          "total_samples": 2625
+        },
+        "BLINK": {
+          "accuracy": 0.564966,
+          "correct_samples": 1074,
+          "meta": {
+            "dataset_key": "BLINK"
+          },
+          "name": "BLINK",
+          "total_samples": 1901
+        },
+        "CV-Bench (2D)": {
+          "accuracy": 0.774687,
+          "correct_samples": 1114,
+          "meta": {
+            "dataset_key": "CV-Bench-2D"
+          },
+          "name": "CV-Bench (2D)",
+          "total_samples": 1438
+        },
+        "CV-Bench (3D)": {
+          "accuracy": 0.855,
+          "correct_samples": 1026,
+          "meta": {
+            "dataset_key": "CV-Bench-3D"
+          },
+          "name": "CV-Bench (3D)",
+          "total_samples": 1200
+        },
+        "MMSI-Bench": {
+          "accuracy": 0.287,
+          "correct_samples": 287,
+          "meta": {
+            "dataset_key": "MMSIBench_wo_circular"
+          },
+          "name": "MMSI-Bench",
+          "total_samples": 1000
+        },
+        "MMVP": {
+          "accuracy": 0.77,
+          "correct_samples": 231,
+          "meta": {
+            "dataset_key": "MMVP"
+          },
+          "name": "MMVP",
+          "total_samples": 300
+        },
+        "MindCube": {
+          "accuracy": 0.372115,
+          "correct_samples": 387,
+          "meta": {
+            "dataset_key": "MindCube"
+          },
+          "name": "MindCube",
+          "total_samples": 1040
+        },
+        "OmniSpatial": {
+          "accuracy": 0.439008,
+          "correct_samples": 673,
+          "meta": {
+            "dataset_key": "OmniSpatial"
+          },
+          "name": "OmniSpatial",
+          "total_samples": 1533
+        },
+        "RealWorldQA": {
+          "accuracy": 0.65098,
+          "correct_samples": 498,
+          "meta": {
+            "dataset_key": "RealWorldQA"
+          },
+          "name": "RealWorldQA",
+          "total_samples": 765
+        },
+        "SAT (Real)": {
+          "accuracy": 0.326667,
+          "correct_samples": 49,
+          "meta": {
+            "dataset_key": "SAT-Real"
+          },
+          "name": "SAT (Real)",
+          "total_samples": 150
+        },
+        "SpatialBench": {
+          "accuracy": 0.58046,
+          "correct_samples": 101,
+          "meta": {
+            "dataset_key": "SpatialBench"
+          },
+          "name": "SpatialBench",
+          "total_samples": 174
+        },
+        "V*Bench": {
+          "accuracy": 0.680628,
+          "correct_samples": 130,
+          "meta": {
+            "dataset_key": "VStarBench"
+          },
+          "name": "V*Bench",
+          "total_samples": 191
+        },
+        "VSR": {
+          "accuracy": 0.781506,
+          "correct_samples": 955,
+          "meta": {
+            "dataset_key": "VSR_MCQ"
+          },
+          "name": "VSR",
+          "total_samples": 1222
+        }
+      },
+      "macro_accuracy": 0.5885104615384615,
+      "micro_accuracy": 0.592,
+      "model_id": "mdl_51e27b799b9843a29a6829cb383d00dd",
+      "model_meta": {
+        "access": "open_weights",
+        "org": "OpenGVLab",
+        "organization": "OpenGVLab",
+        "parameter_count": "8B",
+        "type": "open_weights"
+      },
+      "model_name": "InternVL3.5-8B (Thinking)",
+      "rank": 1,
+      "score_method": "dataset_macro_from_public_evidence",
+      "submission_id": "14cb39b3-b1c6-4acc-94af-a482b34d00ed",
+      "submitted_at": "2026-08-02T17:32:18.082679+00:00",
+      "task_spread": 0.1866,
+      "total_samples": 13539
+    }
+  ],
+  "request_id": "5ef8c3eb-47df-4c03-b6d3-734178c86dc9"
 }
