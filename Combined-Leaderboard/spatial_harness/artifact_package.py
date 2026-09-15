@@ -249,11 +249,19 @@ def _validate_manifest(manifest: dict[str, Any]) -> None:
     if evidence.get("raw_output_scope") not in {
         "complete_model_response",
         "final_answer_only_legacy_conversion",
+        "source_outputs_with_missing_records",
     }:
         raise ArtifactPackageError(
             "invalid_artifact_evidence",
             "manifest.json declares an unsupported raw output scope.",
         )
+    missing = evidence.get("missing_output_rows", 0)
+    missing_scope = evidence.get("raw_output_scope") == "source_outputs_with_missing_records"
+    if (
+        type(missing) is not int or not 0 <= missing <= evidence["raw_output_rows"]
+        or missing_scope != (missing > 0)
+    ):
+        raise ArtifactPackageError("invalid_artifact_evidence", "Missing-output scope and non-negative row count must agree and cannot exceed raw output rows.")
     scoring = manifest.get("scoring")
     if not isinstance(scoring, dict) or scoring != {
         "source": SCORE_SOURCE,

@@ -49,6 +49,10 @@ from spatial_harness.artifact_package import (
     read_artifact_package,
     report_from_claimed_scores,
 )
+from spatial_harness.submitted_cohort import (
+    SCHEMA_VERSION as SUBMITTED_COHORT_SCHEMA,
+    validate_manifest as validate_submitted_cohort_manifest,
+)
 
 
 _BUNDLE_HEALTH_CACHE = {}
@@ -320,6 +324,8 @@ def _artifact_manifest_metadata(package: ArtifactPackage) -> dict:
         "raw_output_scope": manifest["evidence"]["raw_output_scope"],
         "answer_rows": manifest["evidence"]["answer_rows"],
         "raw_output_rows": manifest["evidence"]["raw_output_rows"],
+        "missing_output_rows": manifest["evidence"].get("missing_output_rows", 0),
+        "provenance_status": evaluation.get("provenance_status"),
     }
 
 
@@ -329,12 +335,15 @@ def parse_spatial_artifact_evidence(
     benchmark_manifest_path: ContractSource,
     template_path: ContractSource,
     questions_path: ContractSource,
+    *,
+    allow_submitted_cohort: bool = False,
 ) -> tuple[list[dict], dict, dict, dict]:
     """Validate public IDs and claimed arithmetic, never semantic correctness."""
     manifest, questions, expected_keys = _load_public_spatial_contract(
         benchmark_manifest_path,
         template_path,
         questions_path,
+        allow_submitted_cohort=allow_submitted_cohort,
     )
     selected_model = str(model_name or "").strip()
     package_model = str(package.manifest["model"].get("name") or "").strip()
@@ -801,9 +810,15 @@ def _load_public_spatial_contract(
     manifest_path: ContractSource,
     template_path: ContractSource,
     questions_path: ContractSource,
+    *,
+    allow_submitted_cohort: bool = False,
 ) -> tuple[dict, dict[str, dict], set[tuple[str, str]]]:
     """Load and cross-check the public contract without reading ground truth."""
-    manifest = load_official_benchmark_manifest(manifest_path)
+    candidate = _load_json_object(manifest_path, "Spatial benchmark manifest")
+    if allow_submitted_cohort and candidate.get("schema_version") == SUBMITTED_COHORT_SCHEMA:
+        manifest = validate_submitted_cohort_manifest(candidate, SPATIAL_DATASET_KEYS, EVAL_CONDITIONS)
+    else:
+        manifest = load_official_benchmark_manifest(manifest_path)
     is_v3 = manifest.get("schema_version") == _SPATIAL_V3_BENCHMARK_SCHEMA
 
     questions_artifact = (manifest.get("artifacts") or {}).get("questions") or {}

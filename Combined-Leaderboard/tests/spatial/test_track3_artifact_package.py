@@ -16,6 +16,7 @@ from spatial_harness.artifact_package import (
     read_artifact_package,
     write_artifact_package,
     write_gzip_jsonl,
+    _validate_manifest,
 )
 
 
@@ -95,6 +96,22 @@ def test_artifact_package_validates_integrity_and_claimed_arithmetic_only(tmp_pa
         "total": 2,
     }
     assert package.manifest["verification_level"] == VERIFICATION_LEVEL
+
+
+@pytest.mark.parametrize("scope,missing", [
+    ("source_outputs_with_missing_records", 0),
+    ("source_outputs_with_missing_records", -1),
+    ("source_outputs_with_missing_records", 3),
+    ("source_outputs_with_missing_records", True),
+    ("source_outputs_with_missing_records", "1"),
+    ("complete_model_response", 1),
+])
+def test_missing_output_count_and_scope_must_agree(scope, missing):
+    manifest = _manifest()
+    manifest["evidence"].update(raw_output_scope=scope, missing_output_rows=missing)
+    with pytest.raises(ArtifactPackageError) as captured:
+        _validate_manifest(manifest)
+    assert captured.value.code == "invalid_artifact_evidence"
 
 
 def test_artifact_package_rejects_member_tampering(tmp_path):

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -167,6 +167,67 @@ afterEach(() => {
 });
 
 describe("leaderboard filter contracts", () => {
+  it("keeps cohorts separate across rankings and integrated comparisons", async () => {
+    const baseImplementation = getJSON.getMockImplementation();
+    const cohorts = [
+      { id: "paper", version: "paper-v5", label: "Paper release", model_count: 2 },
+      { id: "submitted", version: "submitted-v2", label: "Submitted v2", model_count: 1 },
+    ];
+    getJSON.mockImplementation((url) => {
+      if (url === "/api/leaderboard/spatial") return Promise.resolve({ leaderboard: defaultSpatialRows, cohort: "paper", cohorts });
+      if (url === "/api/leaderboard/spatial?cohort=submitted") return Promise.resolve({ leaderboard: [{ ...defaultSpatialRows[0], model_name: "New cohort model", missing_output_rows: 243 }], cohort: "submitted", cohorts });
+      return baseImplementation(url);
+    });
+    const user = userEvent.setup();
+    render(<ResearchLeaderboard />);
+    await user.click(screen.getByRole("tab", { name: "Reasoning Analysis" }));
+    const selector = await screen.findByRole("combobox", { name: "Track 3 evaluation cohort" });
+    await user.selectOptions(selector, "submitted");
+    const table = screen.getByRole("table", { name: "Spatial model rankings" });
+    expect(await within(table).findByRole("button", { name: "View model report for New cohort model" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "View model report for Model Alpha" })).not.toBeInTheDocument();
+    expect(within(table).getByText("243 missing")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Integrated Comparison" }));
+    expect(screen.getByRole("combobox", { name: "Track 3 evaluation cohort" })).toHaveValue("submitted");
+  });
+
+  it("clears stale cohort results if the next cohort cannot load", async () => {
+    const baseImplementation = getJSON.getMockImplementation();
+    getJSON.mockImplementation((url) => {
+      if (url === "/api/leaderboard/spatial") return Promise.resolve({ leaderboard: defaultSpatialRows, cohort: "paper", cohorts: [{ id: "paper", version: "Paper", model_count: 2 }, { id: "missing", version: "Missing", model_count: 1 }] });
+      if (url.includes("?cohort=")) return Promise.reject(new Error("Cohort unavailable"));
+      return baseImplementation(url);
+    });
+    const user = userEvent.setup();
+    render(<ResearchLeaderboard />);
+    await user.click(screen.getByRole("tab", { name: "Reasoning Analysis" }));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Track 3 evaluation cohort" }), "missing");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cohort unavailable");
+    expect(within(screen.getByRole("table", { name: "Spatial model rankings" })).queryByRole("button", { name: "View model report for Model Alpha" })).not.toBeInTheDocument();
+  });
+
+  it("ignores an older cohort response after another cohort is selected", async () => {
+    const baseImplementation = getJSON.getMockImplementation();
+    const cohorts = [{ id: "paper", version: "Paper", model_count: 2 }, { id: "slow", version: "Slow", model_count: 1 }];
+    let finishSlow;
+    getJSON.mockImplementation((url) => {
+      if (url === "/api/leaderboard/spatial" || url === "/api/leaderboard/spatial?cohort=paper") return Promise.resolve({ leaderboard: defaultSpatialRows, cohort: "paper", cohorts });
+      if (url === "/api/leaderboard/spatial?cohort=slow") return new Promise((resolve) => { finishSlow = resolve; });
+      return baseImplementation(url);
+    });
+    const user = userEvent.setup();
+    render(<ResearchLeaderboard />);
+    await user.click(screen.getByRole("tab", { name: "Reasoning Analysis" }));
+    const selector = await screen.findByRole("combobox", { name: "Track 3 evaluation cohort" });
+    await user.selectOptions(selector, "slow");
+    await user.selectOptions(selector, "paper");
+    await act(async () => finishSlow({ leaderboard: [{ ...defaultSpatialRows[0], model_name: "Stale result" }], cohort: "slow", cohorts }));
+    expect(selector).toHaveValue("paper");
+    const table = screen.getByRole("table", { name: "Spatial model rankings" });
+    expect(within(table).getByRole("button", { name: "View model report for Model Alpha" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "View model report for Stale result" })).not.toBeInTheDocument();
+  });
+
   it("describes leaderboard metrics using their actual aggregation", async () => {
     render(<ResearchLeaderboard />);
 

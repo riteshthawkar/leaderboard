@@ -606,12 +606,42 @@ class LeaderboardStore:
             r["rank"] = i
         return rows[:limit]
 
-    def spatial_leaderboard(self, limit: int = 100) -> List[dict]:
+    @staticmethod
+    def _spatial_cohort(record: dict) -> dict:
+        metadata = record.get("metadata") or {}
+        run = metadata.get("spatial_run") or {}
+        version = run.get("benchmark_version") or "legacy-unversioned"
+        return {
+            "id": run.get("benchmark_manifest_sha256") or metadata.get("benchmark_manifest_sha256") or version,
+            "version": version,
+            "label": version,
+        }
+
+    def spatial_cohorts(self) -> List[dict]:
+        cohorts = {}
+        for entry in self._read()["models"].values():
+            record = entry.get("tasks", {}).get("spatial")
+            if record:
+                cohort = self._spatial_cohort(record)
+                item = cohorts.setdefault(cohort["id"], {**cohort, "model_count": 0})
+                item["model_count"] += 1
+        return sorted(cohorts.values(), key=lambda item: (
+            item["version"] != "paper-aligned-v5-2026-07", item["version"], item["id"],
+        ))
+
+    def spatial_leaderboard(self, limit: int = 100, *, cohort: str | None = None) -> List[dict]:
+        cohorts = self.spatial_cohorts()
+        selected = cohort or (cohorts[0]["id"] if cohorts else None)
+        if cohort and cohort not in {item["id"] for item in cohorts}:
+            raise ValueError("Unknown spatial evaluation cohort")
         data = self._read()
         rows = []
         for key, entry in data["models"].items():
             sp = entry.get("tasks", {}).get("spatial")
             if not sp:
+                continue
+            scope = self._spatial_cohort(sp)
+            if scope["id"] != selected:
                 continue
             macro_accuracy = self._task_headline_accuracy(sp, "spatial")
             rows.append({
@@ -636,6 +666,10 @@ class LeaderboardStore:
                 "groups": sp.get("groups", {}),
                 "diagnostics": sp.get("diagnostics"),
                 "grading": sp.get("grading"),
+                "cohort_id": scope["id"],
+                "benchmark_version": scope["version"],
+                "verification_level": (sp.get("metadata", {}).get("spatial_run") or {}).get("verification_level"),
+                "missing_output_rows": (sp.get("metadata", {}).get("spatial_run") or {}).get("missing_output_rows", 0),
             })
         rows.sort(
             key=lambda r: (
@@ -716,7 +750,9 @@ class LeaderboardStore:
             "ranked_models": ranked_models,
             "visual_cognition_models": visual_cognition_models,
             "spatial_models": spatial_models,
+            "spatial_cohorts": self.spatial_cohorts(),
             "best_vci": round(best_vci, 4) if best_vci is not None else None,
             "best_spatial_accuracy": round(best_spatial, 4),
-            "with_diagnostics": sum(1 for r in sp if r.get("diagnostics")),
+            "with_diagnostics": sum(1 for tasks in task_maps if (tasks.get("spatial") or {}).get("diagnostics")),
+            "best_spatial_cohort": sp[0]["cohort_id"] if sp else None,
         }

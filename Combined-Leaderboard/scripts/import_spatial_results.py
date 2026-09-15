@@ -17,7 +17,7 @@ import json
 import re
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +51,7 @@ from spatial_submission import (
     read_spatial_artifact_archive,
     read_spatial_submission_archive,
     spatial_bundle_health,
+    _load_public_spatial_contract,
     validate_run_manifest,
     validate_spatial_report,
 )
@@ -100,6 +101,7 @@ class SpatialImport:
     run_metadata: dict[str, Any]
     report: dict[str, Any]
     score: Any
+    declared_model: dict[str, Any] = field(default_factory=dict)
 
 
 def _sha256(value: bytes) -> str:
@@ -139,11 +141,16 @@ def _model_metadata(item: SpatialImport) -> dict[str, Any]:
         item.run_metadata.get("verification_level")
         == "self_reported_artifact_backed"
     )
-    return {
+    declared_access = item.declared_model.get("access")
+    if declared_access is None:
+        declared_access = "open_weights" if item.source_model_name.split("/", 1)[0] in ORGANIZATION_NAMES else "unknown"
+    if declared_access not in {"open_weights", "closed", "unknown"}:
+        raise ValueError("Invalid declared model access type")
+    metadata = {
         "organization": item.organization,
         "org": item.organization,
-        "access": "open_weights",
-        "type": "open_weights",
+        "access": declared_access,
+        "type": declared_access,
         "parameter_count": item.parameter_count,
         "method_description": (
             "Submitter-reported MS-VISTA Track 3 evaluation with complete public "
@@ -157,8 +164,9 @@ def _model_metadata(item: SpatialImport) -> dict[str, Any]:
         ),
         "cot_used": "Both",
         "prompt_template": (
-            "Official Track 3 direct and chain-of-thought prompts identified by "
-            "the hashes in the retained public run manifest."
+            "Direct and chain-of-thought conditions; see the retained manifest for submitter-declared configuration. Prompt/model revision attestation is not implied."
+            if artifact_backed else
+            "Official Track 3 direct and chain-of-thought prompts identified by the retained run manifest."
         ),
         "changes_from_previous": (
             "Imported from the self-reported, artifact-backed Track 3 package."
@@ -167,27 +175,30 @@ def _model_metadata(item: SpatialImport) -> dict[str, Any]:
         ),
         "model_repository": item.source_model_name,
         "model_revision": item.model_revision,
-        "weight_loading": "unquantized",
-        "compute_dtype": "bfloat16",
         "submission_track": "spatial",
     }
+    if not artifact_backed:
+        metadata.update(weight_loading="unquantized", compute_dtype="bfloat16")
+    if item.run_metadata.get("missing_output_rows"):
+        metadata["method_description"] += f" {item.run_metadata['missing_output_rows']} source outputs are missing and retain zero claimed credit; their failure cause is unknown."
+    return metadata
 
 
-def _contract_sources(contract_dir: Path) -> dict[str, bytes | str]:
+def _contract_sources(contract_dir: Path, *, allow_submitted_cohort: bool = False) -> dict[str, bytes | str]:
     contract_dir = contract_dir.expanduser().resolve()
     paths = {
         "manifest": contract_dir / "manifest.json",
         "questions": contract_dir / "questions.jsonl",
         "template": contract_dir / "submission_template.jsonl",
     }
-    status, details = spatial_bundle_health(
-        paths["manifest"], paths["template"], paths["questions"]
-    )
-    if status != "healthy" or details.get("production_ready") is not True:
-        raise ValueError(
-            "The installed Spatial public contract is not production ready: "
-            f"{details.get('error') or details}"
+    if allow_submitted_cohort:
+        _load_public_spatial_contract(paths["manifest"], paths["template"], paths["questions"], allow_submitted_cohort=True)
+    else:
+        status, details = spatial_bundle_health(
+            paths["manifest"], paths["template"], paths["questions"]
         )
+        if status != "healthy" or details.get("production_ready") is not True:
+            raise ValueError(f"The installed Spatial public contract is not production ready: {details.get('error') or details}")
     result: dict[str, bytes | str] = {
         key: path.read_bytes() for key, path in paths.items()
     }
@@ -200,10 +211,11 @@ def build_import_plan(
     *,
     contract_dir: Path,
     model_names: dict[str, str] | None = None,
+    allow_submitted_cohort: bool = False,
 ) -> list[SpatialImport]:
     if not package_paths:
         raise ValueError("At least one --package or package under --package-root is required.")
-    contract = _contract_sources(contract_dir)
+    contract = _contract_sources(contract_dir, allow_submitted_cohort=allow_submitted_cohort)
     model_names = {**DEFAULT_MODEL_NAMES, **(model_names or {})}
     plan: list[SpatialImport] = []
     seen_paths: set[Path] = set()
@@ -238,7 +250,7 @@ def build_import_plan(
         if not source_model_name:
             raise ValueError(f"{package_path} does not declare a model name.")
         display_name = model_names.get(
-            source_model_name, _default_display_name(source_model_name)
+            source_model_name, (manifest.get("model") or {}).get("display_name") or _default_display_name(source_model_name)
         )
         normalized_display = normalize_model_name(display_name)
         if normalized_display in seen_display_names:
@@ -255,6 +267,7 @@ def build_import_plan(
                     contract["manifest"],
                     contract["template"],
                     contract["questions"],
+                    allow_submitted_cohort=allow_submitted_cohort,
                 )
             )
             artifact_contents = {
@@ -305,7 +318,7 @@ def build_import_plan(
             package_sha256=_sha256(package_bytes),
             source_model_name=source_model_name,
             display_name=display_name,
-            organization=_organization(source_model_name),
+            organization=(manifest.get("model") or {}).get("organization") or _organization(source_model_name),
             parameter_count=_parameter_count(source_model_name),
             model_revision=model_revision,
             records=records,
@@ -314,6 +327,7 @@ def build_import_plan(
             run_metadata=run_metadata,
             report=report,
             score=None,
+            declared_model=dict(manifest.get("model") or {}),
         )
         provisional.score = build_spatial_task_score(
             report,
@@ -396,7 +410,7 @@ def apply_import_plan(
                 item.display_name,
                 {
                     "organization": item.organization,
-                    "access": "open_weights",
+                    "access": item.score.model_meta["access"],
                     "parameter_count": item.parameter_count,
                 },
             )
@@ -536,6 +550,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--quota-limit", type=int, default=10_000)
     parser.add_argument("--replace-existing", action="store_true")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--submitted-cohort", action="store_true", help="Explicitly allow a reviewed, separately ranked submitted-cohort contract; does not change public upload admission.")
     return parser
 
 
@@ -549,6 +564,7 @@ def main(argv: list[str] | None = None) -> int:
             _package_paths(args),
             contract_dir=args.contract_dir,
             model_names=model_names,
+            allow_submitted_cohort=args.submitted_cohort,
         )
     except (OSError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc

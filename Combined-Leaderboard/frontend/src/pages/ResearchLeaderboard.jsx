@@ -1731,11 +1731,16 @@ function AnalysisCards({ items }) {
 }
 
 export function ResearchLeaderboard() {
-  const [tab, setTab] = useState("vc");
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get("view") === "spatial" ? "spatial" : "vc");
   const [, setStats] = useState({});
   const [, setTaskInfo] = useState({});
   const [visualRows, setVisualRows] = useState([]);
   const [spatialRows, setSpatialRows] = useState([]);
+  const [spatialCohorts, setSpatialCohorts] = useState([]);
+  const [requestedCohort, setRequestedCohort] = useState(() => new URLSearchParams(window.location.search).get("cohort") || "");
+  const [activeCohort, setActiveCohort] = useState("");
+  const [spatialStatus, setSpatialStatus] = useState("loading");
+  const [spatialError, setSpatialError] = useState("");
   const [reportModel, setReportModel] = useState(null);
   const [loadStatus, setLoadStatus] = useState("loading");
   const [loadError, setLoadError] = useState("");
@@ -1779,7 +1784,6 @@ export function ResearchLeaderboard() {
       getJSON("/api/tasks/minds_eye/info"),
       getJSON("/api/tasks/spatial/info"),
       getJSON("/api/leaderboard/visual-cognition"),
-      getJSON("/api/leaderboard/spatial"),
     ]).then((results) => {
       if (!live) return;
       const value = (index, fallback = {}) => results[index].status === "fulfilled" ? results[index].value : fallback;
@@ -1790,7 +1794,6 @@ export function ResearchLeaderboard() {
         spatial: value(3),
       });
       setVisualRows(value(4, { leaderboard: [] }).leaderboard || []);
-      setSpatialRows(value(5, { leaderboard: [] }).leaderboard || []);
       const failed = results
         .map((result, index) => result.status === "rejected" ? { index, error: result.reason } : null)
         .filter(Boolean);
@@ -1808,6 +1811,26 @@ export function ResearchLeaderboard() {
     });
     return () => { live = false; };
   }, [reloadKey]);
+
+  useEffect(() => {
+    let live = true;
+    setSpatialStatus("loading");
+    setSpatialError("");
+    setSpatialRows([]);
+    const query = requestedCohort ? `?cohort=${encodeURIComponent(requestedCohort)}` : "";
+    getJSON(`/api/leaderboard/spatial${query}`).then((data) => {
+      if (!live) return;
+      setSpatialRows(data.leaderboard || []);
+      setSpatialCohorts(data.cohorts || []);
+      setActiveCohort(data.cohort || "");
+      setSpatialStatus("ready");
+    }).catch((error) => {
+      if (!live) return;
+      setSpatialError(errorMessage(error, "This evaluation cohort could not be loaded."));
+      setSpatialStatus("error");
+    });
+    return () => { live = false; };
+  }, [requestedCohort, reloadKey]);
 
   const capabilities = useMemo(
     () => visualCapabilities(visualRows),
@@ -2497,6 +2520,26 @@ export function ResearchLeaderboard() {
           <div className="px-6 pb-8 pt-3 lg:px-8 lg:pb-10 lg:pt-4">
 
           {loadStatus === "loading" && <div className={ui.message} role="status">Loading current rankings and evaluation details...</div>}
+          {tab !== "vc" && (
+            <div className="mb-6 border-b border-border pb-5">
+              {spatialCohorts.length > 0 && (
+                <div className="max-w-xl">
+                  <FilterField label="Track 3 evaluation cohort">
+                    <select className={ui.input} value={requestedCohort || activeCohort} onChange={(event) => {
+                      setRequestedCohort(event.target.value);
+                      setSelectedCompareModels([]);
+                      setReportModel(null);
+                    }}>
+                      {spatialCohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.label || cohort.version} ({cohort.model_count} models)</option>)}
+                    </select>
+                  </FilterField>
+                  <p className="mt-2 text-sm text-muted">Rankings use one cohort at a time. Different sample sets are not directly comparable. Scores are self-reported and evidence-backed, not independently regraded.</p>
+                </div>
+              )}
+              {spatialStatus === "loading" && <p className="mt-3 text-sm text-muted" role="status">Loading evaluation cohort...</p>}
+              {spatialError && <div className={ui.message} role="alert">{spatialError} <button type="button" className="underline" onClick={() => setReloadKey((value) => value + 1)}>Retry cohort</button></div>}
+            </div>
+          )}
           {tab === "vc" && (
             <section className="tab-panel is-active">
               <DashboardStats items={visualStats} />
@@ -3118,6 +3161,7 @@ export function ResearchLeaderboard() {
                                 &mdash;
                               </span>
                             )}
+                            {row.missing_output_rows > 0 && <span className="mt-1 block text-xs text-warning" title="Missing source outputs retain zero claimed credit; failure cause is unknown.">{row.missing_output_rows} missing</span>}
                           </td>
                           {spatialMetaCols.has("org") && (
                             <td
@@ -3472,6 +3516,9 @@ function ReportRunMeta({ task, benchmark }) {
   const meta = task?.model_meta;
   if (!meta) return null;
   const rows = [
+    ["Evaluation cohort", task?.metadata?.spatial_run?.benchmark_version],
+    ["Verification", task?.metadata?.spatial_run?.verification_level],
+    ["Missing source outputs", task?.metadata?.spatial_run?.missing_output_rows || null],
     ["CoT used", modelCot(meta)],
     ["Method", meta.method_description],
     ["Prompt template", meta.prompt_template],

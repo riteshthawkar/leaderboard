@@ -1096,6 +1096,14 @@ def _stored_predictions(answer_rows: list[dict]) -> Dict[str, Dict[str, str]]:
     return predictions
 
 
+def _stored_artifact_model_name(stored, package):
+    source = package.manifest["model"]["name"]
+    allowed = {stored.get("model_name"), (stored.get("model_meta") or {}).get("model_repository")}
+    if source not in allowed:
+        raise ValueError("Stored artifact model is not bound to this registered model")
+    return source
+
+
 def _rescore_stored_submission(score_submission_id: str):
     try:
         stored = get_submission_for_rescore(score_submission_id)
@@ -1164,10 +1172,11 @@ def _rescore_stored_submission(score_submission_id: str):
                 records, report, _manifest, run_metadata = (
                     parse_spatial_artifact_evidence(
                         artifact_package,
-                        stored.get("model_name") or "",
+                        _stored_artifact_model_name(stored, artifact_package),
                         benchmark_manifest_source,
                         template_source,
                         questions_source,
+                        allow_submitted_cohort=bool(stored_contract),
                     )
                 )
             else:
@@ -3509,7 +3518,10 @@ def get_leaderboard():
             )
 
         if scope == "spatial":
-            rows = leaderboard_store.spatial_leaderboard(limit=limit)
+            cohort = request.args.get("cohort", "").strip() or None
+            if cohort and cohort not in {item["id"] for item in leaderboard_store.spatial_cohorts()}:
+                return _error_response("Unknown spatial evaluation cohort.", "invalid_spatial_cohort", 400)
+            rows = leaderboard_store.spatial_leaderboard(limit=limit, cohort=cohort)
         else:
             rows = leaderboard_store.visual_cognition_leaderboard(
                 limit=MAX_LEADERBOARD_LIMIT
@@ -5104,8 +5116,13 @@ def leaderboard_spatial():
         limit, error_response = _query_limit()
         if error_response is not None:
             return error_response
-        rows = leaderboard_store.spatial_leaderboard(limit=limit)
+        cohorts = leaderboard_store.spatial_cohorts()
+        cohort = request.args.get("cohort", "").strip() or (cohorts[0]["id"] if cohorts else None)
+        if cohort and cohort not in {item["id"] for item in cohorts}:
+            return _error_response("Unknown spatial evaluation cohort.", "invalid_spatial_cohort", 400)
+        rows = leaderboard_store.spatial_leaderboard(limit=limit, cohort=cohort)
         return jsonify({"leaderboard": rows, "count": len(rows),
+                        "cohort": cohort, "cohorts": cohorts,
                         "request_id": request_id}), 200
     except Exception as e:
         logger.error(f"Spatial leaderboard error: {e}", extra={"request_id": request_id}, exc_info=True)
