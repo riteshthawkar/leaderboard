@@ -80,6 +80,8 @@ describe("profile quota summary", () => {
     await user.click(await screen.findByRole("button", { name: "Delete account" }));
     const dialog = screen.getByRole("dialog");
     const confirmButton = within(dialog).getByRole("button", { name: "Delete account" });
+    expect(dialog).toHaveTextContent("Personal information inside uploaded files is not automatically scrubbed");
+    expect(dialog).toHaveTextContent("older backups remain until they expire");
     expect(confirmButton).toBeDisabled();
 
     await user.type(within(dialog).getByLabelText("Type DELETE to confirm"), "DELETE");

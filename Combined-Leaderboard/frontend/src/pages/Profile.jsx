@@ -88,8 +88,8 @@ function DeleteAccountDialog({
             </DialogTitle>
             <DialogDescription className="mt-3 text-sm leading-relaxed text-muted">
               {isDeleted
-                ? "Your identity and sign-in credentials have been removed. Published research results remain available in anonymised form."
-                : "This permanently removes your account identity, credentials, and sign-in access. Published leaderboard results remain available but are detached from your identity."}
+                ? "Your live account and sign-in credentials have been removed. Account linkage in retained submissions is anonymised, but published model metadata and uploaded evidence remain public. Older backups expire under the retention policy."
+                : "This permanently removes your live account and sign-in access. Published model metadata and evidence remain public. Personal information inside uploaded files is not automatically scrubbed, and older backups remain until they expire."}
             </DialogDescription>
             {!isDeleted && (
               <label className={cn(ui.field, "mt-5 mb-0")}>
@@ -264,7 +264,7 @@ export function Profile() {
                 <span className={ui.sectionTag}>Privacy controls</span>
                 <h2 className={ui.heading3} id="privacy-controls-heading">Manage your account data</h2>
                 <p className="my-2 max-w-3xl text-sm leading-relaxed text-muted">
-                  Download the account and submission information associated with your identity, or permanently remove your identity and sign-in credentials. Published research results are retained in anonymised form.
+                  Download your account information or remove your live account and sign-in credentials. Account deletion anonymises submission ownership, not the contents of published model metadata or evidence files. See the Leaderboard Data Notice for backup retention and removal limits.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2.5 max-sm:flex-col max-sm:[&>*]:w-full">
                   <Button
