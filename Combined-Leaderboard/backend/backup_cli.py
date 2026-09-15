@@ -1,7 +1,6 @@
 """Offline backup verification and restore drill commands."""
 
 import argparse
-import io
 import json
 from pathlib import Path
 
@@ -28,8 +27,8 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "verify":
-        payload = args.archive.expanduser().resolve().read_bytes()
-        result = validate_backup_archive(io.BytesIO(payload))
+        with args.archive.expanduser().resolve().open("rb") as archive:
+            result = validate_backup_archive(archive)
         output = {
             "archive": args.archive.name,
             "sqlite_snapshots": result["sqlite_snapshots"],

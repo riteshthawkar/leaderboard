@@ -5057,6 +5057,7 @@ def admin_run_backup():
 def admin_download_backup():
     """Create and download a CSRF-protected backup archive."""
     request_id = getattr(g, "request_id", None)
+    archive = None
     try:
         archive, filename, _manifest = create_backup_archive()
         validation = validate_backup_archive(archive)
@@ -5066,12 +5067,15 @@ def admin_download_backup():
             as_attachment=True,
             download_name=filename,
         )
+        response.call_on_close(archive.close)
         response.headers["X-Backup-Request-Id"] = request_id or ""
         response.headers["X-Backup-Sqlite-Database-Count"] = str(
             validation["sqlite_snapshots"]
         )
         return response
     except Exception as e:
+        if archive is not None:
+            archive.close()
         logger.error(
             f"Backup download error: {e}",
             extra={"request_id": request_id},

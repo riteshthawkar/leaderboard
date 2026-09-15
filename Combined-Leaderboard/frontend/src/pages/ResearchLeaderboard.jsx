@@ -2525,12 +2525,12 @@ export function ResearchLeaderboard() {
               {spatialCohorts.length > 0 && (
                 <div className="max-w-xl">
                   <FilterField label="Track 3 evaluation cohort">
-                    <select className={ui.input} value={requestedCohort || activeCohort} onChange={(event) => {
+                    <select aria-label="Track 3 evaluation cohort" className={ui.input} value={requestedCohort || activeCohort} onChange={(event) => {
                       setRequestedCohort(event.target.value);
                       setSelectedCompareModels([]);
                       setReportModel(null);
                     }}>
-                      {spatialCohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.label || cohort.version} ({cohort.model_count} models)</option>)}
+                      {spatialCohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.label || cohort.version} ({cohort.model_count} {cohort.model_count === 1 ? "model" : "models"})</option>)}
                     </select>
                   </FilterField>
                   <p className="mt-2 text-sm text-muted">Rankings use one cohort at a time. Different sample sets are not directly comparable. Scores are self-reported and evidence-backed, not independently regraded.</p>

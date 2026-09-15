@@ -276,6 +276,17 @@ SQLite integrity. Public readiness fails when the mirror is missing, overdue, or
 on the same filesystem. Public startup also refuses a missing, disabled, or
 same-filesystem mirror configuration.
 
+Backup creation, validation, mirroring, download, and restore stream large
+payloads. SQLite's online backup API writes a temporary disk snapshot; compressed
+archives spill to a private temporary file after 1 MiB. This avoids loading the
+whole database or its evidence blobs into the API's RAM. Keep temporary storage
+on a writable disk with room for an uncompressed database snapshot plus the
+compressed archive; do not replace it with a small RAM-backed filesystem.
+Mirrors are validated before atomic publication, so a failed replacement keeps
+the previous archive. A second attached volume does not protect against every
+VM, account, or regional failure; production still needs independent off-host
+backup storage and regular recovery drills.
+
 Run an offline recovery drill without touching the live database:
 
 ```bash

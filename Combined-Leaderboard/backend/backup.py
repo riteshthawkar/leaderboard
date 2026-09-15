@@ -7,14 +7,15 @@ import json
 import logging
 import os
 import re
+import shutil
 import sqlite3
 import tempfile
 import threading
 import zipfile
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Optional
+from typing import BinaryIO, Dict, Optional
 
 from sqlalchemy.engine import make_url
 
@@ -61,31 +62,41 @@ def _sqlite_db_path(db_url: str) -> Optional[Path]:
     return Path(url.database).expanduser().resolve()
 
 
-def _backup_sqlite_to_bytes(path: Path) -> bytes:
-    """Return a consistent SQLite snapshot using the online backup API."""
-    target = io.BytesIO()
-    with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as source:
-        with sqlite3.connect(":memory:") as dest:
-            source.backup(dest)
-            for chunk in dest.iterdump():
-                # iterdump is not used for the backup bytes; this loop forces
-                # SQLite to materialize any deferred pages before serialize().
-                if chunk:
-                    break
-            data = dest.serialize()
-    target.write(data)
-    return target.getvalue()
+BACKUP_BUFFER_BYTES = 1024 * 1024
+
+
+def _write_sqlite_snapshot(path: Path, destination: Path) -> None:
+    """Keep a consistent online snapshot on disk, not in the API's memory."""
+    with closing(sqlite3.connect(f"file:{path}?mode=ro", uri=True)) as source:
+        with closing(sqlite3.connect(destination)) as target:
+            harden_private_file(destination)
+            source.execute("PRAGMA cache_size = -2048")
+            target.execute("PRAGMA cache_size = -2048")
+            source.backup(target, pages=256)
+
+
+def _copy_stream(source: BinaryIO, destination: BinaryIO) -> None:
+    shutil.copyfileobj(source, destination, length=BACKUP_BUFFER_BYTES)
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(BACKUP_BUFFER_BYTES):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def create_backup_archive(
     database_urls: Optional[Dict[str, str]] = None,
     extra_files: Optional[Dict[str, Path]] = None,
     now: Optional[datetime] = None,
-) -> tuple[io.BytesIO, str, dict]:
+) -> tuple[BinaryIO, str, dict]:
     """Build a ZIP archive containing SQLite snapshots and public cache files.
 
     Secrets such as `.env`, OAuth client secrets, ACS keys, and private ground
-    truths are intentionally excluded.
+    truths are intentionally excluded. The caller owns the returned seekable
+    stream and must close it; larger archives spill into a private temp file.
     """
     now = now or datetime.now(timezone.utc)
     timestamp = now.strftime("%Y%m%dT%H%M%SZ")
@@ -113,49 +124,55 @@ def create_backup_archive(
         "excluded": [".env", "ground_truths", "oauth_secrets", "acs_keys"],
     }
 
-    archive = io.BytesIO()
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(
-            "README.txt",
-            "MS-VISTA backup archive.\n"
-            "Includes SQLite database snapshots and public leaderboard cache files.\n"
-            "Does not include .env secrets or private ground-truth files.\n",
-        )
+    archive = tempfile.SpooledTemporaryFile(max_size=BACKUP_BUFFER_BYTES, mode="w+b")
+    try:
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr(
+                "README.txt",
+                "MS-VISTA backup archive.\n"
+                "Includes SQLite database snapshots and public leaderboard cache files.\n"
+                "Does not include .env secrets or private ground-truth files.\n",
+            )
 
-        for index, (path, labels) in enumerate(sorted(db_paths.items(), key=lambda item: str(item[0])), start=1):
-            entry = {
-                "labels": labels,
-                "source_path": str(path),
-                "exists": path.exists(),
-                "archive_path": None,
-            }
-            if path.exists():
-                archive_name = f"sqlite/{index:02d}-{_safe_label(labels[0])}-{path.name}"
-                zf.writestr(archive_name, _backup_sqlite_to_bytes(path))
-                entry["archive_path"] = archive_name
-            manifest["sqlite_databases"].append(entry)
+            for index, (path, labels) in enumerate(sorted(db_paths.items(), key=lambda item: str(item[0])), start=1):
+                entry = {
+                    "labels": labels,
+                    "source_path": str(path),
+                    "exists": path.exists(),
+                    "archive_path": None,
+                }
+                if path.exists():
+                    archive_name = f"sqlite/{index:02d}-{_safe_label(labels[0])}-{path.name}"
+                    with tempfile.TemporaryDirectory(prefix="ms-vista-snapshot-") as temp_dir:
+                        snapshot = Path(temp_dir) / "snapshot.db"
+                        _write_sqlite_snapshot(path, snapshot)
+                        zf.write(snapshot, archive_name)
+                    entry["archive_path"] = archive_name
+                manifest["sqlite_databases"].append(entry)
 
-        for label, path_value in extra_files.items():
-            path = Path(path_value)
-            entry = {
-                "label": label,
-                "source_path": str(path),
-                "exists": path.exists(),
-                "archive_path": None,
-            }
-            if path.exists() and path.is_file():
-                archive_name = f"files/{_safe_label(label)}{path.suffix}"
-                zf.write(path, archive_name)
-                entry["archive_path"] = archive_name
-            manifest["files"].append(entry)
+            for label, path_value in extra_files.items():
+                path = Path(path_value)
+                entry = {
+                    "label": label,
+                    "source_path": str(path),
+                    "exists": path.exists(),
+                    "archive_path": None,
+                }
+                if path.exists() and path.is_file():
+                    archive_name = f"files/{_safe_label(label)}{path.suffix}"
+                    zf.write(path, archive_name)
+                    entry["archive_path"] = archive_name
+                manifest["files"].append(entry)
 
-        zf.writestr("manifest.json", json.dumps(manifest, indent=2, sort_keys=True))
-
-    archive.seek(0)
+            zf.writestr("manifest.json", json.dumps(manifest, indent=2, sort_keys=True))
+        archive.seek(0)
+    except BaseException:
+        archive.close()
+        raise
     return archive, f"ms-vista-backup-{timestamp}.zip", manifest
 
 
-def validate_backup_archive(archive: io.BytesIO) -> dict:
+def validate_backup_archive(archive: BinaryIO) -> dict:
     """Validate ZIP integrity and every included SQLite snapshot."""
     archive.seek(0)
     sqlite_entries = []
@@ -173,8 +190,10 @@ def validate_backup_archive(archive: io.BytesIO) -> dict:
         with tempfile.TemporaryDirectory(prefix="ms-vista-backup-check-") as temp_dir:
             for index, name in enumerate(sorted(sqlite_entries), start=1):
                 db_path = Path(temp_dir) / f"snapshot-{index}.db"
-                db_path.write_bytes(zf.read(name))
-                with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as connection:
+                with zf.open(name) as source, db_path.open("wb") as destination:
+                    _copy_stream(source, destination)
+                harden_private_file(db_path)
+                with closing(sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)) as connection:
                     result = connection.execute("PRAGMA quick_check").fetchone()
                 if not result or result[0] != "ok":
                     raise RuntimeError(f"SQLite integrity check failed for {name}.")
@@ -207,14 +226,15 @@ def write_backup_archive(
         extra_files=extra_files,
         now=now,
     )
-    validation = validate_backup_archive(archive)
     destination = output_dir / filename
     temporary = output_dir / f".{filename}.tmp"
     try:
-        with open(temporary, "wb") as handle:
-            handle.write(archive.getbuffer())
-            handle.flush()
-            os.fsync(handle.fileno())
+        with archive:
+            validation = validate_backup_archive(archive)
+            with open(temporary, "wb") as handle:
+                _copy_stream(archive, handle)
+                handle.flush()
+                os.fsync(handle.fileno())
         os.chmod(temporary, 0o600)
         os.replace(temporary, destination)
     finally:
@@ -263,27 +283,25 @@ def mirror_backup_archive(
         raise ValueError("Backup mirror directory must differ from the primary backup directory.")
     harden_private_directory(mirror_dir)
 
-    payload = source.read_bytes()
-    source_digest = hashlib.sha256(payload).hexdigest()
-    source_validation = validate_backup_archive(io.BytesIO(payload))
+    source_digest = _file_sha256(source)
+    with source.open("rb") as handle:
+        source_validation = validate_backup_archive(handle)
     destination = mirror_dir / source.name
     temporary = mirror_dir / f".{source.name}.tmp"
     try:
-        with open(temporary, "wb") as handle:
-            handle.write(payload)
+        with source.open("rb") as source_handle, open(temporary, "wb") as handle:
+            _copy_stream(source_handle, handle)
             handle.flush()
             os.fsync(handle.fileno())
         harden_private_file(temporary)
+        mirror_digest = _file_sha256(temporary)
+        if not hmac.compare_digest(source_digest, mirror_digest):
+            raise RuntimeError("Mirrored backup checksum does not match the source archive.")
+        with temporary.open("rb") as handle:
+            mirror_validation = validate_backup_archive(handle)
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
-
-    mirrored_payload = destination.read_bytes()
-    mirror_digest = hashlib.sha256(mirrored_payload).hexdigest()
-    if not hmac.compare_digest(source_digest, mirror_digest):
-        destination.unlink(missing_ok=True)
-        raise RuntimeError("Mirrored backup checksum does not match the source archive.")
-    mirror_validation = validate_backup_archive(io.BytesIO(mirrored_payload))
 
     backups = sorted(
         mirror_dir.glob("ms-vista-backup-*.zip"),
@@ -300,14 +318,16 @@ def mirror_backup_archive(
         "zip_crc": "ok",
         "sqlite_quick_check": "ok",
     }
-def _write_restored_file(destination: Path, payload: bytes, *, overwrite: bool) -> None:
+
+
+def _write_restored_file(destination: Path, source: BinaryIO, *, overwrite: bool) -> None:
     if destination.exists() and not overwrite:
         raise FileExistsError(f"Restore target already exists: {destination}")
     harden_private_directory(destination.parent)
     temporary = destination.parent / f".{destination.name}.tmp"
     try:
         with open(temporary, "wb") as handle:
-            handle.write(payload)
+            _copy_stream(source, handle)
             handle.flush()
             os.fsync(handle.fileno())
         harden_private_file(temporary)
@@ -324,13 +344,13 @@ def restore_backup_archive(
 ) -> dict:
     """Validate and safely unpack a backup into an offline recovery directory."""
     archive_path = Path(archive_path).expanduser().resolve()
-    payload = archive_path.read_bytes()
-    validation = validate_backup_archive(io.BytesIO(payload))
     destination_dir = Path(destination_dir).expanduser().resolve()
     harden_private_directory(destination_dir)
     restored = []
 
-    with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+    with archive_path.open("rb") as archive:
+        validation = validate_backup_archive(archive)
+    with zipfile.ZipFile(archive_path) as zf:
         manifest = json.loads(zf.read("manifest.json"))
         selected = []
         selected.extend(
@@ -349,11 +369,12 @@ def restore_backup_archive(
             group = "sqlite" if archive_name.startswith("sqlite/") else "files"
             safe_name = Path(archive_name).name
             target = destination_dir / group / safe_name
-            _write_restored_file(target, zf.read(archive_name), overwrite=overwrite)
+            with zf.open(archive_name) as source:
+                _write_restored_file(target, source, overwrite=overwrite)
             restored.append(str(target))
         _write_restored_file(
             destination_dir / "manifest.json",
-            json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"),
+            io.BytesIO(json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8")),
             overwrite=overwrite,
         )
 

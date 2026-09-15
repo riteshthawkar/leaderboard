@@ -103,6 +103,12 @@ and two frozen contracts. Retrying every package produced no duplicates. All
 answer/artifact hashes and cache/database score fingerprints validated. No
 authentication records were copied into this rehearsal.
 
+The live administrative import on 2026-09-15 reproduced those counts and
+validated every retained answer/artifact hash. All 47 prior submission score
+fingerprints and all existing authentication records remained unchanged. The
+three imports were applied individually under the deployment maintenance lock;
+normal public upload limits were restored before bringing the API back online.
+
 The API accepts `GET /api/leaderboard/spatial?cohort=<manifest-sha256>` and returns
 the selected cohort plus available cohorts. Omitting the filter preserves the
 paper-aligned default; unknown cohorts return HTTP 400. The frontend applies the
