@@ -250,7 +250,7 @@ describe("leaderboard filter contracts", () => {
         "title",
         "Equal-weight mean of the Do You See Me and Mind's Eye task-score standard deviations, reported in percentage points. Lower values indicate more consistent performance across tasks; this is not repeated-run uncertainty.",
       );
-    expect(screen.getByRole("cell", { name: "10.0" })).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "10.0" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "15.0" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Model or organization")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/parameters/i)).not.toBeInTheDocument();
