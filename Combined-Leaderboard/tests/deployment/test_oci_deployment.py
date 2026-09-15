@@ -77,11 +77,20 @@ def test_micro_profile_is_explicit_and_keeps_production_guards():
     production_check = (DEPLOYMENT / "check_host.sh").read_text(encoding="utf-8")
 
     assert compose.count("file: ../oci/compose.yaml") == 3
-    assert 'GUNICORN_THREADS: "1"' in compose
-    assert "mem_limit: 512m" in compose
-    assert 'MAX_SPATIAL_SUBMISSION_BYTES: "33554432"' in compose
+    assert "GUNICORN_THREADS: ${MICRO_GUNICORN_THREADS:-1}" in compose
+    assert "mem_limit: ${API_MEMORY_LIMIT:-512m}" in compose
+    assert "MAX_SPATIAL_SUBMISSION_BYTES: ${MICRO_MAX_SPATIAL_SUBMISSION_BYTES:-33554432}" in compose
     assert "DISABLE_SUBMISSION_AUTH" not in compose
     assert "AUTO_BACKUP_ENABLED" not in compose
     assert "SwapTotal" in check
     assert "../oci/check_host.sh" in check
     assert "MIN_MEMORY_KIB:-3670016" in production_check
+
+
+def test_deployment_validates_capacity_before_changing_the_release():
+    deploy = (DEPLOYMENT.parent / "azure/deploy_release.sh").read_text()
+    assert deploy.index('bash "${DEPLOY_DIR}/check_capacity.sh"') < deploy.index('sed -i "s/^MS_VISTA_IMAGE_TAG=')
+    preflight = (DEPLOYMENT / "check_capacity.sh").read_text()
+    assert "config --format json" in preflight
+    assert "check_deployment_capacity.py" in preflight
+    assert 'bash "${DEPLOY_DIR}/check_host.sh"' in preflight

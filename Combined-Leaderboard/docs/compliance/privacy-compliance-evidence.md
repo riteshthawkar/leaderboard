@@ -66,7 +66,50 @@ Completion procedure:
 
 Registration evidence remains incomplete until the Web Compliance Portal record URL and screenshot are attached to RC&ET. Do not mark the task complete based only on this repository record.
 
-## Verification commands
+## 2026-09-15 deployment review
+
+Automated checks on this revision: 499 Python tests passed, 4 skipped; 61
+frontend tests passed; frontend lint passed. The GitHub Pages production build
+passed, with an existing large-chunk size warning. These are technical test
+results, not evidence of the external registration or live identity-provider
+approval described below.
+
+The current testing frontend is GitHub Pages and the API/storage run on OCI.
+The data notice now reflects that deployment rather than the former Hugging
+Face plan. It explicitly warns that the entire published Track 3 archive,
+including raw model outputs and any reasoning text, is public. Personal data
+embedded in evidence is not automatically removed by account deletion.
+
+The application-controlled cookie/browser-storage inventory is available at
+`/privacy#browser-storage-inventory` (prepend the Pages project base path).
+It includes `lb_refresh_token_v1` in session storage, `lb_user`, `lb_csrf_token`
+and `vci-theme` in local storage, and API-origin `ms_vista_session` and
+`vista_oauth_state` cookies. Bearer access tokens remain in memory. OAuth may
+use cookies even though ordinary GitHub Pages API calls omit credentials.
+Provider-controlled identity-page storage must be included in the owner's
+broader inventory review. No advertising/analytics integrations were added.
+
+This URL is evidence for the inventory, **not a WCP registration**. The FTE
+owners must record the approved inventory URL in WCP/RC&ET, complete the saved
+website-registration record, and review the final hosting and canonical URL.
+The service owner must also resolve age/region/parental-consent requirements:
+the application currently verifies account access, not age or parental consent.
+
+GitHub Pages builds now restrict CSP connections to the configured API origin
+instead of arbitrary HTTPS destinations. Pages uses a meta CSP; it cannot set
+application-specific `Permissions-Policy` or `frame-ancestors` response headers.
+The smoke checker reports this hosting limitation rather than declaring those
+headers present. Acceptance of that limitation remains an owner decision.
+
+Account export/deletion and authorization tests use isolated test databases;
+they do not delete live accounts or send real verification email. A full live
+Microsoft sign-in still requires an interactive account-holder/MFA test.
+Older backup copies expire by retention, and any restore must reapply later
+deletions before reopening access. The separate backup volume is not an
+independent off-region recovery copy. None of these technical checks certifies
+legal compliance or replaces the external approvals above.
+
+## Repeatable checks
 
 ```bash
 cd Combined-Leaderboard

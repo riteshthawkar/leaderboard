@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { buildContentSecurityPolicy } from "./build-security.js";
 
 function isHttpOrigin(value) {
   try {
@@ -41,7 +42,20 @@ export default defineConfig(({ mode }) => {
   }
   return {
     base: basePath,
-    plugins: [react()],
+    plugins: [react(), {
+      name: "production-csp",
+      apply: "build",
+      transformIndexHtml() {
+        return [{
+          tag: "meta",
+          attrs: {
+            "http-equiv": "Content-Security-Policy",
+            content: buildContentSecurityPolicy(isSameOrigin || isStatic ? "" : apiBaseUrl),
+          },
+          injectTo: "head-prepend",
+        }];
+      },
+    }],
     build: {
       outDir: isStatic ? "dist-static" : "dist",
       emptyOutDir: true,

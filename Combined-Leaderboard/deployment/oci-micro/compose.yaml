@@ -10,24 +10,24 @@ services:
       - ${MS_VISTA_ENV_FILE:-production.env}
     environment:
       WEB_CONCURRENCY: "1"
-      GUNICORN_THREADS: "1"
+      GUNICORN_THREADS: ${MICRO_GUNICORN_THREADS:-1}
       OPENBLAS_NUM_THREADS: "1"
       OMP_NUM_THREADS: "1"
-      MAX_CONTENT_LENGTH: "16777216"
-      MAX_FILE_SIZE_PER_SUBMISSION: "16777216"
-      MAX_SPATIAL_ARCHIVE_BYTES: "10485760"
-      MAX_SPATIAL_MULTIPART_BYTES: "12582912"
-      MAX_SPATIAL_SUBMISSION_BYTES: "33554432"
-    mem_limit: 512m
-    memswap_limit: 768m
+      MAX_CONTENT_LENGTH: ${MICRO_MAX_CONTENT_LENGTH:-16777216}
+      MAX_FILE_SIZE_PER_SUBMISSION: ${MICRO_MAX_FILE_SIZE_PER_SUBMISSION:-16777216}
+      MAX_SPATIAL_ARCHIVE_BYTES: ${MICRO_MAX_SPATIAL_ARCHIVE_BYTES:-10485760}
+      MAX_SPATIAL_MULTIPART_BYTES: ${MICRO_MAX_SPATIAL_MULTIPART_BYTES:-12582912}
+      MAX_SPATIAL_SUBMISSION_BYTES: ${MICRO_MAX_SPATIAL_SUBMISSION_BYTES:-33554432}
+    mem_limit: ${API_MEMORY_LIMIT:-512m}
+    memswap_limit: ${API_MEMORY_SWAP_LIMIT:-768m}
     pids_limit: 128
 
   frontend:
     extends:
       file: ../oci/compose.yaml
       service: frontend
-    mem_limit: 32m
-    memswap_limit: 64m
+    mem_limit: ${FRONTEND_MEMORY_LIMIT:-32m}
+    memswap_limit: ${FRONTEND_MEMORY_SWAP_LIMIT:-64m}
     pids_limit: 32
 
   caddy:
@@ -36,10 +36,10 @@ services:
       service: caddy
     env_file: !override
       - ${MS_VISTA_ENV_FILE:-production.env}
-    mem_limit: 96m
-    memswap_limit: 128m
+    mem_limit: ${CADDY_MEMORY_LIMIT:-96m}
+    memswap_limit: ${CADDY_MEMORY_SWAP_LIMIT:-128m}
     environment:
-      GOMEMLIMIT: 64MiB
+      GOMEMLIMIT: ${CADDY_GO_MEMORY_LIMIT:-64MiB}
 
 networks:
   app:

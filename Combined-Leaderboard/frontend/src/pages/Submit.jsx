@@ -784,7 +784,7 @@ export function Submit() {
                   </div>
                   {task.harness && (
                     <p className="text-sm text-muted">
-                      Run <code>spatial_harness/run_eval.sh</code>, then upload the generated <code>track3_artifact_submission.zip</code> package unchanged. Its claimed scores, final answers, compressed model outputs, provenance, and checksums are retained for audit.
+                      Run <code>spatial_harness/run_eval.sh</code>, then upload the generated <code>track3_artifact_submission.zip</code> package unchanged. The entire package becomes public with the result, including compressed model outputs and any reasoning text. Do not include personal data, contact details, credentials, or confidential material.
                     </p>
                   )}
                   {task.harness && submissionReady === false && (

@@ -19,7 +19,7 @@ done
 cpus=$(getconf _NPROCESSORS_ONLN)
 memory_kib=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
 (( cpus >= MIN_CPUS )) || fail "At least ${MIN_CPUS} CPUs are required; found ${cpus}."
-(( memory_kib >= MIN_MEMORY_KIB )) || fail "At least 3.5 GiB RAM is required."
+(( memory_kib >= MIN_MEMORY_KIB )) || fail "At least ${MIN_MEMORY_KIB} KiB RAM is required; found ${memory_kib}."
 
 [[ -d ${DATA_DIR} ]] || fail "Data directory is missing: ${DATA_DIR}"
 [[ -d ${BACKUP_DIR} ]] || fail "Backup directory is missing: ${BACKUP_DIR}"

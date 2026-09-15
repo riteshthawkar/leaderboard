@@ -64,3 +64,11 @@ def test_production_smoke_validates_public_controls(monkeypatch):
 
     assert result["status"] == "passed"
     assert not result["failed_checks"]
+
+
+def test_pages_csp_requires_exact_api_origin_and_rejects_broad_https():
+    valid = b'''<meta http-equiv="Content-Security-Policy" content="default-src 'self'; object-src 'none'; script-src 'self'; connect-src 'self' https://api.example.com">'''
+    assert production_smoke._pages_csp_valid(valid, "https://api.example.com")
+    assert not production_smoke._pages_csp_valid(valid, "https://wrong.example.com")
+    assert not production_smoke._pages_csp_valid(valid.replace(b"https://api.example.com", b"https:"), "https://api.example.com")
+    assert not production_smoke._pages_csp_valid(b"<html></html>", "https://api.example.com")

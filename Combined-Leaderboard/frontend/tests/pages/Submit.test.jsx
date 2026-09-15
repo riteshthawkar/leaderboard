@@ -171,6 +171,8 @@ describe("spatial submission contract", () => {
       "Official spatial harness non-CoT and CoT prompts, verified by the packaged run manifest.",
     );
     expect(screen.getByText("track3_artifact_submission.zip")).toBeInTheDocument();
+    expect(screen.getByText(/The entire package becomes public with the result/)).toBeInTheDocument();
+    expect(screen.getByText(/Do not include personal data, contact details, credentials/)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Spatial submissions not open" })).toBeDisabled();

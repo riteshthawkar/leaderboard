@@ -1,4 +1,5 @@
 import { WorkspacePage } from "@/components/WorkspacePage";
+import { AUTH_TRANSPORT } from "@/lib/api";
 
 const sections = [
   {
@@ -11,24 +12,33 @@ const sections = [
   },
   {
     title: "Submission files",
-    body: "Visual capability response files are validated and scored in memory, with normalized final answers retained for owner and administrator audit. Reasoning-analysis submissions are different: the original ZIP, per sample final answer evidence, run manifest, aggregate report, scores, and integrity hashes are retained in the database and made public with the leaderboard result. Raw reasoning traces are not required or published.",
+    body: "Visual capability response files are validated and scored in memory, with normalized final answers retained for owner and administrator audit. Reasoning-analysis submissions are different: the entire submitted Track 3 ZIP, including final answers, compressed model outputs, provenance, scores, and hashes, is retained and made public with the published result. Model outputs may contain reasoning text. Do not include personal data, contact details, credentials, or confidential material anywhere in the package. Public downloads can be copied by others; removing a result cannot recall those copies.",
   },
   {
     title: "Storage and retention",
-    body: "Account and submission records are stored in a protected SQLite database. Verified backup archives are retained according to the deployment retention policy. Records may remain while the research leaderboard is active or as needed to preserve published evaluation history.",
+    body: "Account and submission records are stored in a restricted database. Verified backups use a separate restricted storage volume and rotate according to the deployment retention policy. Deletion from the live service does not immediately erase older backups; those copies remain until they expire. Published evaluation records may remain while the research leaderboard is active. Restoring a backup requires the operator to reapply subsequent account-deletion requests before reopening the service.",
   },
   {
     title: "Service providers",
-    body: "Hugging Face provides application hosting and private storage. Microsoft or Google may process identity information when their sign in option is selected. Azure Communication Services may deliver verification and password reset email.",
+    body: "The current deployment uses GitHub Pages for the frontend and Oracle Cloud Infrastructure for the backend, database, and backup storage. Azure Communication Services delivers verification and password reset email. Selecting Microsoft sign in sends you to Microsoft's identity service. These providers may process connection and security information under their own terms. This hosting description is not a claim of Microsoft privacy or compliance approval.",
   },
   {
     title: "Children and minimum age",
-    body: "This leaderboard is a research tool intended for researchers and practitioners. It is not directed to children. You must be at least 16 years old to create an account or make a submission, and we do not knowingly collect personal information from anyone under 16. Where a sign in provider is used, that provider verifies the account holder; we receive only an email address and a provider identifier. If you believe someone under 16 has created an account, contact the project administrator and it will be removed.",
+    body: "This research leaderboard is intended for researchers and practitioners aged 16 or older and is not directed to children. Sign in verifies account access; it does not independently verify a person's age or establish parental consent. If you believe a child has created an account, contact the project administrator for review and removal. The service owner must review any applicable age, region, or parental-consent requirements before a public production launch.",
   },
   {
     title: "Cookies and security",
-    body: "The application uses an essential secure session cookie and browser storage for cross site request protection, theme preference, and session recovery. Operational safeguards include access controls, request limits, encrypted transport, restricted backups, and audit records.",
+    body: "MS-VISTA does not include advertising or analytics trackers. Essential browser storage supports sign in, session recovery, request protection, and theme preference. GitHub Pages uses bearer authentication rather than cross-site session cookies; the same-origin backend frontend can use a secure HttpOnly session cookie. Microsoft sign in may temporarily use an API-origin cookie to protect the redirect flow, and Microsoft controls storage on its own sign-in pages. Operational safeguards include access controls, request limits, encrypted transport, restricted backups, and audit records.",
   },
+];
+
+const storage = [
+  ["lb_refresh_token_v1", "Session storage", "Rotating refresh token for bearer sign in; access tokens stay in memory.", "Cleared on logout or when the tab session ends; also expires server-side."],
+  ["lb_user", "Local storage", "Cached signed-in email and session UI information; not authorization proof.", "Cleared on logout or invalid session; otherwise until browser data is cleared."],
+  ["lb_csrf_token", "Local storage", "Request-protection token for cookie authentication.", "Cleared on logout or invalid session."],
+  ["vci-theme", "Local storage", "Chosen light or dark appearance.", "Until changed or browser data is cleared."],
+  ["ms_vista_session", "Secure HttpOnly cookie on the API origin", "Same-origin session and temporary OAuth redirect state; not required for GitHub Pages bearer API requests.", "Session or configured server expiry; cleared on logout."],
+  ["vista_oauth_state", "Secure HttpOnly cookie on the API origin", "Binds Microsoft sign-in redirects to the browser that started them.", "Ten-minute maximum; removed when the redirect flow completes."],
 ];
 
 export function Privacy() {
@@ -58,9 +68,21 @@ export function Privacy() {
           </section>
         ))}
       </div>
+      <section id="browser-storage-inventory" className="border-b border-border-strong px-6 py-8 lg:px-8">
+        <h2 className="font-display text-xl font-semibold">Browser storage inventory</h2>
+        <p className="mt-3 text-sm text-muted">This frontend uses {AUTH_TRANSPORT === "bearer" ? "bearer" : "cookie"} authentication. This inventory covers application-controlled storage, not the contents of third-party sign-in pages.</p>
+        <dl className="mt-5 divide-y divide-border">
+          {storage.map(([name, type, purpose, lifetime]) => (
+            <div key={name} className="py-4">
+              <dt className="break-words font-mono text-sm font-semibold">{name}</dt>
+              <dd className="mt-2 text-sm leading-6 text-muted">{type}. {purpose} {lifetime}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
       <div className="border-b border-border-strong px-6 py-8 lg:px-8">
         <p className="m-0 max-w-4xl leading-7 text-muted">
-          You may review your account and submission history through the application. You can download a copy of your account data, and you can delete your account at any time from your profile: deleting removes your identity from our records, while results already published on the leaderboard are retained in anonymised form so that the research record stays reproducible. Any other request concerning correction, removal, or privacy should be directed to the project administrator. This notice was last updated on 2 September 2026.
+          You can download your account data and request account deletion from your profile. Deletion removes the live authentication record and anonymises the account linkage in retained submissions; published model metadata and evidence remain part of the research record. Personal information embedded by a submitter inside an uploaded file is not automatically scrubbed. For correction, evidence removal, or other privacy requests, contact the project administrator. This notice was last updated on 15 September 2026.
         </p>
       </div>
     </WorkspacePage>

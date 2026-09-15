@@ -210,7 +210,7 @@ const faqs = [
   {
     question: "Are private answers or submitted outputs exposed?",
     answer:
-      "Private ground truth never leaves the evaluation service. Perception and cognition response exports remain available only to the account owner and administrators. Spatial final answer evidence, its aggregate report, manifest, hashes, and original ZIP are public so anyone can audit a published reasoning-analysis score. Free form reasoning traces are not required or published.",
+      "Private ground truth is not published. Perception and cognition response exports remain available only to the account owner and administrators. The entire Track 3 evidence ZIP is public, including final answers, model outputs that may contain reasoning text, scores, provenance, and hashes. Never include personal data, credentials, or confidential material in a public submission.",
   },
 ];
 

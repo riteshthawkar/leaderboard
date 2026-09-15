@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+from html.parser import HTMLParser
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
@@ -25,6 +26,36 @@ def _json(url: str, *, origin: str | None = None) -> tuple[int, dict, dict]:
 def _origin(value: str) -> str:
     parsed = urlparse(value.rstrip("/"))
     return f"{parsed.scheme}://{parsed.netloc}"
+
+
+class _HtmlPolicies(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.csp = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == "meta" and attributes.get("http-equiv", "").lower() == "content-security-policy":
+            self.csp.append(attributes.get("content", ""))
+
+
+def _pages_csp_valid(body: bytes, api_origin: str) -> bool:
+    parser = _HtmlPolicies()
+    parser.feed(body.decode("utf-8"))
+    for policy in parser.csp:
+        directives = {}
+        for directive in policy.split(";"):
+            parts = directive.strip().split()
+            if parts:
+                directives[parts[0]] = parts[1:]
+        if (
+            directives.get("default-src") == ["'self'"]
+            and directives.get("object-src") == ["'none'"]
+            and directives.get("script-src") == ["'self'"]
+            and set(directives.get("connect-src", [])) == {"'self'", api_origin}
+        ):
+            return True
+    return False
 
 
 def run(api_url: str, frontend_url: str, *, allow_http: bool, require_spatial: bool) -> dict:
@@ -67,12 +98,20 @@ def run(api_url: str, frontend_url: str, *, allow_http: bool, require_spatial: b
     provider_ids = {provider.get("id") for provider in providers.get("providers", [])}
     checks["microsoft_oauth_configured"] = providers_status == 200 and "microsoft" in provider_ids
 
-    frontend_status, frontend_headers, _frontend_body = _request(frontend_url)
+    frontend_status, frontend_headers, frontend_body = _request(frontend_url)
     normalized_headers = {key.lower(): value for key, value in frontend_headers.items()}
+    github_pages = (urlparse(frontend_origin).hostname or "").endswith(".github.io")
+    limitations = []
     checks["frontend_available"] = frontend_status == 200
-    checks["frontend_csp"] = "content-security-policy" in normalized_headers
+    checks["frontend_csp"] = (
+        _pages_csp_valid(frontend_body, api_origin)
+        if github_pages else "content-security-policy" in normalized_headers
+    )
     checks["frontend_hsts"] = allow_http or "strict-transport-security" in normalized_headers
-    checks["frontend_permissions_policy"] = "permissions-policy" in normalized_headers
+    if github_pages:
+        limitations.append("GitHub Pages does not provide application-configurable Permissions-Policy or CSP frame-ancestors headers. Meta CSP does not replace these controls; hosting acceptance remains an owner decision.")
+    else:
+        checks["frontend_permissions_policy"] = "permissions-policy" in normalized_headers
 
     failed = sorted(name for name, passed in checks.items() if not passed)
     return {
@@ -81,6 +120,7 @@ def run(api_url: str, frontend_url: str, *, allow_http: bool, require_spatial: b
         "frontend_origin": frontend_origin,
         "checks": checks,
         "failed_checks": failed,
+        "limitations": limitations,
     }
 
 

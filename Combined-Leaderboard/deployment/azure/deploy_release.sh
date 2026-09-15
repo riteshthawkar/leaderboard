@@ -71,6 +71,11 @@ REQUIRE_SPATIAL=$(sed -n 's/^REQUIRE_OFFICIAL_SPATIAL=//p' "${ENV_FILE}" | tr '[
 
 docker image inspect "ms-vista-api:${TAG}" "ms-vista-frontend:${TAG}" >/dev/null
 
+# OCI capacity checks inspect the resolved configuration without printing secrets.
+if [[ -f ${DEPLOY_DIR}/check_capacity.sh ]]; then
+  bash "${DEPLOY_DIR}/check_capacity.sh"
+fi
+
 install -d -m 700 -o root -g root "${BACKUP_DIR}"
 install -d -m 700 -o root -g root "${MANIFEST_DIR}"
 install -m 600 -o root -g root "${ENV_FILE}" "${ENV_BACKUP}"
