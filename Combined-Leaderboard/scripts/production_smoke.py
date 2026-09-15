@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+import time
 from html.parser import HTMLParser
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
@@ -130,16 +131,27 @@ def main(argv=None) -> int:
     parser.add_argument("--frontend-url", required=True)
     parser.add_argument("--allow-http", action="store_true", help="Allow local HTTP origins.")
     parser.add_argument("--require-spatial", action="store_true")
+    parser.add_argument(
+        "--attempts", type=int, choices=range(1, 7), default=1,
+        help="Bounded startup retries, five seconds apart; every check must pass.",
+    )
     args = parser.parse_args(argv)
-    try:
-        result = run(
-            args.api_url,
-            args.frontend_url,
-            allow_http=args.allow_http,
-            require_spatial=args.require_spatial,
-        )
-    except (HTTPError, URLError, TimeoutError, ValueError, RuntimeError) as exc:
-        result = {"status": "failed", "error": str(exc)}
+    for attempt in range(1, args.attempts + 1):
+        try:
+            result = run(
+                args.api_url,
+                args.frontend_url,
+                allow_http=args.allow_http,
+                require_spatial=args.require_spatial,
+            )
+        except (HTTPError, URLError, TimeoutError, ValueError, RuntimeError) as exc:
+            result = {"status": "failed", "error": str(exc)}
+        result = {**result, "attempts": attempt}
+        if result.get("status") == "passed":
+            break
+        if attempt < args.attempts:
+            print(json.dumps({"retrying_startup_check": result}), file=sys.stderr, flush=True)
+            time.sleep(5)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result.get("status") == "passed" else 1
 

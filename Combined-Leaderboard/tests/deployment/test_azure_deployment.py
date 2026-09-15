@@ -18,6 +18,7 @@ def test_release_deployment_has_smoke_checked_rollback_and_locking():
 
     assert "ms-vista-deployment.lock" in script
     assert "scripts/production_smoke.py" in script
+    assert "--attempts 6" in script
     assert "restored and verified image tag" in script
     assert "CRITICAL: deployment and automatic rollback both failed" in script
     assert "RELEASE_COMMIT_FILE" in script

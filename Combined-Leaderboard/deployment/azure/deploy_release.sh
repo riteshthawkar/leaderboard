@@ -115,6 +115,7 @@ run_production_smoke() {
     "${APP_DIR}/scripts/production_smoke.py"
     --api-url "https://${DOMAIN}"
     --frontend-url "https://${DOMAIN}"
+    --attempts 6
   )
   if [[ ${REQUIRE_SPATIAL} == true ]]; then
     smoke_args+=(--require-spatial)

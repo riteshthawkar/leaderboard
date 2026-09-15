@@ -36,6 +36,12 @@ Container limits are deliberately not silently increased after an OOM. Record
 the failing payload and upgrade before testing larger workloads. Do not bypass
 authentication or readiness checks to make a deployment appear healthy.
 
+Release and rollback verification allow at most six complete smoke-check
+attempts, five seconds apart, for cold startup on shared CPUs. All readiness,
+privacy-related configuration, and backup checks must pass in one attempt;
+exhausting the retries still fails the release. This is startup tolerance, not
+a throughput guarantee or permission to ignore ongoing request timeouts.
+
 ## Resource upgrades without application changes
 
 CPU/RAM upgrades on the same architecture do not require application source

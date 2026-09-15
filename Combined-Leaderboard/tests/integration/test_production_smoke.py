@@ -1,4 +1,7 @@
 from pathlib import Path
+import json
+
+import pytest
 
 import production_smoke  # noqa: E402
 
@@ -72,3 +75,58 @@ def test_pages_csp_requires_exact_api_origin_and_rejects_broad_https():
     assert not production_smoke._pages_csp_valid(valid, "https://wrong.example.com")
     assert not production_smoke._pages_csp_valid(valid.replace(b"https://api.example.com", b"https:"), "https://api.example.com")
     assert not production_smoke._pages_csp_valid(b"<html></html>", "https://api.example.com")
+
+
+def test_startup_retry_requires_a_complete_success(monkeypatch, capsys):
+    outcomes = iter([
+        TimeoutError("startup timeout"),
+        {"status": "failed", "failed_checks": ["api_readiness"]},
+        {"status": "passed", "failed_checks": []},
+    ])
+    delays = []
+
+    def check(*_args, **kwargs):
+        assert kwargs["require_spatial"] is True
+        result = next(outcomes)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(production_smoke, "run", check)
+    monkeypatch.setattr(production_smoke.time, "sleep", delays.append)
+    status = production_smoke.main([
+        "--api-url", "https://api.example.com", "--frontend-url", "https://app.example.com",
+        "--attempts", "6", "--require-spatial",
+    ])
+    assert status == 0
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {"status": "passed", "failed_checks": [], "attempts": 3}
+    assert delays == [5, 5]
+    assert "startup timeout" in output.err
+    assert "api_readiness" in output.err
+
+
+def test_startup_retries_do_not_hide_persistent_failure(monkeypatch, capsys):
+    delays = []
+    monkeypatch.setattr(production_smoke, "run", lambda *_args, **_kwargs: {
+        "status": "failed", "failed_checks": ["verified_admin"],
+    })
+    monkeypatch.setattr(production_smoke.time, "sleep", delays.append)
+    assert production_smoke.main([
+        "--api-url", "https://api.example.com", "--frontend-url", "https://app.example.com",
+        "--attempts", "6",
+    ]) == 1
+    assert delays == [5] * 5
+    assert json.loads(capsys.readouterr().out) == {
+        "status": "failed", "failed_checks": ["verified_admin"], "attempts": 6,
+    }
+
+
+@pytest.mark.parametrize("attempts", ["0", "7"])
+def test_startup_attempts_are_bounded(attempts):
+    with pytest.raises(SystemExit) as error:
+        production_smoke.main([
+            "--api-url", "https://api.example.com", "--frontend-url", "https://app.example.com",
+            "--attempts", attempts,
+        ])
+    assert error.value.code == 2
