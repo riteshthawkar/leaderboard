@@ -85,7 +85,7 @@ except ImportError:  # pragma: no cover - Windows fallback
     fcntl = None
 
 _DB_URL = SUBMISSION_DATABASE_URL
-SUBMISSION_SCHEMA_VERSION = 5
+SUBMISSION_SCHEMA_VERSION = 6  # keep equal to the last entry in init_db()'s migration list
 
 
 def _sqlite_db_path(db_url: str) -> Optional[Path]:
@@ -179,6 +179,9 @@ class Submission(Base):
     model_id = Column(String(64), ForeignKey("registered_models.id"), nullable=True, index=True)
     status = Column(String(16), nullable=False, default="accepted")  # accepted | scored | failed
     request_id = Column(String(64), nullable=True)
+    # Legacy column: client IPs are no longer recorded with submissions (nothing used them, and
+    # the privacy plan commits to not storing them). Schema migration 6 clears existing values;
+    # the column is kept only so databases created by older releases stay readable.
     ip = Column(String(64), nullable=True)
     score_submission_id = Column(String(64), nullable=True)
     file_sha256 = Column(String(64), nullable=True)
@@ -290,6 +293,13 @@ class SubmissionArtifact(Base):
     )
 
 
+def _clear_legacy_submission_ips(connection) -> None:
+    """Remove client IPs recorded by earlier releases. Idempotent."""
+    existing = {col["name"] for col in inspect(connection).get_columns("submissions")}
+    if "ip" in existing:
+        connection.execute(text("UPDATE submissions SET ip = NULL WHERE ip IS NOT NULL"))
+
+
 def init_db() -> None:
     migrations = [
         (1, _ensure_submission_columns),
@@ -297,6 +307,7 @@ def init_db() -> None:
         (3, _ensure_submission_integrity_indexes),
         (4, _ensure_submission_artifacts),
         (5, _ensure_spatial_contracts),
+        (6, _clear_legacy_submission_ips),
     ]
     if _DB_DRIVER.startswith("postgresql"):
         with _engine.begin() as connection:
@@ -531,7 +542,6 @@ def try_consume_quota(
     model_name: Optional[str] = None,
     model_id: Optional[str] = None,
     request_id: Optional[str] = None,
-    ip: Optional[str] = None,
     limit: Optional[int] = None,
 ) -> QuotaResult:
     """Reserve one daily submission slot. Inserts an 'accepted' row if allowed."""
@@ -564,7 +574,6 @@ def try_consume_quota(
             model_id=model_id,
             status="accepted",
             request_id=request_id,
-            ip=ip,
             created_at=now,
         )
         session.add(row)
@@ -1010,7 +1019,6 @@ def export_user_submission_data(user_email: str) -> Dict:
             summary.update({
                 "database_id": row.id,
                 "request_id": row.request_id,
-                "source_ip": row.ip,
             })
             submissions.append(summary)
         return {
@@ -1031,7 +1039,7 @@ def rewrite_user_identity(old_email: str, new_email: str) -> Dict[str, int]:
         submission_count = session.query(Submission).filter(
             func.lower(Submission.user_email) == old_email,
         ).update(
-            {Submission.user_email: new_email},
+            {Submission.user_email: new_email, Submission.ip: None},
             synchronize_session=False,
         )
         model_count = session.query(RegisteredModel).filter(

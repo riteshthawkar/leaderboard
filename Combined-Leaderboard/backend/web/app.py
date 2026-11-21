@@ -1058,7 +1058,6 @@ def _enforce_quota(task_id: str, model_name: str, model_id: str):
             model_name,
             model_id=model_id,
             request_id=getattr(g, "request_id", None),
-            ip=get_remote_address(),
             limit=1_000_000,
         )
         return result.submission_id, None
@@ -1066,7 +1065,7 @@ def _enforce_quota(task_id: str, model_name: str, model_id: str):
         return None, None
     result = try_consume_quota(
         email, task_id, model_name, model_id=model_id,
-        request_id=getattr(g, "request_id", None), ip=get_remote_address(),
+        request_id=getattr(g, "request_id", None),
     )
     if result.allowed:
         return result.submission_id, None

@@ -86,6 +86,9 @@ def test_export_returns_account_data_and_no_secrets(data_rights_app):
         "replaced_by_digest",
     ):
         assert secret_field not in encoded
+    # client IPs are no longer recorded or exported; the legacy IP seeded above must not appear
+    assert "source_ip" not in encoded
+    assert "203.0.113.10" not in encoded
 
 
 def test_export_requires_authentication(auth_app):
@@ -122,6 +125,7 @@ def test_delete_anonymises_and_preserves_published_rows(data_rights_app):
     assert len(submissions) == 1, "published submission was destroyed"
     assert len(models) == 1, "registered model was destroyed"
     assert submissions[0].user_email.endswith("@anonymized.invalid")
+    assert submissions[0].ip is None, "a legacy client IP survived account deletion"
     assert models[0].owner_email == submissions[0].user_email
 
     # ...and the session no longer authenticates

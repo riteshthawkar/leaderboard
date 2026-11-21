@@ -4,7 +4,7 @@ import { AUTH_TRANSPORT } from "@/lib/api";
 const sections = [
   {
     title: "Information collected",
-    body: "Account records include your email address, verification status, sign in provider, and a password hash when email authentication is used. Submission records include model metadata, final answers, scores, file hashes, request identifiers, and limited network information used for security and quotas.",
+    body: "Account records include your email address, verification status, sign in provider, and a password hash when email authentication is used. Submission records include model metadata, final answers, scores, file hashes, and request identifiers. IP addresses are not stored with accounts or submissions; they are used briefly to limit request rates and appear in the web server's access log.",
   },
   {
     title: "How information is used",
@@ -82,7 +82,7 @@ export function Privacy() {
       </section>
       <div className="border-b border-border-strong px-6 py-8 lg:px-8">
         <p className="m-0 max-w-4xl leading-7 text-muted">
-          You can download your account data and request account deletion from your profile. Deletion removes the live authentication record and anonymises the account linkage in retained submissions; published model metadata and evidence remain part of the research record. Personal information embedded by a submitter inside an uploaded file is not automatically scrubbed. For correction, evidence removal, or other privacy requests, contact the project administrator. This notice was last updated on 15 September 2026.
+          You can download your account data and request account deletion from your profile. Deletion removes the live authentication record and anonymises the account linkage in retained submissions; published model metadata and evidence remain part of the research record. Personal information embedded by a submitter inside an uploaded file is not automatically scrubbed. For correction, evidence removal, or other privacy requests, contact the project administrator. This notice was last updated on 22 November 2026.
         </p>
       </div>
     </WorkspacePage>
