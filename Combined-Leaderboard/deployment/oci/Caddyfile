@@ -17,6 +17,19 @@
 
 	log {
 		output stdout
-		format json
+		# Shorten client addresses (IPv4 /24, IPv6 /48) so the access log cannot identify a
+		# visitor, and drop the forwarding header, which would repeat the full address.
+		format filter {
+			wrap json
+			request>remote_ip ip_mask {
+				ipv4 24
+				ipv6 48
+			}
+			request>client_ip ip_mask {
+				ipv4 24
+				ipv6 48
+			}
+			request>headers>X-Forwarded-For delete
+		}
 	}
 }

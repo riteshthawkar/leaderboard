@@ -1,5 +1,6 @@
 """Production Flask API service for the MS-VISTA leaderboard."""
 
+import ipaddress
 import os
 import re
 import secrets
@@ -2043,6 +2044,23 @@ if "pytest" not in sys.modules:
     backup_scheduler.start()
     atexit.register(backup_scheduler.stop)
 
+def _log_safe_ip(address) -> str:
+    """Shorten a client IP before it is logged: keep the network, drop the host.
+
+    IPv4 keeps the first three octets (/24) and IPv6 the first 48 bits, the usual anonymisation
+    for web logs: enough to recognise an abusive network, not enough to identify a visitor.
+    Application logs rotate by size and outlive accounts, so they must never hold full addresses.
+    """
+    try:
+        ip = ipaddress.ip_address(str(address or "").strip())
+    except ValueError:
+        return "unknown"
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    prefix = 24 if ip.version == 4 else 48
+    return str(ipaddress.ip_network(f"{ip}/{prefix}", strict=False).network_address)
+
+
 # Generate request ID for tracking
 @app.before_request
 def before_request():
@@ -2068,7 +2086,7 @@ def before_request():
         f"Incoming {request.method} {request.path}",
         extra={
             "request_id": g.request_id,
-            "remote_addr": request.remote_addr,
+            "remote_addr": _log_safe_ip(request.remote_addr),
             "user_agent": request.user_agent.string
         }
     )
@@ -2133,7 +2151,7 @@ def not_found(error):
 @app.errorhandler(413)
 def request_entity_too_large(error):
     """Handle 413 errors (file too large)."""
-    logger.warning(f"Request entity too large from {request.remote_addr}")
+    logger.warning(f"Request entity too large from {_log_safe_ip(request.remote_addr)}")
     auth_request = request.path.startswith("/api/auth/")
     model_request = request.path.rstrip("/") == "/api/models"
     spatial_upload = request.path.rstrip("/") == "/api/tasks/spatial/submit"
@@ -2168,7 +2186,7 @@ def request_entity_too_large(error):
 @app.errorhandler(429)
 def ratelimit_handler(e):
     """Handle rate limiting."""
-    logger.warning(f"Rate limit exceeded for {request.remote_addr}: {e.description}")
+    logger.warning(f"Rate limit exceeded for {_log_safe_ip(request.remote_addr)}: {e.description}")
     try:
         retry_after = int(e.limit.limit.get_expiry())
     except (AttributeError, TypeError, ValueError):
