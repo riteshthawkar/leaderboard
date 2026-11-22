@@ -42,16 +42,6 @@ export function PageHero({ eyebrow, title, subtitle, cta, paperUrl, authors, sho
       isBenchmark && "benchmark-page-hero [&_.page-hero-art]:!text-page-accent",
       )}>
       {isBenchmark && <HeroArt variant={id} paused={artPaused} />}
-      {isBenchmark && !reduceMotion && (
-        <button
-          type="button"
-          className="absolute bottom-4 right-4 z-20 inline-flex min-h-9 cursor-pointer items-center gap-2 border border-border-strong bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-[700px]:bottom-2 max-[700px]:right-2"
-          onClick={() => setArtPaused((value) => !value)}
-        >
-          {artPaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}
-          {artPaused ? "Play animation" : "Pause animation"}
-        </button>
-      )}
       <div className="container relative z-10 flex flex-col justify-center max-[700px]:py-20">
         <div className="w-full max-w-[550px]">
           <span className={cn("mb-5 inline-flex items-center text-xs font-medium uppercase text-faint", isBenchmark && "!text-page-accent")}>{eyebrow}</span>
@@ -77,6 +67,18 @@ export function PageHero({ eyebrow, title, subtitle, cta, paperUrl, authors, sho
           )}
         </div>
       </div>
+      {/* After the hero content in the DOM, so Tab reaches the headline links first: the button sits in the
+          bottom-right corner, and focus order has to follow the visual reading order (WCAG 2.4.3). */}
+      {isBenchmark && !reduceMotion && (
+        <button
+          type="button"
+          className="absolute bottom-4 right-4 z-20 inline-flex min-h-9 cursor-pointer items-center gap-2 border border-border-strong bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-[700px]:bottom-2 max-[700px]:right-2"
+          onClick={() => setArtPaused((value) => !value)}
+        >
+          {artPaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}
+          {artPaused ? "Play animation" : "Pause animation"}
+        </button>
+      )}
     </section>
   );
 }
