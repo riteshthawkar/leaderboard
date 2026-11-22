@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { Benchmark } from "@/pages/Benchmark";
 
 
@@ -89,5 +89,23 @@ describe("benchmark routing", () => {
     expect(screen.getByText("Reasoning analysis module", { selector: "dd" })).toBeVisible();
     expect(screen.getByRole("navigation", { name: "Spatial Reasoning paper sections" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Read the paper" })).toHaveAttribute("href", "https://arxiv.org/abs/2604.16060");
+  });
+
+  it("puts the animation pause button after the hero links in focus order", async () => {
+    render(
+      <MemoryRouter initialEntries={["/benchmarks/minds-eye"]}>
+        <Routes>
+          <Route path="/benchmarks/:slug" element={<Benchmark />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // The button sits in the hero's bottom-right corner, so Tab must reach it after the hero's links.
+    const pause = await screen.findByRole("button", { name: "Pause animation" });
+    const heroLinks = within(pause.closest("section")).getAllByRole("link");
+    expect(heroLinks.length).toBeGreaterThan(0);
+    for (const link of heroLinks) {
+      expect(link.compareDocumentPosition(pause) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
   });
 });
