@@ -2619,7 +2619,7 @@ export function ResearchLeaderboard() {
                   )}
                   <thead>
                     <tr>
-                      <th className="rank-col !text-center" data-tip={RANK_DESCRIPTION} title={RANK_DESCRIPTION}>##</th>
+                      <th className="rank-col !text-center" data-tip={RANK_DESCRIPTION} title={RANK_DESCRIPTION}><span aria-hidden="true">##</span><span className="sr-only">Rank</span></th>
                       <SortHeader
                         className={visualModelColumnClass}
                         label="Model"
@@ -3033,7 +3033,7 @@ export function ResearchLeaderboard() {
                 <table className="lb-table" aria-labelledby="spatial-rankings-title">
                   <thead>
                     <tr>
-                      <th className="rank-col !text-center" data-tip={RANK_DESCRIPTION} title={RANK_DESCRIPTION}>##</th>
+                      <th className="rank-col !text-center" data-tip={RANK_DESCRIPTION} title={RANK_DESCRIPTION}><span aria-hidden="true">##</span><span className="sr-only">Rank</span></th>
                       <SortHeader
                         className="model-col"
                         label="Model"
