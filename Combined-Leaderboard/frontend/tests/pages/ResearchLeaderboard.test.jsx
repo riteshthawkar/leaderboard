@@ -254,7 +254,7 @@ describe("leaderboard filter contracts", () => {
     expect(screen.getByRole("cell", { name: "15.0" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Model or organization")).toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/parameters/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "##" })).toHaveAttribute(
+    expect(screen.getByRole("columnheader", { name: "Rank" })).toHaveAttribute(
       "title",
       "Position after applying the current filters and sort order.",
     );
