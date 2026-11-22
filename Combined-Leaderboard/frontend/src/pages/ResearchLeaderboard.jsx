@@ -255,7 +255,7 @@ const spatialDatasetTypes = {
 
 function RankBadge({ rank }) {
   return (
-    <span className={cn("inline-grid size-8 place-items-center border border-border bg-surface-subtle font-display text-sm font-bold tabular-nums", rank === 1 && "border-amber-400 bg-amber-400/15 text-amber-500", rank === 2 && "border-zinc-400 bg-zinc-400/15", rank === 3 && "border-orange-600 bg-orange-600/15 text-orange-600")}>
+    <span className={cn("inline-grid size-8 place-items-center border border-border bg-surface-subtle font-display text-sm font-bold tabular-nums", rank === 1 && "border-amber-400 bg-amber-400/15 text-amber-800 dark:text-amber-500", rank === 2 && "border-zinc-400 bg-zinc-400/15", rank === 3 && "border-orange-600 bg-orange-600/15 text-orange-800 dark:text-orange-600")}>
       {rank}
     </span>
   );
