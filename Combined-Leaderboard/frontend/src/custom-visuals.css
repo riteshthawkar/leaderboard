@@ -90,6 +90,10 @@
   .detect-rect { animation: detect-march 0.7s linear infinite; }
 }
 
+/* Pause control for the looping hero art (WCAG 2.2.2). */
+.motion-paused,
+.motion-paused * { animation-play-state: paused !important; }
+
 @keyframes hero-art-spin { to { transform: rotate(360deg); } }
 @keyframes detect-march { to { stroke-dashoffset: -24; } }
 @keyframes detect-pulse {

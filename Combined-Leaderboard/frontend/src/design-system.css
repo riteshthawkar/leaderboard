@@ -52,6 +52,9 @@
   --maxw: 1240px;
 }
 
+/* Keep keyboard-focused elements clear of the sticky header. */
+html { scroll-padding-top: calc(var(--header-h) + 0.75rem); }
+
 [data-theme="dark"] {
   --bg: #000000;
   --bg-2: #000000;

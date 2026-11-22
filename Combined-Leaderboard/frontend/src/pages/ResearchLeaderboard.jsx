@@ -852,7 +852,7 @@ function scoreColor(value, invert = false, opacity = 1) {
 
 function FilterField({ label, children }) {
   return (
-    <label className="flex min-w-0 flex-col gap-1.5 text-sm font-semibold text-foreground [&_input]:min-h-10 [&_input]:w-full [&_input]:border [&_input]:border-border-strong [&_input]:bg-surface [&_input]:px-3 [&_input]:py-2 [&_input]:text-sm [&_input]:font-normal [&_input]:outline-none [&_input]:focus:border-brand [&_input]:focus:ring-2 [&_input]:focus:ring-brand-soft [&_select]:min-h-10 [&_select]:w-full [&_select]:border [&_select]:border-border-strong [&_select]:bg-surface [&_select]:px-3 [&_select]:py-2 [&_select]:text-sm [&_select]:font-normal [&_select]:outline-none [&_select]:focus:border-brand [&_select]:focus:ring-2 [&_select]:focus:ring-brand-soft">
+    <label className="flex min-w-0 flex-col gap-1.5 text-sm font-semibold text-foreground [&_input]:min-h-10 [&_input]:w-full [&_input]:border [&_input]:border-border-strong [&_input]:bg-surface [&_input]:px-3 [&_input]:py-2 [&_input]:text-sm [&_input]:font-normal [&_input]:outline-none [&_input:focus]:border-brand [&_input:focus]:ring-2 [&_input:focus]:ring-brand-soft [&_select]:min-h-10 [&_select]:w-full [&_select]:border [&_select]:border-border-strong [&_select]:bg-surface [&_select]:px-3 [&_select]:py-2 [&_select]:text-sm [&_select]:font-normal [&_select]:outline-none [&_select:focus]:border-brand [&_select:focus]:ring-2 [&_select:focus]:ring-brand-soft">
       <span className="text-xs uppercase text-faint">{label}</span>
       {children}
     </label>
@@ -1176,7 +1176,7 @@ function ChartModelSelector({ defaultCount = DEFAULT_CHART_MODELS, label, onRese
                   type="checkbox"
                   onChange={() => onToggle(row.model_name)}
                 />
-                <span className="min-w-0 truncate">{row.model_name}</span>
+                <span className="min-w-0 break-words">{row.model_name}</span>
               </label>
             );
           }) : <p className="px-2.5 py-3 text-sm text-muted">No models are available under the current filters.</p>}
@@ -1324,7 +1324,7 @@ function RobustGeneralistRankingChart({ rows }) {
         {visibleRows.map((row, index) => (
           <div key={row.model_name}>
             <div className="mb-1.5 flex min-w-0 items-center justify-between gap-3 text-sm">
-              <span className="min-w-0 truncate font-medium text-foreground">
+              <span className="min-w-0 break-words font-medium text-foreground">
                 <span className="mr-2 text-xs tabular-nums text-faint">#{index + 1}</span>
                 {row.model_name}
               </span>
@@ -1397,7 +1397,7 @@ function CapabilityGapDumbbellChart({ rows }) {
             : `C +${(row.absGap * 100).toFixed(1)}`;
           return (
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(150px,2fr)_72px] items-center gap-3 text-xs" key={row.model_name}>
-              <span className="min-w-0 truncate font-medium text-foreground" title={row.model_name}>{row.model_name}</span>
+              <span className="min-w-0 break-words font-medium text-foreground">{row.model_name}</span>
               <div className="relative h-7" title={`${row.model_name}: Do You See Me ${fmtPct(row.perception)}, Mind's Eye ${fmtPct(row.cognition)}`}>
                 <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-border" />
                 <div

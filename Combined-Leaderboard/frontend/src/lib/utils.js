@@ -1,5 +1,17 @@
 import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge, validators } from "tailwind-merge";
+
+// tailwind-merge 3 follows Tailwind 4, where `outline` sets the outline width. This project uses
+// Tailwind 3, where `outline` sets the outline *style*. Without this override, cn() dropped `outline`
+// whenever `outline-2` was also present, which made keyboard focus rings invisible (WCAG 2.4.7).
+const twMerge = extendTailwindMerge({
+  override: {
+    classGroups: {
+      "outline-w": [{ outline: [validators.isNumber, validators.isArbitraryVariableLength, validators.isArbitraryLength] }],
+    },
+  },
+  extend: { classGroups: { "outline-style": ["outline"] } },
+});
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));

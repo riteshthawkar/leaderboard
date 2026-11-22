@@ -1,12 +1,13 @@
+import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Pause, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HeroArt } from "@/components/HeroArt";
 import { cn } from "@/lib/utils";
 
 export function HomeHero() {
   return (
-    <section className="relative isolate flex h-[var(--hero-section-h)] items-center overflow-hidden bg-black text-[#f5f7f8] max-[700px]:h-auto max-[700px]:min-h-[var(--hero-section-h)] max-[700px]:overflow-visible max-[700px]:py-20">
+    <section className="relative isolate flex min-h-[var(--hero-section-h)] items-center overflow-hidden bg-black text-[#f5f7f8] max-[700px]:h-auto max-[700px]:min-h-[var(--hero-section-h)] max-[700px]:overflow-visible max-[700px]:py-20">
       <div className="home-hero-art" aria-hidden="true" />
       <div className="container relative z-10">
         <div className="w-full max-w-[550px]">
@@ -29,13 +30,28 @@ export function HomeHero() {
 
 export function PageHero({ eyebrow, title, subtitle, cta, paperUrl, authors, showMeta = false, id }) {
   const isBenchmark = id === "dysm" || id === "minds_eye" || id === "spatial";
+  const [artPaused, setArtPaused] = useState(false);
+  const reduceMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   return (
     <section className={cn(
       "relative isolate flex items-stretch overflow-hidden bg-background max-[700px]:h-auto max-[700px]:overflow-visible",
-      "h-[var(--hero-section-h)] max-[700px]:min-h-[var(--hero-section-h)]",
+      "min-h-[var(--hero-section-h)]",
       isBenchmark && "benchmark-page-hero [&_.page-hero-art]:!text-page-accent",
       )}>
-      {isBenchmark && <HeroArt variant={id} />}
+      {isBenchmark && <HeroArt variant={id} paused={artPaused} />}
+      {isBenchmark && !reduceMotion && (
+        <button
+          type="button"
+          className="absolute bottom-4 right-4 z-20 inline-flex min-h-9 cursor-pointer items-center gap-2 border border-border-strong bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand max-[700px]:bottom-2 max-[700px]:right-2"
+          onClick={() => setArtPaused((value) => !value)}
+        >
+          {artPaused ? <Play size={14} aria-hidden="true" /> : <Pause size={14} aria-hidden="true" />}
+          {artPaused ? "Play animation" : "Pause animation"}
+        </button>
+      )}
       <div className="container relative z-10 flex flex-col justify-center max-[700px]:py-20">
         <div className="w-full max-w-[550px]">
           <span className={cn("mb-5 inline-flex items-center text-xs font-medium uppercase text-faint", isBenchmark && "!text-page-accent")}>{eyebrow}</span>

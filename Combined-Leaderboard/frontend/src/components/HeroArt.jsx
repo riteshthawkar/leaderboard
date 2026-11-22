@@ -194,24 +194,26 @@ const D_GRID = (() => {
   return lines;
 })();
 
-function PerceptionArt() {
+function PerceptionArt({ paused = false }) {
   const reduce =
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const [t, setT] = useState(0);
   const rafRef = useRef(0);
+  const elapsedRef = useRef(0);
   useEffect(() => {
-    if (reduce) return undefined;
+    if (reduce || paused) return undefined;
     let s;
     const tick = (ts) => {
-      if (s === undefined) s = ts;
-      setT((ts - s) / 1000);
+      if (s === undefined) s = ts - elapsedRef.current * 1000;  // resume where it paused
+      elapsedRef.current = (ts - s) / 1000;
+      setT(elapsedRef.current);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [reduce]);
+  }, [reduce, paused]);
 
   const N = D_KEYS.length;
   const SLOT = 3.6;
@@ -368,26 +370,28 @@ function foldAngles(p) {
   ];
 }
 
-function FoldArt() {
+function FoldArt({ paused = false }) {
   const prefersReduced =
     typeof window !== "undefined" &&
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const [p, setP] = useState(prefersReduced ? 0.66 : 0);
   const rafRef = useRef(0);
+  const elapsedRef = useRef(0);
 
   useEffect(() => {
-    if (prefersReduced) return undefined;
+    if (prefersReduced || paused) return undefined;
     let startTs;
     const period = 10000;
     const tick = (ts) => {
-      if (startTs === undefined) startTs = ts;
-      setP(((ts - startTs) % period) / period);
+      if (startTs === undefined) startTs = ts - elapsedRef.current;  // resume where it paused
+      elapsedRef.current = ts - startTs;
+      setP((elapsedRef.current % period) / period);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [prefersReduced]);
+  }, [prefersReduced, paused]);
 
   const [wN, wE, wS, wW, t] = foldAngles(p);
   const faces = foldFaces(wN, wE, wS, wW, t)
@@ -864,12 +868,12 @@ const ART = {
   spatial: SpaceArt,
 };
 
-export function HeroArt({ variant }) {
+export function HeroArt({ variant, paused = false }) {
   const Art = ART[variant];
   if (!Art) return null;
   return (
-    <div className="page-hero-art" data-variant={variant} aria-hidden="true">
-      <Art />
+    <div className={paused ? "page-hero-art motion-paused" : "page-hero-art"} data-variant={variant} aria-hidden="true">
+      <Art paused={paused} />
     </div>
   );
 }
