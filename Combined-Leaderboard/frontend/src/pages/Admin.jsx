@@ -195,14 +195,14 @@ export function Admin() {
       <div className={ui.sectionBody}>
           {user === null && (
             <div className="flex flex-col items-start gap-2 border-y border-border-strong py-6">
-              <h3 className={ui.heading3}>Sign in required</h3>
+              <h2 className={ui.heading3}>Sign in required</h2>
               <p className="text-sm text-muted">Admin tools require an approved account.</p>
               <Button asChild variant="brand"><Link to="/login?next=/admin">Sign in</Link></Button>
             </div>
           )}
           {user && !user.isAdmin && (
             <div className="flex flex-col items-start gap-2 border-y border-border-strong py-6">
-              <h3 className={ui.heading3}>Admin access required</h3>
+              <h2 className={ui.heading3}>Admin access required</h2>
               <p className="text-sm text-muted">Your signed-in account does not have administrator permissions.</p>
             </div>
           )}
@@ -213,7 +213,7 @@ export function Admin() {
                 <div className="flex items-start justify-between gap-5 border-b border-border p-5 max-sm:flex-col">
                   <div>
                     <span className={ui.sectionTag}>Admin account</span>
-                    <h3 className={ui.heading3}>{user.email}</h3>
+                    <h2 className={ui.heading3}>{user.email}</h2>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <span className={ui.badge}>{rows.length} submissions</span>

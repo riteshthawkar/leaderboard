@@ -289,7 +289,7 @@ export function Layout() {
           <Link
             to="/"
             className="inline-flex items-center font-display font-bold text-foreground no-underline"
-            aria-label="Home"
+            aria-label="MS VISTA home"
           >
             <span className="flex flex-col leading-none">
               <strong className="text-xl font-bold">MS VISTA</strong>
@@ -541,9 +541,9 @@ export function Layout() {
               </p>
             </div>
             <div className="flex flex-col gap-1">
-              <h5 className="mb-1 text-xs font-semibold uppercase text-faint">
+              <h2 className="mb-1 text-xs font-semibold uppercase text-faint">
                 Evaluation modules
-              </h5>
+              </h2>
               <Link
                 className="text-sm text-muted hover:text-brand-strong"
                 to="/benchmarks/do-you-see-me"
@@ -564,9 +564,9 @@ export function Layout() {
               </Link>
             </div>
             <div className="flex flex-col gap-1">
-              <h5 className="mb-1 text-xs font-semibold uppercase text-faint">
+              <h2 className="mb-1 text-xs font-semibold uppercase text-faint">
                 Explore
-              </h5>
+              </h2>
               <Link
                 className="text-sm text-muted hover:text-brand-strong"
                 to="/leaderboard"
@@ -587,9 +587,9 @@ export function Layout() {
               </Link>
             </div>
             <div className="flex flex-col gap-1">
-              <h5 className="mb-1 text-xs font-semibold uppercase text-faint">
+              <h2 className="mb-1 text-xs font-semibold uppercase text-faint">
                 Papers
-              </h5>
+              </h2>
               <a
                 className="text-sm text-muted hover:text-brand-strong flex items-center gap-1"
                 href="https://arxiv.org/abs/2506.02022"

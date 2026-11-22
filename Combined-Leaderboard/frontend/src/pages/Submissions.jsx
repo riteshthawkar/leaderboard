@@ -189,7 +189,7 @@ export function Submissions() {
       <div className={ui.sectionBody}>
           {authEmail === null && (
             <div className="flex flex-col items-start gap-2 border-y border-border-strong py-6">
-              <h3 className={ui.heading3}>Sign in required</h3>
+              <h2 className={ui.heading3}>Sign in required</h2>
               <p className="text-sm text-muted">Submission history is tied to your verified account.</p>
               <Button asChild variant="brand"><Link to="/login?next=/submissions">Sign in</Link></Button>
             </div>
@@ -208,7 +208,7 @@ export function Submissions() {
 
           {authEmail && status === "ready" && rows.length === 0 && (
             <div className="flex flex-col items-start gap-3 border-y border-border-strong px-5 py-8">
-              <h3 className={ui.heading3}>No submissions yet</h3>
+              <h2 className={ui.heading3}>No submissions yet</h2>
               <p className="text-sm text-muted">Completed benchmark uploads will appear here with their score and export.</p>
               <Button asChild variant="brand"><Link to="/submit">Submit a model</Link></Button>
             </div>
@@ -271,7 +271,7 @@ export function Submissions() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <span className={ui.sectionTag}>{prettyLabel(row.task_id)}</span>
-                    <h3 className="break-words font-display text-lg font-semibold">{row.model_name || "N/A"}</h3>
+                    <h2 className="break-words font-display text-lg font-semibold">{row.model_name || "N/A"}</h2>
                   </div>
                   <span className={cn(ui.badge, row.moderation_status === "deleted" ? ui.badgeNegative : row.moderation_status === "hidden" ? ui.badgeMuted : ui.badgePositive)}>{statusLabel(row)}</span>
                 </div>

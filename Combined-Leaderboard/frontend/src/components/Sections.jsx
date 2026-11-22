@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,7 @@ export function Pipeline({ steps, accented = false }) {
           return (
             <li className="relative grid min-h-40 min-w-0 grid-cols-[64px_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)]" key={title}>
               <div className={cn("col-start-2 min-w-0 py-6 pr-6 md:max-w-[520px] md:py-8", contentSide)}>
-                <h4 className="font-display text-xl font-bold leading-tight">{title}</h4>
+                <h3 className="font-display text-xl font-bold leading-tight">{title}</h3>
                 <p className="mt-3 text-sm leading-relaxed text-muted">{body}</p>
               </div>
               <div className="relative col-start-1 row-start-1 flex items-start justify-center pt-6 md:col-start-2 md:pt-8">
@@ -181,6 +181,27 @@ function SampleVisual({ sample, onZoom }) {
 
 export function SampleGrid({ samples }) {
   const [zoomedSample, setZoomedSample] = useState(null);
+  const closeButtonRef = useRef(null);
+
+  // While the preview is open: focus its close button, keep Tab there (it is the only control),
+  // close on Escape, and return focus to the button that opened it.
+  useEffect(() => {
+    if (!zoomedSample) return undefined;
+    const opener = document.activeElement;
+    closeButtonRef.current?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setZoomedSample(null);
+      if (event.key === "Tab") {
+        event.preventDefault();
+        closeButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      if (opener instanceof HTMLElement) opener.focus();
+    };
+  }, [zoomedSample]);
 
   return (
     <>
@@ -209,9 +230,9 @@ export function SampleGrid({ samples }) {
       </div>
       {zoomedSample && (
         <div className="fixed inset-0 z-[100] grid place-items-center p-5" role="dialog" aria-modal="true" aria-label={`${zoomedSample.title} sample image`} tabIndex={-1}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setZoomedSample(null)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-hidden="true" onClick={() => setZoomedSample(null)} />
           <div className="relative max-h-[92vh] w-full max-w-5xl overflow-auto border border-border bg-surface p-5 shadow-lg">
-            <button className="absolute right-3 top-3 z-10 grid size-10 place-items-center border border-border-strong bg-surface text-foreground" type="button" onClick={() => setZoomedSample(null)} aria-label="Close image preview"><X size={18} aria-hidden="true" /></button>
+            <button ref={closeButtonRef} className="absolute right-3 top-3 z-10 grid size-10 place-items-center border border-border-strong bg-surface text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand" type="button" onClick={() => setZoomedSample(null)} aria-label="Close image preview"><X size={18} aria-hidden="true" /></button>
             <figure className="m-0 grid gap-4">
               <img className="max-h-[72vh] w-full object-contain" src={zoomedSample.imageSrc} alt={`${zoomedSample.title} benchmark sample`} />
               <figcaption className="grid gap-1 border-t border-border pt-4">

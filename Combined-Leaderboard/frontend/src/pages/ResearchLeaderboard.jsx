@@ -883,7 +883,7 @@ function ControlDeck({ eyebrow, title, chips, children }) {
       <div className="mb-4 flex items-start justify-between gap-5 border-b border-border pb-4">
         <div>
           <div className={ui.sectionTag}>{eyebrow}</div>
-          <h3 className={ui.heading3}>{title}</h3>
+          <h2 className={ui.heading3}>{title}</h2>
         </div>
       </div>
       {children}
@@ -1022,11 +1022,11 @@ function DashboardStats({ items }) {
   );
 }
 
-function Heatmap({ rows, columns, valueFor, displayFor, emptyText, translucent = false }) {
+function Heatmap({ rows, columns, valueFor, displayFor, emptyText, translucent = false, label = "Heatmap" }) {
   if (!rows.length || !columns.length)
     return <div className="grid min-h-52 place-items-center border border-dashed border-border p-6 text-center text-sm text-muted">{emptyText}</div>;
   return (
-    <div className="max-h-[460px] max-w-full overflow-auto pb-1">
+    <div className={cn("max-h-[460px] max-w-full overflow-auto pb-1", ui.focusRingInset)} role="region" aria-label={label} tabIndex={0}>
       <div
         className="grid min-w-max gap-px border border-border bg-border"
         style={{
@@ -1074,6 +1074,7 @@ function VisualCapabilityChart({ benchmark, rows, capabilities }) {
   return (
     <>
       <Heatmap
+        label="Capability profile by model"
         rows={chartRows}
         columns={capabilities}
         valueFor={(row, column) => getVisualCapability(row, column.id)}
@@ -1093,6 +1094,7 @@ function VisualCapabilityChart({ benchmark, rows, capabilities }) {
 function SpatialDatasetChart({ rows, datasets }) {
   return (
     <Heatmap
+      label="Spatial accuracy by dataset"
       rows={rows}
       columns={datasets.map((dataset) => ({ id: dataset, label: dataset }))}
       valueFor={(row, column) => spatialDatasetValue(row, column.id)}
@@ -1151,8 +1153,9 @@ function ChartModelSelector({ defaultCount = DEFAULT_CHART_MODELS, label, onRese
     : `${selected.length} models`;
   return (
     <details className="relative shrink-0">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground [&::-webkit-details-marker]:hidden" aria-label={`Select models for ${label}`}>
+      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-2 border border-border-strong px-3 py-1.5 text-xs font-medium text-foreground [&::-webkit-details-marker]:hidden">
         <span className="max-w-40 truncate">{summary || "Select model"}</span>
+        <span className="sr-only">, select models for {label}</span>
         <ChevronDown className="size-3.5 shrink-0 text-faint" aria-hidden="true" />
       </summary>
       <div className="absolute right-0 z-40 mt-2 w-[min(19rem,80vw)] border border-border-strong bg-background shadow-lg">

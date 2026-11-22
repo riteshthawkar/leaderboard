@@ -34,9 +34,9 @@ export function Citation({ citation }) {
             </div>
             {copyError && <div className="mt-3 border border-negative border-l-[3px] bg-negative-soft p-3 text-sm text-negative" role="alert">{copyError}</div>}
           </div>
-          <div className="grid min-w-0 grid-rows-[auto_1fr]" aria-label="BibTeX citation">
+          <div className="grid min-w-0 grid-rows-[auto_1fr]">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3"><span className="text-xs font-semibold uppercase text-faint">BibTeX</span><button className="border border-border bg-surface px-2.5 py-1 text-xs text-muted hover:text-foreground" type="button" onClick={copy}>{copied ? "Copied" : "Copy"}</button></div>
-            <pre className="m-0 overflow-x-auto p-5 font-sans text-xs leading-relaxed text-muted">{bibtex}</pre>
+            <pre className={cn("m-0 overflow-x-auto p-5 font-sans text-xs leading-relaxed text-muted", ui.focusRingInset)} role="region" aria-label="BibTeX citation" tabIndex={0}>{bibtex}</pre>
           </div>
         </div>
       </div>
