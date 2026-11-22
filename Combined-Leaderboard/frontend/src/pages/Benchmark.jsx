@@ -251,14 +251,14 @@ function TaskTableSection({ page, className }) {
   if (!page.taskSection) return null;
   return (
     <BenchmarkSection className={className} head={page.taskSection} bodyClassName="px-6 lg:px-8">
-      <TaskTable table={page.taskSection.table} />
+      <TaskTable table={page.taskSection.table} label={page.taskSection.title} />
     </BenchmarkSection>
   );
 }
 
-function TaskTable({ table }) {
+function TaskTable({ table, label }) {
   return (
-    <div className={ui.tableWrap}>
+    <div className={ui.tableWrap} role="region" aria-label={label || "Task table"} tabIndex={0}>
       <table className={`${ui.table} ${benchmarkTableClasses} ${taskTableClasses}`}>
         <thead><tr><th className="w-20">#</th>{table.headers.map((header) => <th key={header}>{header}</th>)}</tr></thead>
         <tbody>{table.rows.map((row, rowIndex) => <tr key={`${row[0]}-${rowIndex}`}><td className="w-20 text-xs font-semibold tabular-nums text-page-accent">[{String(rowIndex + 1).padStart(2, "0")}]</td>{row.map((cell, index) => <td key={`${row[0]}-${index}`}>{index === 0 ? <strong>{cell}</strong> : cell}</td>)}</tr>)}</tbody>
@@ -379,7 +379,7 @@ const FIG_BASE = "var(--chart-primary)";
 
 function AccuracyMatrix({ chart }) {
   return (
-    <div className="mt-6 overflow-x-auto border border-border-strong" role="img" aria-label={`${chart.title}. Accuracy by object size and rotation angle.`}>
+    <div className={cn("mt-6 overflow-x-auto border border-border-strong", ui.focusRingInset)} role="region" aria-label={`${chart.title}. Accuracy by object size and rotation angle.`} tabIndex={0}>
       <table className="w-full min-w-[560px] border-collapse text-sm">
         <thead>
           <tr>
@@ -398,7 +398,7 @@ function AccuracyMatrix({ chart }) {
                   className={cn(
                     "border-b border-r border-border px-4 py-4 text-center font-semibold tabular-nums last:border-r-0",
                     value >= 100
-                      ? "bg-page-accent text-white"
+                      ? "bg-page-accent text-background"
                       : value > 0
                         ? "bg-page-accent-soft text-page-accent"
                         : "bg-surface-subtle text-faint",
@@ -424,7 +424,7 @@ const effectLabels = {
 
 function EffectMatrix({ chart }) {
   return (
-    <div className="mt-6 overflow-x-auto border border-border-strong" role="img" aria-label={`${chart.title}. Direction of accuracy change relative to Chain of Thought.`}>
+    <div className={cn("mt-6 overflow-x-auto border border-border-strong", ui.focusRingInset)} role="region" aria-label={`${chart.title}. Direction of accuracy change relative to Chain of Thought.`} tabIndex={0}>
       <table className="w-full min-w-[620px] border-collapse text-sm">
         <thead>
           <tr>
@@ -555,7 +555,7 @@ function ModelPerformanceSection({ page, rows, className, id }) {
 function SpatialDataSection({ datasets }) {
   return (
     <BenchmarkSection head={{ tag: "The data", title: "Thirteen spatial datasets, one policy", body: "Static 2D relations, 3D geometry, and dynamic or temporal understanding are unified under a single evaluation and scoring scheme. Datasets are downloaded from their official sources on your machine; none are redistributed here." }}>
-      <div className={ui.tableWrap}><table className={`${ui.table} ${benchmarkTableClasses}`}><thead><tr><th>Dataset</th><th>Type</th><th className={ui.tableNumber}>Approx. n</th><th>Capabilities</th><th>License</th></tr></thead><tbody>{datasets.length ? datasets.map((dataset) => <tr key={dataset.name}><td><strong>{dataset.name}</strong></td><td>{dataset.type}</td><td className={ui.tableNumber}>{dataset.approx_n ? `~${dataset.approx_n}` : "N/A"}</td><td>{(dataset.tags || []).map((tag) => <span className="mr-1 inline-flex min-h-7 items-center border border-page-accent-chip-border bg-page-accent-chip px-2.5 py-1 text-xs text-muted" key={tag}>{tag}</span>)}</td><td>{dataset.license || "N/A"}</td></tr>) : <tr><td colSpan="5" className={ui.emptyRow}>Manifest unavailable.</td></tr>}</tbody></table></div>
+      <div className={ui.tableWrap} role="region" aria-label="Datasets" tabIndex={0}><table className={`${ui.table} ${benchmarkTableClasses}`}><thead><tr><th>Dataset</th><th>Type</th><th className={ui.tableNumber}>Approx. n</th><th>Capabilities</th><th>License</th></tr></thead><tbody>{datasets.length ? datasets.map((dataset) => <tr key={dataset.name}><td><strong>{dataset.name}</strong></td><td>{dataset.type}</td><td className={ui.tableNumber}>{dataset.approx_n ? `~${dataset.approx_n}` : "N/A"}</td><td>{(dataset.tags || []).map((tag) => <span className="mr-1 inline-flex min-h-7 items-center border border-page-accent-chip-border bg-page-accent-chip px-2.5 py-1 text-xs text-muted" key={tag}>{tag}</span>)}</td><td>{dataset.license || "N/A"}</td></tr>) : <tr><td colSpan="5" className={ui.emptyRow}>Manifest unavailable.</td></tr>}</tbody></table></div>
     </BenchmarkSection>
   );
 }

@@ -294,7 +294,9 @@ describe("leaderboard filter contracts", () => {
     await user.click(screen.getByRole("button", { name: "Mind's Eye" }));
     const cognitionHumanLabel = screen.getByText("Human accuracy");
     expect(within(cognitionHumanLabel.parentElement).getByText("80%")).toBeInTheDocument();
-    expect(within(screen.getByRole("columnheader", { name: /^A/ })).getByRole("button")).toHaveAttribute(
+    // Scope to the rankings table: charts on this view also expose hidden data tables with their own headers.
+    const mindsEyeRankings = screen.getByRole("table", { name: "Mind's Eye rankings" });
+    expect(within(within(mindsEyeRankings).getByRole("columnheader", { name: /^A/ })).getByRole("button")).toHaveAttribute(
       "title",
       "Unweighted mean of the Mind's Eye Abstraction task accuracies.",
     );

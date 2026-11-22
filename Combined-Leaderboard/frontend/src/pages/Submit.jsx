@@ -544,7 +544,7 @@ export function Submit() {
           {taskInfoError && <div className={cn(ui.message, ui.messageError)} role="status">{taskInfoError}</div>}
           {authEmail === null && (
             <div className="mb-6 flex flex-col items-start gap-2 border-y border-border-strong py-6">
-              <h3 className={ui.heading3}>Sign in to submit</h3>
+              <h2 className={ui.heading3}>Sign in to submit</h2>
               <p className="text-sm text-muted">Submissions require a verified MS VISTA account. Create one or sign in to upload model predictions.</p>
               <Button asChild variant="brand"><Link to="/login?next=/submit">Sign in or create account</Link></Button>
             </div>
@@ -567,7 +567,7 @@ export function Submit() {
             <div className="flex items-start justify-between gap-6 border-b border-border py-5 max-md:flex-col">
               <div>
                 <span className={ui.sectionTag}>Submission workflow</span>
-                <h3 className={ui.heading3}>Prepare, upload, and score</h3>
+                <h2 className={ui.heading3}>Prepare, upload, and score</h2>
               </div>
               <div className="flex flex-wrap gap-2">
                 <span className={ui.badge}>

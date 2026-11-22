@@ -129,6 +129,56 @@ function ChartTip({ tip }) {
   );
 }
 
+function joinLabels(items) {
+  const labels = items.map((item) => item.label).filter(Boolean);
+  return labels.length > 4 ? `${labels.slice(0, 4).join(", ")} and ${labels.length - 4} more` : labels.join(", ");
+}
+
+/** The chart's numbers as a table for screen readers; the picture alone does not expose them. */
+function ChartDataTable({ categories, series, valueScale, valueSuffix }) {
+  return (
+    <table className="sr-only">
+      <caption>{`Values for ${joinLabels(series)}`}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Category</th>
+          {series.map((entry) => <th key={entry.key} scope="col">{entry.label}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {categories.map((category, index) => (
+          <tr key={`${index}-${category.label}`}>
+            <th scope="row">{category.label}</th>
+            {series.map((entry) => (
+              <td key={entry.key}>{formatPct(entry.valueFor(category, index), { scale: valueScale, suffix: valueSuffix })}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function PointDataTable({ nameLabel, points, xLabel, yLabel }) {
+  return (
+    <table className="sr-only">
+      <caption>{`${yLabel} and ${xLabel} for each point`}</caption>
+      <thead>
+        <tr><th scope="col">{nameLabel}</th><th scope="col">{xLabel}</th><th scope="col">{yLabel}</th></tr>
+      </thead>
+      <tbody>
+        {points.map((point) => (
+          <tr key={point.key || point.label}>
+            <th scope="row">{point.label}</th>
+            <td>{formatPct(point.x)}</td>
+            <td>{formatPct(point.y)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function ChartLegend({ series }) {
   return (
     <div className="mt-3.5 flex flex-wrap gap-3">
@@ -221,6 +271,7 @@ export function BarChart({
   forceHorizontalLabels = false,
   showLegend = true,
   xLabelAngle = -32,
+  label,
 }) {
   const [tip, setTip] = useState(null);
   const clearTip = useCallback(() => setTip(null), []);
@@ -266,6 +317,7 @@ export function BarChart({
           {({ width, height }) => (
             <BarChartSvg
               categories={categories}
+              label={label || `Bar chart of ${joinLabels(series)} across ${categories.length} categories. Values are in the table that follows.`}
               bottomMargin={bottomMargin}
               compactXLabels={compactXLabels}
               forceHorizontalLabels={forceHorizontalLabels}
@@ -285,6 +337,7 @@ export function BarChart({
         </ParentSize>
         <ChartTip tip={tip} />
       </div>
+      <ChartDataTable categories={categories} series={series} valueScale={valueScale} valueSuffix={valueSuffix} />
       {showLegend && grouped && <ChartLegend series={series} />}
     </div>
   );
@@ -303,6 +356,7 @@ export function ScatterChart({
   showLabels = true,
   showPointKey = false,
   pointKeyTitle = "Models",
+  label,
 }) {
   const [tip, setTip] = useState(null);
   const clearTip = useCallback(() => setTip(null), []);
@@ -324,6 +378,7 @@ export function ScatterChart({
           {({ width, height }) => (
             <ScatterChartSvg
               height={height}
+              label={label || `Scatter plot of ${yLabel} against ${xLabel} for ${visiblePoints.length} points. Values are in the table that follows.`}
               points={visiblePoints}
               setTip={setTip}
               showLabels={showLabels}
@@ -335,12 +390,13 @@ export function ScatterChart({
         </ParentSize>
         <ChartTip tip={tip} />
       </div>
+      <PointDataTable nameLabel={pointKeyTitle} points={visiblePoints} xLabel={xLabel} yLabel={yLabel} />
       {showPointKey && <PointKey points={visiblePoints} title={pointKeyTitle} />}
     </div>
   );
 }
 
-function ScatterChartSvg({ height, points, setTip, showLabels, width, xLabel, yLabel }) {
+function ScatterChartSvg({ height, label, points, setTip, showLabels, width, xLabel, yLabel }) {
   if (width < 10 || height < 10) return null;
   const left = 48;
   const right = 22;
@@ -361,7 +417,7 @@ function ScatterChartSvg({ height, points, setTip, showLabels, width, xLabel, yL
   });
 
   return (
-    <svg height={height} role="img" width={width}>
+    <svg aria-label={label} height={height} role="img" width={width}>
       <g transform={`translate(${left},${top})`}>
         {ticks.map((tick) => (
           <g key={tick}>
@@ -409,7 +465,7 @@ function ScatterChartSvg({ height, points, setTip, showLabels, width, xLabel, yL
   );
 }
 
-function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontalLabels, grouped, height, maxValue, minValue = 0, series, setTip, valueScale, valueSuffix, valueDigits = 0, width, xLabelAngle }) {
+function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontalLabels, grouped, height, label, maxValue, minValue = 0, series, setTip, valueScale, valueSuffix, valueDigits = 0, width, xLabelAngle }) {
   const gradientPrefix = useId().replace(/[^A-Za-z0-9_-]/g, "");
   if (width < 10 || height < 10) return null;
   const labels = categories.map((category) => String(category.label ?? ""));
@@ -445,7 +501,7 @@ function BarChartSvg({ bottomMargin, categories, compactXLabels, forceHorizontal
     }));
 
   return (
-    <svg height={height} role="img" width={width}>
+    <svg aria-label={label} height={height} role="img" width={width}>
       <g transform={`translate(${left},${top})`}>
         {yTicks.map((tick) => (
           <g key={tick} transform={`translate(0,${yScale(tick)})`}>
@@ -547,6 +603,7 @@ export function RadarChart({
   levels = 4,
   emptyMessage = "No data available yet.",
   showLegend = true,
+  label,
 }) {
   const [tip, setTip] = useState(null);
   const clearTip = useCallback(() => setTip(null), []);
@@ -570,6 +627,7 @@ export function RadarChart({
           {({ width, height }) => (
             <RadarSvg
               categories={categories}
+              label={label || `Radar chart of ${joinLabels(series)} across ${categories.length} dimensions. Values are in the table that follows.`}
               height={height}
               levels={levels}
               maxValue={maxValue}
@@ -584,12 +642,13 @@ export function RadarChart({
         </ParentSize>
         <ChartTip tip={tip} />
       </div>
+      <ChartDataTable categories={categories} series={series} valueScale={valueScale} valueSuffix={valueSuffix} />
       {showLegend && <ChartLegend series={series} />}
     </div>
   );
 }
 
-function RadarSvg({ categories, height, levels, maxValue, padding, series, setTip, valueScale, valueSuffix, width }) {
+function RadarSvg({ categories, height, label, levels, maxValue, padding, series, setTip, valueScale, valueSuffix, width }) {
   if (width < 10 || height < 10) return null;
   const count = categories.length;
   const radius = Math.max(24, Math.min(width, height) / 2 - padding);
@@ -648,7 +707,7 @@ function RadarSvg({ categories, height, levels, maxValue, padding, series, setTi
     }));
 
   return (
-    <svg height={height} role="img" width={width}>
+    <svg aria-label={label} height={height} role="img" width={width}>
       {rings.map((ring, level) => (
         <polygon
           className="fill-none stroke-[var(--border)] opacity-50"
