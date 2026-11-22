@@ -63,6 +63,8 @@ export function FileDropzone({ name, accept = "", required = false, hint, maxByt
       <div
         className={cn(
           "relative flex min-h-28 items-center justify-center border border-dashed border-border-strong bg-surface-subtle px-4 py-5 transition-colors hover:border-brand hover:bg-brand-soft",
+          // The file input is invisible, so show its keyboard focus on the drop area (WCAG 2.4.7).
+          "has-[input:focus-visible]:outline has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-brand",
           dragOver && "border-solid border-brand bg-brand-soft",
           file && "border-solid border-border-strong bg-surface",
           error && "border-negative",
@@ -85,7 +87,7 @@ export function FileDropzone({ name, accept = "", required = false, hint, maxByt
           <div className="pointer-events-none relative z-20 flex w-full items-center gap-3">
             <FileText className="shrink-0 text-brand-strong" size={22} aria-hidden="true" />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate text-sm font-semibold text-foreground">{file.name}</span>
+              <span className="break-all text-sm font-semibold text-foreground">{file.name}</span>
               <span className="text-xs text-faint">
                 {formatBytes(file.size)} · ready to submit
               </span>

@@ -52,6 +52,27 @@ const MICROSOFT_TRADEMARKS_URL = "https://www.microsoft.com/trademarks";
 const MICROSOFT_TERMS_OF_USE_URL = "https://go.microsoft.com/fwlink/?LinkID=206977";
 const CURRENT_YEAR = new Date().getUTCFullYear();
 
+const SITE_TITLE = "MS VISTA";
+const ROUTE_TITLES = {
+  "/submit": "Submit",
+  "/submissions": "Evaluation history",
+  "/profile": "Profile",
+  "/admin": "Submission operations",
+  "/privacy": "Privacy notice",
+};
+
+// Each page gets its own title (WCAG 2.4.2), so tabs, history and screen readers can tell pages apart.
+function pageTitle(pathname, search) {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (path === "/") return `${SITE_TITLE} | Unified Multimodal Visual Intelligence Evaluation`;
+  if (path === "/login") {
+    const register = new URLSearchParams(search).get("mode") === "register";
+    return `${register ? "Create an account" : "Sign in"} | ${SITE_TITLE}`;
+  }
+  const label = ROUTE_TITLES[path] || nav.find(([href]) => href === path)?.[1];
+  return `${label || "Page not found"} | ${SITE_TITLE}`;
+}
+
 function pageId(pathname) {
   if (pathname === "/") return "home";
   if (pathname.includes("do-you-see-me")) return "dysm";
@@ -110,6 +131,8 @@ export function Layout() {
   const accountMenuRef = useRef(null);
   const accountTriggerRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const navRef = useRef(null);
+  const menuButtonRef = useRef(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountError, setAccountError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
@@ -133,6 +156,34 @@ export function Layout() {
     setAccountError("");
     setPageWarning(null);
   }, [location.pathname]);
+
+  useEffect(() => {
+    document.title = pageTitle(location.pathname, location.search);
+  }, [location.pathname, location.search]);
+
+  // Mobile menu: move focus into it when it opens; Escape closes it and returns focus to the button.
+  useEffect(() => {
+    if (!open) return undefined;
+    // The menu slides in and can still be hidden on the first frame, so retry focus for a few frames.
+    let raf = 0;
+    let tries = 0;
+    const focusFirst = () => {
+      const first = navRef.current?.querySelector("a, button");
+      first?.focus();
+      if (first && document.activeElement !== first && tries++ < 10) raf = requestAnimationFrame(focusFirst);
+    };
+    focusFirst();
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
 
   useEffect(() => {
     const handlePageWarning = (event) => setPageWarning(event.detail || null);
@@ -282,6 +333,16 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:border focus:border-border-strong focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-brand"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
+        Skip to main content
+      </a>
       <header className="sticky top-0 z-50 h-[var(--header-h)] border-b border-border bg-background">
         <div className="container grid h-full grid-cols-[1fr_auto] items-center gap-4 border-x border-solid border-border-strong min-[861px]:grid-cols-[1fr_auto_1fr]">
           <Link
@@ -299,6 +360,7 @@ export function Layout() {
               open && "visible translate-y-0",
             )}
             id="nav_menu"
+            ref={navRef}
             aria-label="Primary"
           >
             {nav.map(([to, label, navId]) => (
@@ -400,7 +462,7 @@ export function Layout() {
                     aria-label="Account"
                   >
                     <div
-                      className="truncate border-b border-border px-3 py-2.5 text-xs text-muted"
+                      className="break-all border-b border-border px-3 py-2.5 text-xs text-muted"
                       title={authUser.email}
                     >
                       {authUser.email}
@@ -461,6 +523,7 @@ export function Layout() {
               className="grid size-10 cursor-pointer place-items-center border border-border-strong bg-surface text-foreground transition-colors hover:bg-surface-subtle min-[861px]:hidden"
               type="button"
               aria-label="Menu"
+              ref={menuButtonRef}
               aria-controls="nav_menu"
               aria-expanded={open}
               onClick={() => setOpen((value) => !value)}
@@ -512,7 +575,7 @@ export function Layout() {
         </div>
       )}
 
-      <main className="relative flex-1 overflow-x-clip">
+      <main id="main-content" tabIndex={-1} className="relative flex-1 overflow-x-clip focus:outline-none">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 left-1/2 z-20 hidden w-full max-w-content -translate-x-1/2 border-x border-solid border-border-strong md:block"

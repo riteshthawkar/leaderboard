@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { Layout } from "@/components/Layout";
 
@@ -127,5 +127,47 @@ describe("service warning relevance", () => {
     expect(
       screen.getByLabelText(`Copyright ${new Date().getUTCFullYear()} Microsoft`),
     ).toBeInTheDocument();
+  });
+});
+
+
+describe("keyboard and page-title accessibility", () => {
+  beforeEach(() => {
+    apiMocks.fetchMe.mockResolvedValue(null);
+    apiMocks.getJSON.mockResolvedValue({ status: "healthy", components: {} });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("gives each page its own title", async () => {
+    render(
+      <MemoryRouter initialEntries={["/privacy"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="privacy" element={<p>Notice</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.title).toBe("Privacy notice | MS VISTA"));
+  });
+
+  it("offers a skip link that moves focus to the main content", async () => {
+    renderLayout();
+    fireEvent.click(await screen.findByRole("link", { name: "Skip to main content" }));
+    expect(document.activeElement).toBe(document.getElementById("main-content"));
+  });
+
+  it("moves focus into the mobile menu and closes it with Escape", async () => {
+    renderLayout();
+    const menuButton = await screen.findByRole("button", { name: "Menu" });
+    fireEvent.click(menuButton);
+    await waitFor(() => expect(document.activeElement.closest("#nav_menu")).not.toBeNull());
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(menuButton).toHaveAttribute("aria-expanded", "false"));
+    expect(document.activeElement).toBe(menuButton);
   });
 });

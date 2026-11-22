@@ -200,7 +200,7 @@ function PointKey({ points, title }) {
         {points.map((point) => (
           <span className="flex min-w-0 items-center gap-2 text-xs text-muted" key={point.key || point.label}>
             <span className="size-2.5 shrink-0 border border-background" style={{ background: point.color }} aria-hidden="true" />
-            <span className="min-w-0 truncate" title={point.label}>{point.label}</span>
+            <span className="min-w-0 break-words">{point.label}</span>
           </span>
         ))}
       </div>
