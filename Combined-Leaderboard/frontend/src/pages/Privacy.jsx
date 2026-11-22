@@ -8,7 +8,7 @@ const sections = [
   },
   {
     title: "How information is used",
-    body: "Information is used to operate accounts, verify email addresses, process evaluation-module submissions, publish approved results, investigate failures, prevent abuse, and maintain reproducible evaluation records.",
+    body: "Information is used to operate accounts, verify email addresses, process evaluation-module submissions, publish results, investigate failures, prevent abuse, and maintain reproducible evaluation records.",
   },
   {
     title: "Submission files",

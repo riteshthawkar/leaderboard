@@ -30,6 +30,13 @@
 				ipv6 48
 			}
 			request>headers>X-Forwarded-For delete
+			# Remove one-time sign-in values and the anti-forgery token from the log.
+			request>uri query {
+				delete code
+				delete state
+				delete session_state
+			}
+			request>headers>X-Csrf-Token delete
 		}
 	}
 }
