@@ -30,6 +30,7 @@ Environment variables:
 
 import logging
 import os
+import re
 import smtplib
 import ssl
 from html import escape
@@ -37,6 +38,16 @@ from email.message import EmailMessage
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# Recipient addresses are never written to the logs. Application logs are rotated by size rather
+# than age and are not rewritten when a user deletes their account, so a logged address would
+# outlive the account it belonged to. Provider errors can echo the recipient, so they are redacted.
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+
+
+def _redact(value) -> str:
+    """Return log-safe text with any email address removed."""
+    return _EMAIL_RE.sub("<email>", str(value))
 
 
 def _smtp_config():
@@ -93,15 +104,14 @@ def _acs_send(to_addr: str, subject: str, text_body: str, html_body: Optional[st
         status = str(result.get("status") if isinstance(result, dict) else "").lower()
         if status != "succeeded":
             logger.error(
-                "ACS email to %s did not report terminal success (status=%s)",
-                to_addr,
+                "ACS email did not report terminal success (status=%s)",
                 status or "missing",
             )
             return "error"
-        logger.info("ACS email delivered for %s", to_addr)
+        logger.info("ACS email delivered (subject: %s)", subject)
         return "sent"
     except Exception as exc:  # pragma: no cover - network dependent
-        logger.error("ACS email to %s failed: %s", to_addr, exc)
+        logger.error("ACS email delivery failed: %s", _redact(exc))
         return "error"
 
 
@@ -123,16 +133,14 @@ def send_email(to_addr: str, subject: str, text_body: str, html_body: Optional[s
     if not cfg:
         if os.getenv("AUTH_DEV_MODE", "").strip().lower() in {"1", "true", "yes", "on"}:
             logger.warning(
-                "Development email for %s was not delivered.\nSubject: %s\n%s",
-                to_addr,
+                "Development email was not delivered.\nSubject: %s\n%s",
                 subject,
-                text_body,
+                _redact(text_body),
             )
             return "logged"
         logger.error(
-            "No email provider is configured; email to %s was not delivered. "
-            "The message body was omitted from logs.",
-            to_addr,
+            "No email provider is configured; the email was not delivered. "
+            "The message body was omitted from logs."
         )
         return "error"
 
@@ -151,10 +159,10 @@ def send_email(to_addr: str, subject: str, text_body: str, html_body: Optional[s
             if cfg["username"]:
                 server.login(cfg["username"], cfg["password"])
             server.send_message(msg)
-        logger.info("Email sent to %s (subject: %s)", to_addr, subject)
+        logger.info("Email sent (subject: %s)", subject)
         return "sent"
     except Exception as exc:  # pragma: no cover - network dependent
-        logger.error("Failed to send email to %s: %s", to_addr, exc)
+        logger.error("Failed to send email: %s", _redact(exc))
         return "error"
 
 

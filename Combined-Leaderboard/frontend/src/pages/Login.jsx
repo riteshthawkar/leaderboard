@@ -14,6 +14,11 @@ import {
 } from "@/lib/api";
 import { cn, safeNext } from "@/lib/utils";
 import { ui } from "@/lib/styles";
+import {
+  MICROSOFT_PRIVACY_STATEMENT_URL,
+  LEADERBOARD_DATA_NOTICE_URL,
+  LEADERBOARD_DATA_NOTICE_IS_EXTERNAL,
+} from "@/lib/privacy";
 
 const oauthProviders = [
   { id: "google", provider: "Google", Icon: GoogleIcon },
@@ -346,6 +351,27 @@ export function Login() {
                   <button type="button" className={cn(ui.linkButton, "font-medium text-foreground")} onClick={() => switchMode(tab === "register" ? "login" : "register")}>
                     {tab === "register" ? "Sign in" : "Create an account"}
                   </button>
+                </p>
+              )}
+              {(tab === "login" || tab === "register") && (
+                <p className="mt-4 text-xs leading-5 text-faint" data-testid="auth-privacy-notice">
+                  We use your email address to run your account and record your submissions. If you sign
+                  in with Google or Microsoft, we keep only your email address and account identifier.
+                  See{" "}
+                  <a className="font-medium text-muted underline underline-offset-2 hover:text-foreground" href={MICROSOFT_PRIVACY_STATEMENT_URL} target="_blank" rel="noreferrer">
+                    Privacy &amp; Cookies
+                  </a>{" "}
+                  and the{" "}
+                  {LEADERBOARD_DATA_NOTICE_IS_EXTERNAL ? (
+                    <a className="font-medium text-muted underline underline-offset-2 hover:text-foreground" href={LEADERBOARD_DATA_NOTICE_URL} target="_blank" rel="noreferrer">
+                      Leaderboard Data Notice
+                    </a>
+                  ) : (
+                    <Link className="font-medium text-muted underline underline-offset-2 hover:text-foreground" to={LEADERBOARD_DATA_NOTICE_URL} target="_blank" rel="noreferrer">
+                      Leaderboard Data Notice
+                    </Link>
+                  )}
+                  .
                 </p>
               )}
             </>

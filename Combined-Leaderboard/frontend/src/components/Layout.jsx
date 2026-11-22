@@ -27,6 +27,11 @@ import {
   logout,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import {
+  MICROSOFT_PRIVACY_STATEMENT_URL,
+  LEADERBOARD_DATA_NOTICE_URL as privacyPolicyUrl,
+  LEADERBOARD_DATA_NOTICE_IS_EXTERNAL as privacyPolicyIsExternal,
+} from "@/lib/privacy";
 
 const nav = [
   ["/", "Overview", "home"],
@@ -42,17 +47,10 @@ const navAccentClass = {
   spatial: "!text-spatial",
 };
 
-// Microsoft Privacy Statement (required on releases intended for people outside Microsoft).
-// The label must read exactly "Privacy & Cookies" and the href must be this forward link.
-const MICROSOFT_PRIVACY_STATEMENT_URL = "https://go.microsoft.com/fwlink/?LinkId=521839";
 const CONSUMER_HEALTH_PRIVACY_URL = "https://go.microsoft.com/fwlink/?linkid=2259814";
 const MICROSOFT_TRADEMARKS_URL = "https://www.microsoft.com/trademarks";
 const MICROSOFT_TERMS_OF_USE_URL = "https://go.microsoft.com/fwlink/?LinkID=206977";
 const CURRENT_YEAR = new Date().getUTCFullYear();
-// Separate, service-specific notice describing what THIS leaderboard stores. It supplements the
-// Microsoft Privacy Statement above; it does not replace it.
-const privacyPolicyUrl = (import.meta.env.VITE_PRIVACY_POLICY_URL || "/privacy").trim();
-const privacyPolicyIsExternal = /^https?:\/\//i.test(privacyPolicyUrl);
 
 function pageId(pathname) {
   if (pathname === "/") return "home";

@@ -549,3 +549,68 @@ def test_schema_migration_backfills_existing_benchmarks_to_one_model(tmp_path, m
     assert "spatial_benchmark_contracts" in table_names
     assert schema_version == store.SUBMISSION_SCHEMA_VERSION
     engine.dispose()
+
+
+@pytest.mark.parametrize("auth_disabled", [False, True])
+def test_quota_reservation_does_not_send_the_client_ip_to_the_store(monkeypatch, auth_disabled):
+    # The store only records an IP when its caller supplies one, so the guarantee lives in the
+    # web layer: neither branch of _enforce_quota may pass the client address through.
+    import importlib
+    import types
+    from flask import g
+
+    web = importlib.import_module("web.app")
+    calls = []
+
+    def spy(*args, **kwargs):
+        calls.append(kwargs)
+        return types.SimpleNamespace(allowed=True, submission_id="sub-1")
+
+    monkeypatch.setattr(web, "try_consume_quota", spy)
+    monkeypatch.setattr(web, "SUBMISSION_AUTH_DISABLED", auth_disabled)
+    with web.app.test_request_context("/", environ_overrides={"REMOTE_ADDR": "203.0.113.55"}):
+        g.user_id = "member@example.com"
+        submission_id, error = web._enforce_quota("do_you_see_me", "Model A", "mdl_a")
+    assert (submission_id, error) == ("sub-1", None)
+    assert len(calls) == 1
+    assert "ip" not in calls[0], "the client IP is still being passed to the submission store"
+
+def test_try_consume_quota_no_longer_accepts_a_client_ip(isolated_submission_store):
+    with pytest.raises(TypeError):
+        isolated_submission_store.try_consume_quota(
+            "member@example.com", "spatial", "Spatial Model", limit=2, ip="203.0.113.10"
+        )
+
+
+def test_schema_migration_clears_ips_recorded_by_earlier_releases(tmp_path, monkeypatch):
+    store = submission_store
+    engine = create_engine(f"sqlite:///{tmp_path / 'legacy-ips.db'}")
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE submissions ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_email VARCHAR(255) NOT NULL, task_id VARCHAR(64) NOT NULL, "
+            "model_name VARCHAR(255), status VARCHAR(16) NOT NULL, "
+            "request_id VARCHAR(64), ip VARCHAR(64), created_at DATETIME NOT NULL)"
+        )
+        connection.execute(
+            store.text(
+                "INSERT INTO submissions (user_email, task_id, model_name, status, ip, created_at) "
+                "VALUES ('member@example.com', 'do_you_see_me', 'Model A', 'scored', "
+                "'203.0.113.10', :created_at)"
+            ),
+            {"created_at": datetime.now(timezone.utc).isoformat()},
+        )
+    monkeypatch.setattr(store, "_engine", engine)
+    monkeypatch.setattr(store, "_Session", sessionmaker(bind=engine))
+    monkeypatch.setattr(store, "_DB_DRIVER", "sqlite")
+    monkeypatch.setattr(store, "_DB_PATH", None)
+
+    store.init_db()
+
+    with engine.connect() as connection:
+        ips = connection.execute(store.text("SELECT ip FROM submissions")).scalars().all()
+        kept = connection.execute(store.text("SELECT COUNT(*) FROM submissions")).scalar_one()
+    assert ips == [None], "an IP recorded by an earlier release survived the migration"
+    assert kept == 1, "the migration must clear IPs, not delete submissions"
+    engine.dispose()

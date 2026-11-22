@@ -2578,3 +2578,60 @@ def test_cross_site_frontend_requires_samesite_none(monkeypatch):
 
     assert status == "healthy"
     assert details["credential_cookie_ready"] is True
+
+
+# --- client IPs are shortened before they reach any log ---------------------------------------
+FULL_IP, SHORT_IP = "203.0.113.55", "203.0.113.0"
+
+
+@pytest.mark.parametrize(
+    "address, expected",
+    [
+        ("203.0.113.55", "203.0.113.0"),
+        ("2001:db8:85a3:1234:5678:8a2e:370:7334", "2001:db8:85a3::"),
+        ("::ffff:198.51.100.7", "198.51.100.0"),
+        (None, "unknown"),
+        ("not-an-ip", "unknown"),
+    ],
+)
+def test_log_safe_ip_keeps_the_network_and_drops_the_host(address, expected):
+    web_app_module = importlib.import_module("web.app")
+    assert web_app_module._log_safe_ip(address) == expected
+
+
+def _leaked(records):
+    """True if the full IP appears in any record's message or extra fields."""
+    return any(FULL_IP in str(value) for r in records for value in [r.getMessage(), *vars(r).values()])
+
+
+def test_request_debug_log_records_only_the_shortened_ip(caplog):
+    import logging
+
+    web_app_module = importlib.import_module("web.app")
+    web_app_module.app.config["TESTING"] = True
+    with caplog.at_level(logging.DEBUG, logger="leaderboard"):
+        with web_app_module.app.test_client() as client:
+            client.get("/api/auth/me", environ_overrides={"REMOTE_ADDR": FULL_IP})
+    incoming = [r for r in caplog.records if r.getMessage().startswith("Incoming ")]
+    assert incoming, "the per-request debug log did not run"
+    assert all(getattr(r, "remote_addr", None) == SHORT_IP for r in incoming)
+    assert not _leaked(caplog.records)
+
+
+def test_rate_limit_and_oversized_request_logs_shorten_the_ip(caplog):
+    import logging
+    import types
+
+    web_app_module = importlib.import_module("web.app")
+    limit_hit = types.SimpleNamespace(
+        description="1 per 1 minute",
+        limit=types.SimpleNamespace(limit=types.SimpleNamespace(get_expiry=lambda: 60)),
+    )
+    with caplog.at_level(logging.WARNING, logger="leaderboard"):
+        with web_app_module.app.test_request_context("/api/auth/login", environ_overrides={"REMOTE_ADDR": FULL_IP}):
+            web_app_module.ratelimit_handler(limit_hit)
+            web_app_module.request_entity_too_large(None)
+    messages = [r.getMessage() for r in caplog.records]
+    assert any(f"Rate limit exceeded for {SHORT_IP}" in m for m in messages)
+    assert any(f"Request entity too large from {SHORT_IP}" in m for m in messages)
+    assert not _leaked(caplog.records)
